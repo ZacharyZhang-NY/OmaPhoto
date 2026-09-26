@@ -59,8 +59,10 @@ The build runs in Docker, so the host needs only Docker:
 ```sh
 scripts/dev.sh build   # configure and build in Ubuntu 24.04
 scripts/dev.sh test    # every test, headless
-scripts/dev.sh run     # the app on your Wayland display
+scripts/dev.sh run     # build, then the app on your Wayland display
 ```
+
+`run` gives the container your home folder at its own path, so the app opens and saves your files and reads your Omarchy theme, and the GPU's render nodes (`/dev/dri/renderD*`), which Mesa's EGL wants. Files outside your home folder stay out of reach.
 
 By hand: C++20, Qt 6.4 or later (Widgets, Concurrent, image formats), CMake, Ninja, libheif, fontconfig and ONNX Runtime. `-DOMAPHOTO_MODEL=path/to/u2net.onnx` installs Remove Background's model. `scripts/distro-check.sh arch|fedora|nixos|resolute` builds and tests on those systems (`resolute` is Ubuntu 26.04).
 

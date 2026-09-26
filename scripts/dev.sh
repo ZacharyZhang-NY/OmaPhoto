@@ -26,12 +26,14 @@ run)
     socket=$WAYLAND_DISPLAY
     [[ $socket = /* ]] || socket=$XDG_RUNTIME_DIR/$socket
     socket=$(readlink -f "$socket")
-    # The desktop's theme, where Omarchy keeps it, read-only.
-    theme=$HOME/.local/state/omarchy
-    mounts=()
-    [[ -d $theme ]] && mounts=(-v "$theme:/tmp/.local/state/omarchy:ro")
+    # The home folder at its own path: files, settings, theme.
+    mounts=(-v "$HOME:$HOME" -e HOME="$HOME")
+    # The GPU's render nodes, which Mesa's EGL needs.
+    for node in /dev/dri/renderD*; do
+        [[ -e $node ]] && mounts+=(--device "$node" --group-add "$(stat -c %g "$node")")
+    done
     in_container "${mounts[@]}" -v "$socket:$runtime/wayland-0" -e WAYLAND_DISPLAY=wayland-0 \
-        -e QT_QPA_PLATFORM=wayland "$image" build/omaphoto "${@:2}"
+        -e QT_QPA_PLATFORM=wayland "$image" sh -c "$configure_and_build && exec build/omaphoto \"\$@\"" sh "${@:2}"
     ;;
 *)
     echo "usage: dev.sh build|test|run [args]" >&2
