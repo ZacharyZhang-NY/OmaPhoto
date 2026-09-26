@@ -14,7 +14,11 @@
       packages.x86_64-linux.default = pkgs.stdenv.mkDerivation {
         pname = "omaphoto";
         version = "1.0.0";
-        src = self;
+        # dev.sh builds in ./build; the package starts clean.
+        src = pkgs.lib.cleanSourceWith {
+          src = self;
+          filter = path: type: path != "${toString self}/build";
+        };
         nativeBuildInputs = with pkgs; [ cmake ninja pkg-config qt6.wrapQtAppsHook ];
         buildInputs = with pkgs; [ qt6.qtbase qt6.qtimageformats libheif libde265 fontconfig onnxruntime ];
         cmakeFlags = [ "-DOMAPHOTO_MODEL=${model}" ];

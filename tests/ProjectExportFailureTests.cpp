@@ -2,6 +2,7 @@
 #include "DialogDesk.h"
 #include "IO/ImageExporter.h"
 #include "IO/ProjectController.h"
+#include "UI/JPEGExportSheet.h"
 #include <QApplication>
 #include <QSemaphore>
 #include <QTemporaryDir>
@@ -14,12 +15,14 @@
 class ProjectExportFailureTests : public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase();
     void aRenderThatFindsNoMemoryIsARenderError();
     void aSnapshotThatFindsNoMemoryIsExplained();
     void aJPEGRenderThatFindsNoMemoryIsExplained();
     void aPanelsHandOffThatFindsNoMemoryIsExplained();
     void thePanelOpensWithoutCopyingTheSnapshot();
     void aRefusedNameCopiesNoSnapshot();
+    void theJPEGRenderTakesTheSnapshotWithoutACopy();
 };
 
 namespace {
@@ -54,6 +57,20 @@ struct Desk {
         return {QStringLiteral("alert|2|%1|%2|OK|busy 1").arg(title, QString::fromUtf8(ExportError(ExportError::Kind::render).what()))};
     }
 };
+}
+
+// The app opened panels and alerts before any export.
+void ProjectExportFailureTests::initTestCase()
+{
+    Desk desk;
+    QTemporaryDir folder;
+    QFile taken(folder.filePath("taken.jpg.png"));
+    QVERIFY(taken.open(QIODevice::WriteOnly));
+    taken.close();
+    desk.alerts.replies = {folder.filePath("taken.jpg"), "OK"};
+    desk.controller.exportPNG([&desk] { desk.done = true; });
+    QTRY_VERIFY(desk.done);
+    QCOMPARE(desk.alerts.seen.size(), 2);
 }
 
 void ProjectExportFailureTests::aRenderThatFindsNoMemoryIsARenderError()
@@ -162,6 +179,30 @@ void ProjectExportFailureTests::aRefusedNameCopiesNoSnapshot()
     QTRY_VERIFY(desk.done);
     QVERIFY(desk.alerts.seen.value(1).contains("“taken.jpg.png” already exists."));
     QVERIFY(!desk.session.isProjectBusy());
+}
+
+// The worker takes the snapshot; a copy would not fit.
+void ProjectExportFailureTests::theJPEGRenderTakesTheSnapshotWithoutACopy()
+{
+    Desk desk;
+    QThreadPool *pool = QThreadPool::globalInstance();
+    pool->setMaxThreadCount(1);
+    QSemaphore entered, release;
+    const QFuture<void> held = QtConcurrent::run([&] {
+        entered.release();
+        release.acquire();
+    });
+    entered.acquire();
+    {
+        malloc_trim(0);
+        const AddressSpaceLimit limit(2048ll * 1024);
+        desk.controller.exportJPEG([&desk] { desk.done = true; });
+    }
+    release.release();
+    QTRY_VERIFY(desk.window.findChild<JPEGExportSheet *>());
+    QTest::keyClick(desk.window.findChild<JPEGExportSheet *>(), Qt::Key_Escape);
+    QTRY_VERIFY(desk.done);
+    QVERIFY(desk.alerts.seen.isEmpty() && !desk.session.isProjectBusy());
 }
 
 int main(int argc, char **argv)
