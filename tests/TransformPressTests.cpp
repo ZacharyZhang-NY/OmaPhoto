@@ -1,0 +1,325 @@
+#include "CanvasFixtures.h"
+
+// The Move tool on the canvas: drags, handles, snapping.
+namespace {
+// The document fills the canvas: view points are pixels.
+struct Canvas : Shown {
+    QUuid red;
+    Canvas() : Shown(QSize(400, 300), QSize(400, 300))
+    {
+        settle();
+        session.zoom(1);
+        session.insert(filled(100, 100, qRgba(255, 0, 0, 255), "Red"));
+        red = session.activeLayerID().value();
+        session.selectTool(NavigationTool::move);
+        canvas->synchronizeDisplay();
+        if (session.viewport.viewPoint(QPointF(0, 0), documentSize()) != QPointF(0, 0))
+            throw std::runtime_error("the document does not fill the canvas");
+    }
+    QPointF origin() const { return layerWith(session, red).transform.origin; }
+    void press(QPointF at, Qt::KeyboardModifiers modifiers = Qt::NoModifier) { QTest::mousePress(canvas, Qt::LeftButton, modifiers, at.toPoint()); }
+    void move(QPointF to, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    {
+        QMouseEvent event(QEvent::MouseMove, to, to, canvas->mapToGlobal(to.toPoint()), Qt::NoButton, Qt::LeftButton, modifiers);
+        QApplication::sendEvent(canvas, &event);
+    }
+    void release(QPointF at, Qt::KeyboardModifiers modifiers = Qt::NoModifier) { QTest::mouseRelease(canvas, Qt::LeftButton, modifiers, at.toPoint()); }
+    void drag(QPointF from, QPointF to, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    {
+        press(from, modifiers);
+        move((from + to) / 2, modifiers);
+        move(to, modifiers);
+        release(to, modifiers);
+    }
+    void click(QPointF at, Qt::KeyboardModifiers modifiers = Qt::NoModifier)
+    {
+        press(at, modifiers);
+        release(at, modifiers);
+    }
+};
+}
+
+class TransformPressTests : public QObject {
+    Q_OBJECT
+private slots:
+    void draggingOutsideTheLayerMovesIt();
+    void altDraggingOutsideTheLayerDuplicatesIt();
+    void handlesResizeAndTheGripRotates();
+    void movesSnapToTheCanvasAndOtherLayersUnlessCtrl();
+    void autoSelectCanBeDisabledAndCtrlClickOverridesIt();
+    void escapeMidDragRestoresAndAPersistentEditWaitsForReturn();
+    void losingTheKeysOrTheWheelMidDrag();
+    void aSelectionDragsAsOneBox();
+};
+
+void TransformPressTests::draggingOutsideTheLayerMovesIt()
+{
+    Canvas shown;
+    QCOMPARE(shown.origin(), QPointF(150, 100));
+    // Thirteen down keeps the middle clear of the canvas's snap.
+    shown.drag(QPointF(20, 20), QPointF(40, 33));
+    QVERIFY(!shown.session.transformEdit().has_value());
+    QCOMPARE(shown.origin(), QPointF(170, 113));
+    QCOMPARE(shown.session.history.undoName(), QString("Transform Layer"));
+    // A press that never moves changes nothing and records nothing.
+    const int steps = shown.session.history.undoCount();
+    shown.click(QPointF(20, 20));
+    QCOMPARE(shown.session.history.undoCount(), steps);
+    QCOMPARE(shown.origin(), QPointF(170, 113));
+    // At 200% drags land on whole pixels; snapping halves.
+    shown.session.zoom(2);
+    shown.canvas->synchronizeDisplay();
+    shown.drag(QPointF(20, 20), QPointF(66, 20));
+    QCOMPARE(shown.origin(), QPointF(193, 113));
+    shown.drag(QPointF(20, 20), QPointF(21, 20));
+    QCOMPARE(shown.origin(), QPointF(194, 113));
+    shown.session.zoom(1);
+    shown.canvas->synchronizeDisplay();
+    // Nothing drags while the project is busy.
+    shown.session.setIsProjectBusy(true);
+    shown.drag(QPointF(20, 20), QPointF(60, 20));
+    QCOMPARE(shown.origin(), QPointF(194, 113));
+}
+
+void TransformPressTests::altDraggingOutsideTheLayerDuplicatesIt()
+{
+    Canvas shown;
+    shown.drag(QPointF(20, 20), QPointF(40, 33), Qt::AltModifier);
+    const std::vector<ImageLayer> &layers = shown.session.document().value().layers;
+    QCOMPARE(int(layers.size()), 2);
+    QCOMPARE(layers[0].transform.origin, QPointF(150, 100));
+    QCOMPARE(layers[1].transform.origin, QPointF(170, 113));
+    QCOMPARE(layers[1].name, QString("Red copy"));
+    QVERIFY(!shown.session.transformEdit().has_value());
+    QCOMPARE(shown.session.history.undoName(), QString("Duplicate Layer"));
+    shown.session.undo();
+    QCOMPARE(int(shown.session.document().value().layers.size()), 1);
+    // Alt on a handle resizes about the middle, no copy.
+    shown.drag(QPointF(250, 200), QPointF(300, 250), Qt::AltModifier);
+    QCOMPARE(int(shown.session.document().value().layers.size()), 1);
+    QCOMPARE(layerWith(shown.session, shown.red).transform, (LayerTransform{.origin = {100, 50}, .size = {200, 200}}));
+}
+
+void TransformPressTests::handlesResizeAndTheGripRotates()
+{
+    Canvas shown;
+    // Shift frees a locked corner: each side follows the pointer.
+    shown.drag(QPointF(250, 200), QPointF(300, 225), Qt::ShiftModifier);
+    QCOMPARE(layerWith(shown.session, shown.red).transform, (LayerTransform{.origin = {150, 100}, .size = {150, 125}}));
+    shown.session.undo();
+    // The bottom right corner dragged out: both sides grow, locked.
+    shown.drag(QPointF(250, 200), QPointF(300, 250));
+    LayerTransform transform = layerWith(shown.session, shown.red).transform;
+    QCOMPARE(transform.size, QSizeF(150, 150));
+    QCOMPARE(transform.origin, QPointF(150, 100));
+    shown.session.setLocksTransformRatio(false);
+    shown.drag(QPointF(300, 250), QPointF(300, 200));
+    transform = layerWith(shown.session, shown.red).transform;
+    QCOMPARE(transform.size, QSizeF(150, 100));
+    // An edge, away from its handle, resizes too.
+    shown.drag(QPointF(300, 170), QPointF(320, 170));
+    QCOMPARE(layerWith(shown.session, shown.red).transform.size, QSizeF(170, 100));
+    // Resizing never snaps: five past the middle stays five past.
+    shown.drag(QPointF(320, 170), QPointF(205, 170));
+    QCOMPARE(layerWith(shown.session, shown.red).transform, (LayerTransform{.origin = {150, 100}, .size = {55, 100}}));
+    // The grip: a quarter turn about the middle.
+    const QPointF center = layerWith(shown.session, shown.red).transform.center();
+    const QPointF grip = center + QPointF(0, -78);
+    shown.drag(grip, center + QPointF(78, 0));
+    transform = layerWith(shown.session, shown.red).transform;
+    QCOMPARE(transform.rotation, 90.0);
+    QCOMPARE(transform.center(), center);
+    QCOMPARE(shown.session.history.undoName(), QString("Transform Layer"));
+}
+
+void TransformPressTests::movesSnapToTheCanvasAndOtherLayersUnlessCtrl()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    // Three short of the middle, the left edge snaps.
+    shown.press(QPointF(20, 20));
+    shown.move(QPointF(73, 20));
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(200, 100));
+    QCOMPARE(session.snapGuides, (SnapGuides{{200}, {150}}));
+    shown.release(QPointF(73, 20));
+    QCOMPARE(shown.origin(), QPointF(200, 100));
+    QCOMPARE(session.snapGuides, SnapGuides{});
+    // Ctrl drags freely.
+    shown.press(QPointF(20, 20));
+    shown.move(QPointF(23, 20), Qt::ControlModifier);
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(203, 100));
+    QCOMPARE(session.snapGuides, SnapGuides{});
+    shown.release(QPointF(23, 20), Qt::ControlModifier);
+    QCOMPARE(shown.origin(), QPointF(203, 100));
+    // Another layer's edge is the nearest target now.
+    session.insert(filled(50, 50, qRgba(0, 0, 255, 255), "Blue"), QPointF(330, 50));
+    session.selectLayer(shown.red);
+    shown.press(QPointF(20, 20));
+    shown.move(QPointF(21, 20));
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(205, 100));
+    QCOMPARE(session.snapGuides, (SnapGuides{{305}, {150}}));
+    shown.release(QPointF(21, 20));
+    QCOMPARE(shown.origin(), QPointF(205, 100));
+}
+
+void TransformPressTests::autoSelectCanBeDisabledAndCtrlClickOverridesIt()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    session.insert(filled(100, 100, qRgba(0, 0, 255, 255), "Blue"), QPointF(300, 50));
+    const QUuid blue = session.activeLayerID().value();
+    session.selectLayer(shown.red);
+    QVERIFY(!session.transformAutoSelect());
+    shown.click(QPointF(300, 50));
+    QCOMPARE(session.activeLayerID(), std::optional(shown.red));
+    session.setTransformAutoSelect(true);
+    shown.click(QPointF(300, 50));
+    QCOMPARE(session.activeLayerID(), std::optional(blue));
+    session.selectLayer(shown.red);
+    session.setTransformAutoSelect(false);
+    shown.click(QPointF(300, 50));
+    QCOMPARE(session.activeLayerID(), std::optional(shown.red));
+    shown.click(QPointF(300, 50), Qt::ControlModifier);
+    QCOMPARE(session.activeLayerID(), std::optional(blue));
+    QVERIFY(!session.transformAutoSelect());
+    // Ctrl+Shift adds the layer under the pointer to the selection.
+    shown.click(QPointF(200, 150), Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{shown.red, blue}));
+    // With auto-select, empty canvas still drags the active layer.
+    session.selectLayer(shown.red);
+    session.setTransformAutoSelect(true);
+    shown.drag(QPointF(20, 250), QPointF(33, 250));
+    QCOMPARE(shown.origin(), QPointF(163, 100));
+    // Inside the active layer's box, it drags, whatever lies above.
+    session.insert(filled(100, 100, qRgba(0, 255, 0, 255), "Green"), QPointF(220, 120));
+    session.selectLayer(shown.red);
+    shown.click(QPointF(213, 150));
+    QCOMPARE(session.activeLayerID(), std::optional(shown.red));
+    // Ctrl picks what lies under the pointer, active included.
+    const QUuid green = session.activeLayerID() == shown.red ? session.document().value().layers.back().id : shown.red;
+    shown.click(QPointF(213, 150), Qt::ControlModifier);
+    QCOMPARE(session.activeLayerID(), std::optional(green));
+    session.selectLayer(shown.red);
+    // A selection's box drags them all; outside it auto-select picks.
+    session.insert(filled(100, 100, qRgba(255, 255, 0, 255), "Yellow"), QPointF(60, 260));
+    const QUuid yellow = session.activeLayerID().value();
+    session.selectLayers({shown.red, blue}, shown.red);
+    shown.click(QPointF(300, 50));
+    QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{shown.red, blue}));
+    shown.click(QPointF(60, 260));
+    QCOMPARE(session.activeLayerID(), std::optional(yellow));
+    QCOMPARE(session.selectedLayerIDs(), QSet<QUuid>{yellow});
+}
+
+void TransformPressTests::escapeMidDragRestoresAndAPersistentEditWaitsForReturn()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    QTRY_VERIFY(shown.canvas->hasFocus());
+    shown.press(QPointF(20, 20));
+    shown.move(QPointF(55, 40));
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(185, 120));
+    QVERIFY(!session.transformEdit().value().persistent);
+    QTest::keyClick(shown.canvas, Qt::Key_Escape);
+    QVERIFY(!session.transformEdit().has_value());
+    shown.release(QPointF(55, 40));
+    QCOMPARE(shown.origin(), QPointF(150, 100));
+    // Ctrl+T's edit outlives the drag until Return applies it.
+    session.beginTransform();
+    QVERIFY(session.transformEdit().value().persistent);
+    shown.drag(QPointF(20, 20), QPointF(40, 33));
+    QVERIFY(session.transformEdit().has_value());
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(170, 113));
+    QCOMPARE(shown.origin(), QPointF(150, 100));
+    QTest::keyClick(shown.canvas, Qt::Key_Return);
+    QVERIFY(!session.transformEdit().has_value());
+    QCOMPARE(shown.origin(), QPointF(170, 113));
+    // A snapped drag under Ctrl+T: guides go with the release.
+    session.beginTransform();
+    shown.press(QPointF(20, 20));
+    shown.move(QPointF(53, 20));
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(200, 113));
+    QCOMPARE(session.snapGuides, (SnapGuides{{200}, {}}));
+    // The release repaints the guide away, though nothing commits.
+    struct PaintSpy : QObject {
+        std::vector<QRect> rects;
+        bool eventFilter(QObject *, QEvent *event) override
+        {
+            if (event->type() == QEvent::Paint)
+                rects.push_back(static_cast<QPaintEvent *>(event)->region().boundingRect());
+            return false;
+        }
+    } spy;
+    QCoreApplication::processEvents();
+    shown.canvas->installEventFilter(&spy);
+    shown.release(QPointF(53, 20));
+    QVERIFY(session.transformEdit().has_value());
+    QCOMPARE(session.snapGuides, SnapGuides{});
+    QCoreApplication::processEvents();
+    shown.canvas->removeEventFilter(&spy);
+    QVERIFY(std::any_of(spy.rects.begin(), spy.rects.end(), [&](const QRect &rect) { return rect == shown.canvas->rect(); }));
+    // Escape mid-resize puts the layer and the cursor back.
+    shown.press(QPointF(300, 213));
+    QCOMPARE(shown.canvas->cursor().shape(), Qt::SizeFDiagCursor);
+    shown.move(QPointF(350, 263));
+    QCOMPARE(session.transformEdit().value().draft.size, QSizeF(150, 150));
+    QTest::keyClick(shown.canvas, Qt::Key_Escape);
+    QVERIFY(!session.transformEdit().has_value());
+    QVERIFY(shown.canvas->cursor().shape() != Qt::SizeFDiagCursor);
+    shown.release(QPointF(350, 263));
+    QCOMPARE(layerWith(session, shown.red).transform.size, QSizeF(100, 100));
+}
+
+void TransformPressTests::losingTheKeysOrTheWheelMidDrag()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    shown.press(QPointF(20, 20));
+    shown.move(QPointF(60, 40));
+    // The wheel neither pans nor zooms mid-drag.
+    const CanvasViewport before = session.viewport;
+    wheel(*shown.canvas, QPointF(100, 100), QPoint(0, 30), QPoint(0, 120), Qt::NoModifier);
+    wheel(*shown.canvas, QPointF(100, 100), QPoint(0, 30), QPoint(0, 120), Qt::ControlModifier);
+    QVERIFY(session.viewport == before);
+    // Nor does a pinch.
+    QNativeGestureEvent pinch(Qt::ZoomNativeGesture, QPointingDevice::primaryPointingDevice(), 2, QPointF(100, 100), QPointF(100, 100),
+                              shown.canvas->mapToGlobal(QPoint(100, 100)), 0.5, QPointF());
+    QApplication::sendEvent(shown.canvas, &pinch);
+    QVERIFY(session.viewport == before);
+    // The keys lost mid-drag: the layer goes back.
+    shown.canvas->clearFocus();
+    QVERIFY(!session.transformEdit().has_value());
+    QCOMPARE(shown.origin(), QPointF(150, 100));
+    shown.release(QPointF(60, 40));
+    QCOMPARE(shown.origin(), QPointF(150, 100));
+    wheel(*shown.canvas, QPointF(100, 100), QPoint(0, 30), QPoint(0, 120), Qt::NoModifier);
+    QVERIFY(!(session.viewport == before));
+    // Under Ctrl+T the edit stays, its draft put back.
+    session.viewport = before;
+    session.beginTransform();
+    shown.press(QPointF(20, 20));
+    shown.move(QPointF(55, 40));
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(185, 120));
+    shown.canvas->clearFocus();
+    QVERIFY(session.transformEdit().value().persistent);
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(150, 100));
+    shown.release(QPointF(55, 40));
+    QVERIFY(session.transformEdit().has_value());
+}
+
+void TransformPressTests::aSelectionDragsAsOneBox()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    session.insert(filled(50, 50, qRgba(0, 0, 255, 255), "Blue"), QPointF(325, 275));
+    const QUuid blue = session.activeLayerID().value();
+    session.selectLayers({shown.red, blue}, shown.red);
+    shown.drag(QPointF(20, 20), QPointF(30, 32));
+    QCOMPARE(shown.origin(), QPointF(160, 112));
+    QCOMPARE(layerWith(session, blue).transform.origin, QPointF(310, 262));
+    QCOMPARE(session.history.undoName(), QString("Transform Layers"));
+    QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{shown.red, blue}));
+}
+
+QTEST_MAIN(TransformPressTests)
+#include "TransformPressTests.moc"

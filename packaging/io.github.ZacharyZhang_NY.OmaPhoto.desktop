@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=OmaPhoto
+GenericName=Image Editor
+Comment=Edit and composite layered images
+Exec=omaphoto %F
+Icon=io.github.ZacharyZhang_NY.OmaPhoto
+Terminal=false
+Categories=Graphics;2DGraphics;RasterGraphics;
+MimeType=application/x-compositor-project;image/png;image/jpeg;image/heic;image/tiff;
+StartupWMClass=OmaPhoto

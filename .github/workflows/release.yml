@@ -1,0 +1,70 @@
+# A version tag builds the three packages, each on its own system, and publishes them.
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  deb:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # The dev image carries ONNX Runtime, its notices and the model.
+      - run: docker build -t omaphoto-dev -f Dockerfile.dev .
+      - run: |
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -w /src omaphoto-dev sh -c '
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+              -DOMAPHOTO_BUNDLE_ORT=ON -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
+            cmake --build build --target omaphoto && cd build && cpack -G DEB'
+          mv build/omaphoto_*.deb omaphoto_amd64.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: omaphoto_amd64.deb
+  rpm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t omaphoto-fedora scripts/distro/fedora
+      - run: |
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -w /src omaphoto-fedora sh -c '
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+              -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
+            cmake --build build --target omaphoto && cd build && cpack -G RPM'
+          mv build/omaphoto-*.x86_64.rpm omaphoto.x86_64.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm
+          path: omaphoto.x86_64.rpm
+  arch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t omaphoto-arch scripts/distro/arch
+      # makepkg refuses root; a user of the runner's id builds.
+      - run: |
+          docker run --rm -v "$PWD:/src" omaphoto-arch sh -c "
+            useradd -u $(id -u) builder && chown -R builder /src &&
+            su builder -c 'cd /src/packaging/arch && makepkg -f'"
+          mv packaging/arch/omaphoto-[0-9]*-x86_64.pkg.tar.zst omaphoto-x86_64.pkg.tar.zst
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch
+          path: omaphoto-x86_64.pkg.tar.zst
+  publish:
+    needs: [deb, rpm, arch]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: packages
+      - working-directory: packages
+        run: sha256sum omaphoto_amd64.deb omaphoto.x86_64.rpm omaphoto-x86_64.pkg.tar.zst > SHA256SUMS
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" packages/* --title "OmaPhoto ${GITHUB_REF_NAME#v}" \
+            --notes "Install with the script for your system: see the README's Install section."

@@ -1,0 +1,6 @@
+#pragma once
+#include <QLoggingCategory>
+
+Q_DECLARE_LOGGING_CATEGORY(lcApp)
+Q_DECLARE_LOGGING_CATEGORY(lcRendering)
+Q_DECLARE_LOGGING_CATEGORY(lcIO)
