@@ -384,7 +384,7 @@ void ProjectWorkspaceViewTests::filesAtLaunchGoToTheWorkspace()
     const qsizetype imported = log.indexOf("imported " + folder.filePath("Picture.png").toUtf8() + " 4 x 2");
     // Both arrived, the project first, as they were named.
     QVERIFY2(opened >= 0 && imported > opened, log.constData());
-    QVERIFY2(log.contains("OmaPhoto 1.0.0 on Qt"), log.constData());
+    QVERIFY2(log.contains("OmaPhoto " OMAPHOTO_VERSION " on Qt"), log.constData());
 }
 
 QTEST_MAIN(ProjectWorkspaceViewTests)
