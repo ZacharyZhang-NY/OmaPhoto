@@ -348,8 +348,7 @@ void TransformOverlay::drawTransformHandles(QPainter &context, const QPalette &p
     context.save();
     context.setRenderHint(QPainter::Antialiasing, true);
     context.setBrush(Qt::NoBrush);
-    context.setPen(QPen(QColor(0, 0, 0, 179), 3));
-    context.drawPath(path);
+    // The accent alone: a dark line read as a halo.
     context.setPen(QPen(accent, 1));
     context.drawPath(path);
     context.setBrush(Qt::white);

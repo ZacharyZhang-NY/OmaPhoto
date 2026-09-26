@@ -1,5 +1,6 @@
 #include "UI/LayerAppearanceControls.h"
 #include "UI/BlendModePicker.h"
+#include <QLabel>
 #include <QtTest>
 
 // The opacity slider and field, one undo step a drag.
@@ -52,6 +53,21 @@ void LayerAppearanceControlsTests::theControlsFollowTheActiveLayerAndItsGate()
     QVERIFY(controls.widget.findChild<BlendModePicker *>() != nullptr);
     controls.session.selectLayers({controls.session.document().value().layers.front().id, controls.session.document().value().layers.back().id}, std::nullopt);
     QVERIFY(!controls.widget.isEnabled());
+    // A folder: its opacity edits, its blend mode rests.
+    controls.session.addGroup();
+    QVERIFY(controls.widget.isEnabled() && controls.slider.isEnabled() && controls.field.isEnabled());
+    const auto blendRow = [&] {
+        for (QLabel *label : controls.widget.findChildren<QLabel *>()) {
+            if (label->text() == "Blend")
+                return label;
+        }
+        throw std::runtime_error("no Blend caption");
+    };
+    QVERIFY(!controls.widget.findChild<BlendModePicker *>()->isEnabled() && !blendRow()->isEnabled());
+    controls.slider.setValue(500);
+    QCOMPARE(controls.opacity(), 0.5);
+    controls.session.selectLayer(controls.session.document().value().layers.front().id);
+    QVERIFY(controls.widget.findChild<BlendModePicker *>()->isEnabled() && blendRow()->isEnabled());
 }
 
 void LayerAppearanceControlsTests::aSliderDragIsOneUndoStep()

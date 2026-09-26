@@ -28,7 +28,8 @@ LayerAppearanceControls::LayerAppearanceControls(EditorSession &session, QWidget
     column->setContentsMargins(12, 12, 12, 12);
     column->setSpacing(8);
     auto *blend = new QHBoxLayout;
-    blend->addWidget(caption(QStringLiteral("Blend"), this));
+    m_blendCaption = caption(QStringLiteral("Blend"), this);
+    blend->addWidget(m_blendCaption);
     blend->addWidget(m_picker, 1);
     column->addLayout(blend);
     auto *opacity = new QHBoxLayout;
@@ -74,7 +75,9 @@ LayerAppearanceControls::~LayerAppearanceControls()
 
 void LayerAppearanceControls::synchronize()
 {
-    setEnabled(m_session.canEditAppearance());
+    // A folder takes an opacity; blending rests with the picker.
+    setEnabled(m_session.canEditOpacity());
+    m_blendCaption->setEnabled(m_session.canEditAppearance());
     const std::optional<ImageLayer> active = m_session.activeLayer();
     const double opacity = active ? active->opacity : 1;
     m_syncing = true;

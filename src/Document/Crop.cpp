@@ -168,6 +168,10 @@ SnapGuides EditorSession::transformSnapTargets(const QSet<QUuid> &moving) const
 // `draft` nudged onto a nearby edge or middle, within `tolerance`.
 LayerTransform EditorSession::snappedMove(const LayerTransform &draft, const QSet<QUuid> &moving, double tolerance)
 {
+    if (!m_snappingEnabled) {
+        snapGuides = {};
+        return draft;
+    }
     const SnapGuides targets = transformSnapTargets(moving);
     const TransformSnap::Offset snap = TransformSnap::offset(boxAround(draft), targets.xs, targets.ys, tolerance);
     snapGuides = {snap.x ? std::vector<double>{*snap.x} : std::vector<double>{}, snap.y ? std::vector<double>{*snap.y} : std::vector<double>{}};

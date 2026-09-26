@@ -53,7 +53,7 @@ EffectsSheet::EffectsSheet(EditorSession &session, LayerEffectKind kind, QWidget
         header(QStringLiteral("Stroke"), true);
         colour(true);
         slider(QStringLiteral("Size"), [](const LayerEffects &e) { return e.stroke ? std::optional(e.stroke->size) : std::nullopt; },
-               [](LayerEffects &e, double value) { e.stroke->size = value; }, 1, StrokeEffect::maxSize, QStringLiteral("px"));
+               [](LayerEffects &e, double value) { e.stroke->size = value; }, 0, 20, QStringLiteral("px"), StrokeEffect::maxSize);
         slider(QStringLiteral("Opacity"), [](const LayerEffects &e) { return percent(e.stroke); },
                [](LayerEffects &e, double value) { e.stroke->opacity = value / 100; }, 0, 100, QStringLiteral("%"));
         break;
@@ -64,9 +64,9 @@ EffectsSheet::EffectsSheet(EditorSession &session, LayerEffectKind kind, QWidget
         slider(QStringLiteral("Angle"), [](const LayerEffects &e) { return e.shadow ? std::optional(e.shadow->angle) : std::nullopt; },
                [](LayerEffects &e, double value) { e.shadow->angle = value; }, -180, 180, QStringLiteral("°"));
         slider(QStringLiteral("Distance"), [](const LayerEffects &e) { return e.shadow ? std::optional(e.shadow->distance) : std::nullopt; },
-               [](LayerEffects &e, double value) { e.shadow->distance = value; }, 0, 300, QStringLiteral("px"));
+               [](LayerEffects &e, double value) { e.shadow->distance = value; }, 0, 100, QStringLiteral("px"), 5000);
         slider(QStringLiteral("Blur"), [](const LayerEffects &e) { return e.shadow ? std::optional(e.shadow->blur) : std::nullopt; },
-               [](LayerEffects &e, double value) { e.shadow->blur = value; }, 0, 300, QStringLiteral("px"));
+               [](LayerEffects &e, double value) { e.shadow->blur = value; }, 0, 100, QStringLiteral("px"), 500);
         break;
     case LayerEffectKind::colorOverlay:
         header(QStringLiteral("Color Overlay"), false);
@@ -80,9 +80,9 @@ EffectsSheet::EffectsSheet(EditorSession &session, LayerEffectKind kind, QWidget
         slider(QStringLiteral("Angle"), [](const LayerEffects &e) { return e.innerShadow ? std::optional(e.innerShadow->angle) : std::nullopt; },
                [](LayerEffects &e, double value) { e.innerShadow->angle = value; }, -180, 180, QStringLiteral("°"));
         slider(QStringLiteral("Distance"), [](const LayerEffects &e) { return e.innerShadow ? std::optional(e.innerShadow->distance) : std::nullopt; },
-               [](LayerEffects &e, double value) { e.innerShadow->distance = value; }, 0, 300, QStringLiteral("px"));
+               [](LayerEffects &e, double value) { e.innerShadow->distance = value; }, 0, 50, QStringLiteral("px"), 5000);
         slider(QStringLiteral("Blur"), [](const LayerEffects &e) { return e.innerShadow ? std::optional(e.innerShadow->blur) : std::nullopt; },
-               [](LayerEffects &e, double value) { e.innerShadow->blur = value; }, 0, 300, QStringLiteral("px"));
+               [](LayerEffects &e, double value) { e.innerShadow->blur = value; }, 0, 100, QStringLiteral("px"), 500);
         break;
     }
     auto *cancel = new QPushButton(QStringLiteral("Cancel"), this);
@@ -139,7 +139,7 @@ void EffectsSheet::header(const QString &title, bool position)
 // The effect's colour, opened in the app's own picker.
 void EffectsSheet::colour(bool labelled)
 {
-    auto *swatch = new SwatchButton([this] { return m_session.editingEffects().color(m_kind).value_or(PaletteColor::black()); }, 3, 0, 0.5, this);
+    auto *swatch = new SwatchButton([this] { return m_session.editingEffects().color(m_kind).value_or(PaletteColor::black()); }, 3, 1, 1, this);
     swatch->setObjectName(QStringLiteral("effectColor"));
     swatch->setFixedSize(36, 18);
     swatch->setToolTip(rawValue(m_kind) + QStringLiteral(" color"));
@@ -162,7 +162,8 @@ void EffectsSheet::colour(bool labelled)
 }
 
 void EffectsSheet::slider(const QString &title, std::function<std::optional<double>(const LayerEffects &)> value,
-                          std::function<void(LayerEffects &, double)> change, double low, double high, const QString &unit)
+                          std::function<void(LayerEffects &, double)> change, double low, double high, const QString &unit,
+                          std::optional<double> typedHigh)
 {
     const size_t index = m_sliders.size();
     const QString name = title.toLower();
@@ -215,12 +216,12 @@ void EffectsSheet::slider(const QString &title, std::function<std::optional<doub
     layout->addLayout(suffixed);
     m_column->addWidget(row);
     m_controls.push_back(row);
-    m_sliders.push_back(Slider{std::move(value), std::move(change), low, high, slider, field});
+    m_sliders.push_back(Slider{std::move(value), std::move(change), low, high, typedHigh.value_or(high), slider, field});
 }
 
 void EffectsSheet::apply(const Slider &control, double value)
 {
-    const double clamped = std::clamp(value, control.low, control.high);
+    const double clamped = std::clamp(value, control.low, control.typedHigh);
     m_session.changeEffects([&control, clamped](LayerEffects &effects) { control.change(effects, clamped); });
 }
 
@@ -244,7 +245,7 @@ void EffectsSheet::synchronize()
         if (!value)
             continue;
         {
-            // The slider shows the session's number without writing back.
+            // QSlider pins a larger typed value at its end.
             const QSignalBlocker quiet(control.slider);
             control.slider->setValue(int(std::lround((*value - control.low) / (control.high - control.low) * travel)));
         }

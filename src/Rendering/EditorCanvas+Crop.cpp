@@ -81,7 +81,7 @@ void CanvasView::dragCrop(QPointF point, Qt::KeyboardModifiers modifiers)
     const std::optional<double> ratio = m_session.cropRatio();
     const CropDrag &drag = m_cropDrag.value();
     QRectF next = drag.updated(pixel, ratio, symmetric);
-    if (!modifiers.testFlag(Qt::ControlModifier))
+    if (m_session.snappingEnabled() && !modifiers.testFlag(Qt::ControlModifier))
         next = m_cropSnap.value().apply(next, drag, pixel, ratio, symmetric);
     if (CropGeometry::valid(next))
         m_session.setCropRect(next);

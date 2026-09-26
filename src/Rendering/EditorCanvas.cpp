@@ -81,6 +81,8 @@ CanvasView::DisplayState CanvasView::displayState() const
                                        [](const ImageLayer &layer) { return layer.maskSourceID.has_value(); });
     const std::vector<ImageLayer> rendered = liveMasks ? std::vector<ImageLayer>() : document->renderLayers();
     const QSet<QUuid> visible = document->effectiveVisibleIDs();
+    // A folder's opacity reaches the canvas through its layers.
+    const QHash<QUuid, double> opacities = document->effectiveOpacities();
     for (const ImageLayer &layer : liveMasks ? document->layers : rendered) {
         // A blank layer counts while a draft sits on it.
         if (!layer.asset && !layer.adjustment && !(m_session.shapeDraft() && layer.id == m_session.activeLayerID()))
@@ -88,7 +90,7 @@ CanvasView::DisplayState CanvasView::displayState() const
         state.layers.push_back({.id = layer.id, .transform = m_session.displayedTransform(layer),
                                 .imageID = layer.asset ? std::optional(layer.asset->identity()) : std::nullopt,
                                 .maskID = enabledMaskID(layer.mask), .maskSourceID = layer.maskSourceID, .parentID = layer.parentID,
-                                .visible = visible.contains(layer.id), .opacity = layer.opacity,
+                                .visible = visible.contains(layer.id), .opacity = opacities.value(layer.id),
                                 .blendMode = m_session.displayedBlendMode(layer), .maskPlacement = m_session.displayedMaskPlacement(layer),
                                 .adjustment = layer.adjustment, .effects = layer.effects});
     }
@@ -308,6 +310,8 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
         if (!byID.contains(id) || (m_session.textDraft() && m_session.textDraft().value().layerID == id))
             return;
         const ImageLayer &layer = byID.at(id);
+        // Its folders dim it with everything inside them.
+        const double opacity = layer.effectiveOpacity(byID);
         // A stroke or pixel move stands in for the pixels.
         const PixelMove *move = m_session.pixelMove();
         const std::optional<GradientEdit> &gradient = m_session.gradientEdit();
@@ -323,7 +327,7 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
             const std::optional<QImage> mask = layer.mask ? layer.mask->clipImage(layer.maskTransform(), canvas, warp->width, warp->height, 2048)
                                                           : std::nullopt;
             LayerRenderer::draw(warp->image(), canvas, center(canvas.center()), target,
-                                {.scale = scale, .opacity = layer.opacity, .blendMode = m_session.displayedBlendMode(layer),
+                                {.scale = scale, .opacity = opacity, .blendMode = m_session.displayedBlendMode(layer),
                                  .mask = mask.value_or(QImage()), .clip = clip});
             return;
         }
@@ -344,12 +348,12 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
             const QSize size = owner.asset ? owner.asset->size() : QSize(int(std::round(base.size.width())), int(std::round(base.size.height())));
             mask = layer.mask->clipImage(placement, base, size.width(), size.height(), m_session.transformEdit() ? std::min(2048.0, steady) : steady);
         }
-        const LayerRenderer::Options options{.scale = scale, .opacity = layer.opacity, .blendMode = m_session.displayedBlendMode(layer),
+        const LayerRenderer::Options options{.scale = scale, .opacity = opacity, .blendMode = m_session.displayedBlendMode(layer),
                                              .mask = mask.value_or(QImage()), .clip = clip};
         // Swift asks twice; once, with what shows, is one request.
         const std::optional<EffectsPreviewCache::Result> effects =
             stroke ? std::nullopt : m_session.effectsPreviews.preview(layer, mask, transform, placement, repaint);
-        const LayerRenderer::Options bare{.scale = scale, .opacity = layer.opacity, .blendMode = options.blendMode, .clip = clip};
+        const LayerRenderer::Options bare{.scale = scale, .opacity = opacity, .blendMode = options.blendMode, .clip = clip};
         // A pending distortion warps the effects along with the layer.
         if (const auto warped = effects ? m_session.distortedEffects(layer, effects->image, effects->inset) : std::nullopt) {
             LayerRenderer::draw(warped->image, warped->transform, center(warped->transform.center()), target, bare);
@@ -409,7 +413,7 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
     };
     LiveMaskRenderer live([&](QUuid id) { return byID.contains(id) ? byID.at(id).maskSourceID : std::nullopt; }, drawOwnWithDraft);
     live.adjustment = [&](QUuid id) { return byID.contains(id) ? byID.at(id).adjustment : std::nullopt; };
-    live.adjustmentOpacity = [&](QUuid id) { return byID.at(id).opacity; };
+    live.adjustmentOpacity = [&](QUuid id) { return byID.at(id).effectiveOpacity(byID); };
     live.adjustmentClip = [&](QUuid id, const QPainter &painter, QImage &coverage) {
         const ImageLayer &layer = byID.at(id);
         if (!layer.mask || !layer.mask->isEnabled)
@@ -466,34 +470,5 @@ void CanvasView::drawDocumentPixels(const QRectF &view, const QRectF &pixels, co
     context.save();
     context.setRenderHint(QPainter::SmoothPixmapTransform, false);
     context.drawImage(target, raster);
-    context.restore();
-}
-
-// One-screen-pixel lines on document pixel boundaries, over the image only.
-void CanvasView::drawPixelGrid(const QRectF &view, const CanvasDocument &document, QPainter &context) const
-{
-    const CanvasViewport &viewport = m_session.viewport;
-    const double points = viewport.pointsPerPixel();
-    const QRectF canvas(viewport.viewPoint(QPointF(0, 0), document.size()), QSizeF(document.width * points, document.height * points));
-    const QRectF area = view.intersected(canvas);
-    if (area.isEmpty())
-        return;
-    const QPointF first = viewport.documentPoint(area.topLeft(), document.size());
-    const QPointF last = viewport.documentPoint(area.bottomRight(), document.size());
-    const double hairline = 1 / viewport.backingScale;
-    // Crossings fill once, as CoreGraphics fills the union.
-    QPainterPath path;
-    path.setFillRule(Qt::WindingFill);
-    for (int column = int(std::ceil(first.x())); column <= int(std::floor(last.x())); ++column) {
-        const double x = viewport.viewPoint(QPointF(column, 0), document.size()).x();
-        path.addRect(QRectF(x - hairline / 2, area.top(), hairline, area.height()));
-    }
-    for (int row = int(std::ceil(first.y())); row <= int(std::floor(last.y())); ++row) {
-        const double y = viewport.viewPoint(QPointF(0, row), document.size()).y();
-        path.addRect(QRectF(area.left(), y - hairline / 2, area.width(), hairline));
-    }
-    context.save();
-    context.setRenderHint(QPainter::Antialiasing, true);
-    context.fillPath(path, QColor::fromRgbF(0.55, 0.55, 0.55, 0.45));
     context.restore();
 }

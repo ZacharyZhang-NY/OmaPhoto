@@ -147,7 +147,8 @@ void EffectsPanelTests::theSheetEditsItsEffect()
     QCOMPARE(size.text(), QString("4"));
     type(size, "12");
     QCOMPARE(editor.effects().stroke->size, 12.0);
-    QCOMPARE(slider.value(), 22);
+    // The slider spans 0 to 20; typing reaches 500.
+    QCOMPARE(slider.value(), 600);
     // No finite number changes nothing; the field goes back.
     type(size, "abc");
     QVERIFY(editor.effects().stroke->size == 12 && size.text() == "12");
@@ -158,6 +159,8 @@ void EffectsPanelTests::theSheetEditsItsEffect()
     QCOMPARE(editor.effects().stroke->size, 13.0);
     QTest::keyClick(&size, Qt::Key_Up, Qt::ShiftModifier);
     QCOMPARE(editor.effects().stroke->size, 23.0);
+    // Past its end the thumb rests there, writing nothing back.
+    QCOMPARE(slider.value(), 1000);
     // A step replaces pending typing, even where it clamps.
     typing(size, "12");
     QTest::keyClick(&size, Qt::Key_Up);
@@ -172,12 +175,12 @@ void EffectsPanelTests::theSheetEditsItsEffect()
     size.clearFocus();
     QCOMPARE(editor.effects().stroke->size, 500.0);
     // The slider sets any value; the field rounds, ties even.
-    slider.setValue(500);
-    QVERIFY(editor.effects().stroke->size == 250.5 && size.text() == "250");
+    slider.setValue(525);
+    QVERIFY(editor.effects().stroke->size == 10.5 && size.text() == "10");
     // Leaving an untouched field keeps the exact value.
     size.setFocus();
     size.clearFocus();
-    QCOMPARE(editor.effects().stroke->size, 250.5);
+    QCOMPARE(editor.effects().stroke->size, 10.5);
     // Typing waits while other changes arrive.
     auto &opacity = find<QLineEdit>(sheet, "opacityField");
     QCOMPARE(opacity.text(), QString("100"));
@@ -206,6 +209,11 @@ void EffectsPanelTests::theSheetEditsItsEffect()
     editor.session.setColorPickerHSB(PickerHSB(PaletteColor{1, 0, 0}));
     QCOMPARE(editor.effects().stroke->color(), (PaletteColor{1, 0, 0}));
     QTRY_VERIFY(paints > 0);
+    // A black rim, a white ring inside, then the colour.
+    const QImage shot = swatch.grab().toImage();
+    QVERIFY2(shot.pixelColor(0, 9) == QColor(Qt::black), qPrintable(shot.pixelColor(0, 9).name()));
+    QVERIFY2(shot.pixelColor(1, 9) == QColor(Qt::white), qPrintable(shot.pixelColor(1, 9).name()));
+    QCOMPARE(shot.pixelColor(18, 9), QColor(Qt::red));
     editor.session.closeColorPicker(true);
     // Return commits, then goes on to OK, keeping everything.
     typing(size, "7");
@@ -227,7 +235,7 @@ void EffectsPanelTests::aWheelOnTheSliderReplacesTheTyping()
     QWheelEvent wheel(QPointF(10, 5), slider.mapToGlobal(QPointF(10, 5)), QPoint(), QPoint(0, -120), Qt::NoButton, Qt::NoModifier,
                       Qt::NoScrollPhase, false);
     QApplication::sendEvent(&slider, &wheel);
-    const double wheeled = 1 + 499.0 * (6 - QApplication::wheelScrollLines()) / 1000;
+    const double wheeled = 20.0 * (200 - QApplication::wheelScrollLines()) / 1000;
     QCOMPARE(editor.effects().stroke->size, wheeled);
     QVERIFY(size.hasFocus() && size.text() == QString::number(std::lround(wheeled)) && !size.isModified());
     // Return then keeps the slider's value, going on to OK.
@@ -276,11 +284,13 @@ void EffectsPanelTests::eachKindHasSwiftsControls_data()
     QTest::addColumn<LayerEffectKind>("kind");
     QTest::addColumn<QString>("headline");
     QTest::addColumn<QStringList>("fields");
-    const QStringList shadow{"Opacity:0:100", "Angle:-180:180", "Distance:0:300", "Blur:0:300"};
-    QTest::newRow("stroke") << LayerEffectKind::stroke << QString("Stroke") << QStringList{"Size:1:500", "Opacity:0:100"};
+    // Title, typed floor and ceiling, then the slider's.
+    const QStringList shadow{"Opacity:0:100:100", "Angle:-180:180:180", "Distance:0:5000:100", "Blur:0:500:100"};
+    QTest::newRow("stroke") << LayerEffectKind::stroke << QString("Stroke") << QStringList{"Size:0:500:20", "Opacity:0:100:100"};
     QTest::newRow("shadow") << LayerEffectKind::shadow << QString("Drop Shadow") << shadow;
-    QTest::newRow("overlay") << LayerEffectKind::colorOverlay << QString("Color Overlay") << QStringList{"Opacity:0:100"};
-    QTest::newRow("inner shadow") << LayerEffectKind::innerShadow << QString("Inner Shadow") << shadow;
+    QTest::newRow("overlay") << LayerEffectKind::colorOverlay << QString("Color Overlay") << QStringList{"Opacity:0:100:100"};
+    QTest::newRow("inner shadow") << LayerEffectKind::innerShadow << QString("Inner Shadow")
+                                  << QStringList{"Opacity:0:100:100", "Angle:-180:180:180", "Distance:0:5000:50", "Blur:0:500:100"};
 }
 
 void EffectsPanelTests::eachKindHasSwiftsControls()
@@ -312,6 +322,10 @@ void EffectsPanelTests::eachKindHasSwiftsControls()
         QCOMPARE(field.text(), parts[2]);
         type(field, "-99999");
         QCOMPARE(field.text(), parts[1]);
+        // The slider's end sets its range's top.
+        auto &slider = *sheet.findChild<QSlider *>(parts[0].toLower() + "Slider");
+        slider.setValue(1000);
+        QCOMPARE(field.text(), parts[3]);
     }
     QCOMPARE(names, titles);
 }
@@ -342,7 +356,7 @@ void EffectsPanelTests::cancelAndEscapePutTheEffectBack()
     editor.session.selectEffect(LayerEffectKind::shadow, editor.layer, true);
     QCOMPARE(find<QLineEdit>(*editor.sheet(), "distanceField").text(), QString("20"));
     find<QSlider>(*editor.sheet(), "distanceSlider").setValue(400);
-    QCOMPARE(editor.effects().shadow->distance, 120.0);
+    QCOMPARE(editor.effects().shadow->distance, 40.0);
     find<QPushButton>(*editor.sheet(), "effectsCancel").click();
     QVERIFY(editor.effects().shadow->distance == 20 && !editor.session.effectsEditing());
     // A new overlay's panel: Escape takes the overlay away again.

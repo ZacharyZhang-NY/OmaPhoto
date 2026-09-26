@@ -24,7 +24,7 @@ private slots:
     void moveRotateAndShiftConstraints();
     void previewCommitCancelAndUndoPreserveSources();
     void duplicateTransformPreservesOriginalAndSupportsUndoAndCancel();
-    void duplicateTransformCopiesEveryPixelLayerButNoFolder();
+    void duplicateTransformCopiesLayersAndFoldersWithTheirContents();
     void scalePercentSetsBothSidesAboutTheCenter();
     void noOpInvalidValuesAndSwitchingTools();
     void rotatedHitTesting();
@@ -373,7 +373,7 @@ void TransformTests::duplicateTransformPreservesOriginalAndSupportsUndoAndCancel
     QCOMPARE(int(session.document().value().layers.size()), 1);
 }
 
-void TransformTests::duplicateTransformCopiesEveryPixelLayerButNoFolder()
+void TransformTests::duplicateTransformCopiesLayersAndFoldersWithTheirContents()
 {
     EditorSession session;
     session.createDocument(400, 200);
@@ -383,16 +383,16 @@ void TransformTests::duplicateTransformCopiesEveryPixelLayerButNoFolder()
     const QUuid second = session.activeLayerID().value();
     session.addGroup();
     const QUuid folder = session.activeLayerID().value();
-    // A folder has no pixels to copy; layers do.
+    // Every selected root copies, an empty folder too.
     session.selectLayers({first, second, folder}, first);
     session.beginDuplicateTransform();
-    QCOMPARE(int(session.document().value().layers.size()), 5);
-    QCOMPARE(session.selectedLayerIDs().size(), 2);
-    QVERIFY(!session.selectedLayerIDs().contains(first) && !session.selectedLayerIDs().contains(second));
+    QCOMPARE(int(session.document().value().layers.size()), 6);
+    QCOMPARE(session.selectedLayerIDs().size(), 3);
+    QVERIFY(!session.selectedLayerIDs().contains(first) && !session.selectedLayerIDs().contains(folder));
     // The topmost copy leads; copies sit above their sources.
     QCOMPARE(session.document().value().layers[1].name, QString("Painted layer copy"));
-    QCOMPARE(session.activeLayerID(), std::optional(session.document().value().layers[3].id));
-    QVERIFY(session.transformsAsGroup());
+    QCOMPARE(session.document().value().layers[5].name, QString("Folder 1 copy"));
+    QCOMPARE(session.activeLayerID(), std::optional(session.document().value().layers[5].id));
     session.cancelTransform();
     QCOMPARE(int(session.document().value().layers.size()), 3);
     QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{first, second, folder}));
@@ -402,13 +402,21 @@ void TransformTests::duplicateTransformCopiesEveryPixelLayerButNoFolder()
     session.commitTransform();
     QCOMPARE(session.history.undoName(), QString("Duplicate Layers"));
     QCOMPARE(int(session.document().value().layers.size()), 5);
-    // A folder alone has no pixels: nothing begins.
+    // A folder carries its contents; a selected child rides along.
     QVERIFY(session.placeLayer(second, folder));
-    session.selectLayer(folder);
-    QVERIFY(session.canTransform());
+    session.toggleGroupExpansion(folder);
+    session.selectLayers({folder, second}, folder);
     session.beginDuplicateTransform();
-    QVERIFY(!session.transformEdit().has_value());
+    QCOMPARE(int(session.document().value().layers.size()), 7);
+    const QUuid copy = session.activeLayerID().value();
+    QCOMPARE(session.selectedLayerIDs(), QSet<QUuid>{copy});
+    const std::vector<ImageLayer> &shown = session.document().value().layers;
+    QVERIFY(shown[size_t(indexOf(shown, copy))].isGroup && session.descendantIDs(copy).size() == 1);
+    QVERIFY(session.collapsedGroupIDs().contains(copy));
+    session.cancelTransform();
     QCOMPARE(int(session.document().value().layers.size()), 5);
+    QCOMPARE(session.collapsedGroupIDs(), QSet<QUuid>{folder});
+    QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{folder, second}));
     QVERIFY(session.canUndo());
     session.setIsProjectBusy(true);
     session.selectLayer(first);
@@ -417,6 +425,24 @@ void TransformTests::duplicateTransformCopiesEveryPixelLayerButNoFolder()
     session.setIsProjectBusy(false);
     QVERIFY(session.canUndo());
     QCOMPARE(int(session.document().value().layers.size()), 5);
+    // Past 10,000 layers nothing copies and nothing is recorded.
+    ProjectSnapshot full = session.projectSnapshot().value();
+    while (full.manifest.layers.size() < 10'000)
+        full.manifest.layers.push_back(ProjectLayerRecord{.id = QUuid::createUuid(), .name = "Blank", .isVisible = true,
+                                                          .transform = {.origin = {0, 0}, .size = {40, 40}}, .imageFile = std::nullopt});
+    session.installProject(full, QString());
+    session.selectLayers({first, second}, second);
+    const int steps = session.history.undoCount();
+    session.beginDuplicateTransform();
+    QVERIFY(!session.transformEdit().has_value());
+    QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{first, second}));
+    QCOMPARE(session.activeLayerID(), std::optional(second));
+    QCOMPARE(session.history.undoCount(), steps);
+    // No transaction stays open: the next edit steps.
+    session.selectLayer(first);
+    session.setLayerOpacity(0.3);
+    QVERIFY(session.canUndo());
+    QCOMPARE(session.history.undoCount(), steps + 1);
 }
 
 QTEST_GUILESS_MAIN(TransformTests)

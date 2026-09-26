@@ -54,9 +54,14 @@ bool EditorSession::canEditAppearance() const
     return canEditLayers() && m_selectedLayerIDs.size() == 1 && active && !active->isGroup;
 }
 
+bool EditorSession::canEditOpacity() const
+{
+    return canEditLayers() && m_selectedLayerIDs.size() == 1 && activeLayer();
+}
+
 void EditorSession::beginOpacityEdit()
 {
-    if (!canEditAppearance() || m_opacityEditLayerID)
+    if (!canEditOpacity() || m_opacityEditLayerID)
         return;
     beginEdit(QStringLiteral("Layer Opacity"));
     m_opacityEditLayerID = m_activeLayerID;
@@ -72,7 +77,7 @@ void EditorSession::finishOpacityEdit()
 
 void EditorSession::setLayerOpacity(double opacity)
 {
-    if (!std::isfinite(opacity) || !canEditAppearance())
+    if (!std::isfinite(opacity) || !canEditOpacity())
         return;
     const QUuid id = m_opacityEditLayerID.value_or(*m_activeLayerID);
     const auto layer = std::find_if(m_document->layers.begin(), m_document->layers.end(), [&](const ImageLayer &each) { return each.id == id; });
@@ -88,9 +93,9 @@ void EditorSession::setSelectedLayersOpacity(double opacity)
 {
     if (!std::isfinite(opacity) || !canEditLayers())
         return;
-    // Folders have no opacity of their own.
+    // A selected folder takes it too, dimming what it holds.
     const double value = std::clamp(opacity, 0.0, 1.0);
-    const auto changes = [&](const ImageLayer &layer) { return m_selectedLayerIDs.contains(layer.id) && !layer.isGroup && layer.opacity != value; };
+    const auto changes = [&](const ImageLayer &layer) { return m_selectedLayerIDs.contains(layer.id) && layer.opacity != value; };
     if (std::none_of(m_document->layers.begin(), m_document->layers.end(), changes))
         return;
     finishOpacityEdit();

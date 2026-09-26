@@ -86,6 +86,54 @@ void LayerHierarchy::validate(const std::vector<ProjectLayerRecord> &layers)
     }
 }
 
+double LayerOpacity::effective(double own, std::optional<QUuid> parent, const Node &folder)
+{
+    double opacity = own;
+    std::optional<QUuid> id = parent;
+    // Past 64 folders the tree is wrong: Swift stops there.
+    for (int depth = 0; id && depth < 64; ++depth) {
+        const std::optional<std::pair<double, std::optional<QUuid>>> node = folder(*id);
+        if (!node)
+            break;
+        opacity *= node->first;
+        id = node->second;
+    }
+    return opacity;
+}
+
+double ImageLayer::effectiveOpacity(const std::map<QUuid, ImageLayer> &byID) const
+{
+    return LayerOpacity::effective(opacity, parentID, [&byID](QUuid id) -> std::optional<std::pair<double, std::optional<QUuid>>> {
+        if (!byID.contains(id))
+            return std::nullopt;
+        const ImageLayer &node = byID.at(id);
+        return std::pair(node.opacity, node.parentID);
+    });
+}
+
+double ProjectLayerRecord::effectiveOpacity(const std::map<QUuid, ProjectLayerRecord> &byID) const
+{
+    return LayerOpacity::effective(opacity.value_or(1), parentID, [&byID](QUuid id) -> std::optional<std::pair<double, std::optional<QUuid>>> {
+        if (!byID.contains(id))
+            return std::nullopt;
+        const ProjectLayerRecord &node = byID.at(id);
+        return std::pair(node.opacity.value_or(1), node.parentID);
+    });
+}
+
+QHash<QUuid, double> CanvasDocument::effectiveOpacities() const
+{
+    std::map<QUuid, ImageLayer> byID;
+    for (const ImageLayer &layer : layers) {
+        if (!byID.emplace(layer.id, layer).second)
+            throw std::logic_error("two layers share an id");
+    }
+    QHash<QUuid, double> result;
+    for (const ImageLayer &layer : layers)
+        result.insert(layer.id, layer.effectiveOpacity(byID));
+    return result;
+}
+
 ProjectLayerRecord ImageLayer::hierarchyRecord() const
 {
     const QString file = id.toString(QUuid::WithoutBraces).toUpper();

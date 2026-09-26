@@ -238,6 +238,9 @@ public:
     // The View menu's grid, shown from 800%.
     bool showsPixelGrid() const { return m_showsPixelGrid; }
     void setShowsPixelGrid(bool shows);
+    // View > Snap: moves and crops line up with edges.
+    bool snappingEnabled() const { return m_snappingEnabled; }
+    void setSnappingEnabled(bool enabled);
     // The Eyedropper's ring: the sampled colour over the original.
     bool showsSampleRing() const { return m_showsSampleRing; }
     void setShowsSampleRing(bool shows);
@@ -336,6 +339,7 @@ private:
     std::optional<QUuid> m_renamingLayerID;
     std::optional<QString> m_projectPath;
     bool m_showsPixelGrid = true;
+    bool m_snappingEnabled = true;
     bool m_showsSampleRing = true;
     std::optional<QRectF> m_cropRect;
     QString m_cropRatioChoice = QStringLiteral("Free");

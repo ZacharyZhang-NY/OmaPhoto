@@ -43,7 +43,6 @@ private slots:
     void foldingAFolderTakesTheSelectionFromItsContents();
     void deletingAFolderTakesItsContents();
     void movingStaysAmongSiblings();
-    void duplicatingALayerByDraggingPlacesTheCopyAsOneStep();
     void aNewCanvasCanStartWithALayer();
     void sessionChangesAreLogged();
 };
@@ -445,50 +444,5 @@ void EditorSessionTests::sessionChangesAreLogged()
 }
 
 // Alt-dragging a row drops a duplicate, one step.
-void EditorSessionTests::duplicatingALayerByDraggingPlacesTheCopyAsOneStep()
-{
-    EditorSession session;
-    session.createDocument(800, 600);
-    for (int each = 0; each < 3; ++each)
-        session.addBlankLayer();
-    const std::vector<LayerHierarchy::Entry> rows = session.layerRows();
-    const ProjectLayerRecord top = rows.front().layer, bottom = rows.back().layer;
-    const std::optional<CanvasDocument> before = session.document();
-    const int count = session.history.undoCount();
-    QVERIFY(session.duplicateLayer(bottom.id, std::nullopt, top.id));
-    const std::vector<LayerHierarchy::Entry> after = session.layerRows();
-    QCOMPARE(after.size(), size_t(4));
-    QCOMPARE(session.history.undoCount(), count + 1);
-    QCOMPARE(session.history.undoName(), QString("Duplicate Layer"));
-    QCOMPARE(after.front().layer.name, bottom.name + " copy");
-    QCOMPARE(after.front().layer.id, session.activeLayerID());
-    QVERIFY(indexOf(session.document().value().layers, bottom.id) >= 0);
-    session.undo();
-    QCOMPARE(session.document(), before);
-    // Folders are not duplicated this way; neither is a stranger.
-    session.addGroup();
-    const QUuid folder = session.activeLayerID().value();
-    QVERIFY(!session.duplicateLayer(folder, std::nullopt, std::nullopt, true));
-    QVERIFY(!session.duplicateLayer(QUuid::createUuid(), std::nullopt));
-    QVERIFY(!session.duplicateLayer(bottom.id, bottom.id));
-    QCOMPARE(session.layerRows().size(), size_t(4));
-    // Into a folder, at its top.
-    QVERIFY(session.duplicateLayer(bottom.id, folder));
-    QCOMPARE(layerWith(session, session.activeLayerID().value()).parentID, std::optional(folder));
-    session.setIsImporting(true);
-    QVERIFY(!session.duplicateLayer(bottom.id, std::nullopt));
-    session.setIsImporting(false);
-    // The copy sits right above; a folder makes none.
-    session.selectLayer(top.id);
-    session.duplicateActiveLayer();
-    const int original = indexOf(session.document().value().layers, top.id);
-    QCOMPARE(session.document().value().layers[original + 1].name, top.name + " copy");
-    QCOMPARE(session.activeLayerID(), std::optional(session.document().value().layers[original + 1].id));
-    const size_t kept = session.document().value().layers.size();
-    session.selectLayer(folder);
-    session.duplicateActiveLayer();
-    QCOMPARE(session.document().value().layers.size(), kept);
-}
-
 QTEST_GUILESS_MAIN(EditorSessionTests)
 #include "EditorSessionTests.moc"

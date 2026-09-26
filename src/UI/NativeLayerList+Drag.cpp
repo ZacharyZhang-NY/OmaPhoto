@@ -127,11 +127,6 @@ std::optional<LayerDropTarget> NativeLayerList::dropTarget(const QMimeData &data
         return std::nullopt;
     // Swift duplicates when the source offers a copy alone (Alt).
     const bool copying = offered == Qt::CopyAction;
-    // Folders are not duplicated: a copy with one is refused.
-    for (const QUuid &id : ids) {
-        if (copying && m_rows[size_t(indexOf(m_rows, id))].isGroup)
-            return std::nullopt;
-    }
     const QPoint inColumn = m_column->mapFrom(viewport(), viewport()->mapFrom(this, listPoint));
     int row = int(m_rows.size());
     bool onRow = false;
@@ -326,7 +321,7 @@ QCursor NativeLayerList::cursorFor(QPoint listPoint, Qt::KeyboardModifiers modif
     if (cell.maskThumbnail().isVisible() && cell.maskThumbnail().geometry().contains(inCell))
         return editable ? CanvasView::duplicateCursor(ratio) : QCursor(Qt::ArrowCursor);
     if (!isClippingZone(cell, inCell))
-        return editable && !layer.isGroup ? CanvasView::duplicateCursor(ratio) : QCursor(Qt::ArrowCursor);
+        return editable ? CanvasView::duplicateCursor(ratio) : QCursor(Qt::ArrowCursor);
     if (!m_session.canToggleClippingMask(layer.id))
         return QCursor(Qt::ArrowCursor);
     return clippingCursor(layer.maskSourceID.has_value(), ratio);

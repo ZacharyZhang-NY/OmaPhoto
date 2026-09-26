@@ -134,6 +134,7 @@ add_library(compositor_core STATIC
     src/Rendering/EditorCanvas+Brush.cpp
     src/Rendering/EditorCanvas+Crop.cpp
     src/Rendering/EditorCanvas+Effects.cpp
+    src/Rendering/EditorCanvas+Grid.cpp
     src/Rendering/EditorCanvas+Gradient.cpp
     src/Rendering/EditorCanvas+Cursors.cpp
     src/Rendering/BrushCursorOverlay.cpp
@@ -330,6 +331,7 @@ compositor_test(CanvasThumbnailTests)
 compositor_test(ClippingStackTests)
 compositor_test(CompositorTests)
 compositor_test(CompositorMenusTests)
+compositor_test(ViewMenuTests)
 compositor_test(CompositorUITestsLaunchTests)
 compositor_test(ContentViewTests)
 compositor_test(ContentViewStatusTests)
@@ -338,6 +340,7 @@ compositor_test(DownsampleTests)
 compositor_test(DrawCoverageTests)
 compositor_test(EditorSessionSignalTests)
 compositor_test(EditorSessionTests)
+compositor_test(LayerDuplicateTests)
 compositor_test(ExportTests)
 compositor_test(FolderMaskClipTests)
 compositor_test(EditorCanvasTests)
@@ -352,6 +355,7 @@ compositor_test(ImageSizeTests)
 compositor_test(JPEGExportTests)
 compositor_test(LayerAppearanceControlsTests)
 compositor_test(LayerAppearanceTests)
+compositor_test(FolderOpacityTests)
 compositor_test(LayerMaskEditTests)
 compositor_test(LayerMaskSessionTests)
 compositor_test(LayerMaskTests)

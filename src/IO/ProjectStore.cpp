@@ -42,7 +42,7 @@ void validate(const ProjectManifest &manifest)
 {
     if (manifest.format != QLatin1String("com.compositor.project"))
         throw ProjectError(ProjectError::Kind::invalid);
-    if (manifest.version < 1 || manifest.version > 7)
+    if (manifest.version < 1 || manifest.version > 8)
         throw ProjectError::unsupportedVersion(manifest.version);
     if (manifest.colorSpace != QLatin1String("sRGB"))
         throw ProjectError(ProjectError::Kind::invalid);
@@ -64,9 +64,11 @@ void validate(const ProjectManifest &manifest)
             || (manifest.version >= (group ? 6 : 4) && *layer.maskFile == uuidString(layer.id) + QLatin1String(".mask.png"));
         const bool placementAllowed = !layer.maskPlacement || (layer.maskPlacement->isValid() && layer.maskFile);
         const double opacity = layer.opacity.value_or(1);
-        const bool plain = opacity == 1 && layer.blendMode.value_or(LayerBlendMode::normal) == LayerBlendMode::normal;
+        const bool normal = layer.blendMode.value_or(LayerBlendMode::normal) == LayerBlendMode::normal;
+        const bool plain = opacity == 1 && normal;
+        // Folders dim from version 8; they always pass through.
         if (!maskAllowed || (layer.maskEnabled && !layer.maskFile) || !placementAllowed || !std::isfinite(opacity) || opacity < 0
-            || opacity > 1 || (manifest.version < 3 && !plain) || (group && !plain))
+            || opacity > 1 || (manifest.version < 3 && !plain) || (group && !(normal && (manifest.version >= 8 || opacity == 1))))
             throw ProjectError(ProjectError::Kind::invalid);
     }
     LayerHierarchy::validate(manifest.layers);
@@ -228,7 +230,7 @@ ProjectError::ProjectError(Kind kind) : ProjectError(kind, std::nullopt, descrip
 ProjectError ProjectError::unsupportedVersion(qint64 version)
 {
     return ProjectError(Kind::version, version,
-                        QStringLiteral("This project uses format version %1. This app supports versions 1–7.").arg(version));
+                        QStringLiteral("This project uses format version %1. This app supports versions 1–8.").arg(version));
 }
 
 ProjectError::ProjectError(Kind kind, std::optional<qint64> version, const QString &description)
@@ -304,7 +306,7 @@ ProjectSnapshot ProjectStore::load(const QString &path)
     const auto [format, version] = ProjectManifest::header(metadata);
     if (format != QLatin1String("com.compositor.project"))
         throw ProjectError(ProjectError::Kind::invalid);
-    if (version < 1 || version > 7)
+    if (version < 1 || version > 8)
         throw ProjectError::unsupportedVersion(version);
     const ProjectManifest manifest = ProjectManifest::decoded(metadata);
     validate(manifest);

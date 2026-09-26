@@ -91,7 +91,8 @@ int NativeLayerList::rowAt(QPoint listPoint) const
 
 bool NativeLayerList::isClippingZone(const LayerCell &cell, QPoint cellPoint)
 {
-    return cellPoint.y() >= cell.height() - 10;
+    // A folder clips nothing, so it has no strip.
+    return !cell.isGroup() && cellPoint.y() >= cell.height() - 10;
 }
 
 bool NativeLayerList::clickRow(LayerCell &cell, Qt::KeyboardModifiers modifiers, QPoint cellPoint)
@@ -177,7 +178,7 @@ void NativeLayerList::keyPressEvent(QKeyEvent *event)
         {Qt::Key_Z, NavigationTool::zoom}, {Qt::Key_G, NavigationTool::gradient}, {Qt::Key_L, NavigationTool::lasso}, {Qt::Key_M, NavigationTool::marquee},
         {Qt::Key_W, NavigationTool::wand}, {Qt::Key_J, NavigationTool::spotHealing}, {Qt::Key_S, NavigationTool::cloneStamp},
         {Qt::Key_U, NavigationTool::shape}, {Qt::Key_R, NavigationTool::blur}, {Qt::Key_I, NavigationTool::eyedropper},
-        {Qt::Key_C, NavigationTool::crop}};
+        {Qt::Key_C, NavigationTool::crop}, {Qt::Key_T, NavigationTool::type}};
     if (plain && (key == Qt::Key_Backspace || key == Qt::Key_Delete)) {
         m_session.deleteKeyPressed();
         return;

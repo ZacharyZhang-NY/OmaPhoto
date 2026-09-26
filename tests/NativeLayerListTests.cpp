@@ -350,6 +350,9 @@ void NativeLayerListTests::layerListToolKeysAndTransformNudge()
     shown.list.setFocus();
     QTest::keyClick(&shown.list, Qt::Key_H);
     QCOMPARE(session.tool(), NavigationTool::hand);
+    // T chooses Type, since Swift 1.1.6.
+    QTest::keyClick(&shown.list, Qt::Key_T);
+    QCOMPARE(session.tool(), NavigationTool::type);
     QTest::keyClick(&shown.list, Qt::Key_V);
     QCOMPARE(session.tool(), NavigationTool::move);
     session.beginTransform();

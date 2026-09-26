@@ -199,6 +199,11 @@ void CropCanvasTests::snappingReachesEightViewPoints()
     const QPointF from = shown.session.viewport.viewPoint(QPointF(100, 50), size), to = shown.session.viewport.viewPoint(QPointF(390, 170), size);
     shown.drag(from, to);
     QCOMPARE(shown.frame(), std::optional(QRectF(100, 50, 300, 120)));
+    // Snap off: the edges stay where the pointer puts them.
+    shown.session.setSnappingEnabled(false);
+    shown.session.setCropRect(std::nullopt);
+    shown.drag(from, to);
+    QCOMPARE(shown.frame(), std::optional(QRectF(100, 50, 290, 120)));
 }
 
 void CropCanvasTests::theCursorShowsWhatAPressTakes()

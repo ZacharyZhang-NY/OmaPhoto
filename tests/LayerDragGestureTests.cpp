@@ -65,13 +65,15 @@ void LayerDragGestureTests::altShowsTheClippingAndDuplicateCursors()
     QVERIFY(image(CanvasView::loadSelectionCursor(1)).pixelColor(11, 8).lightness() > 128);
     QVERIFY(image(CanvasView::loadSelectionCursor(1)).pixelColor(21, 18).alpha() > 0);
     QCOMPARE(image(CanvasView::loadSelectionCursor(1)).pixelColor(21, 21).alpha(), 0);
-    // The bottom row clips to nothing; a folder duplicates not.
+    // The bottom row clips nothing; a folder has no strip.
     const QPoint lastStrip = shown.list.cells().at(1)->mapTo(&shown.list, QPoint(200, LayerCell::rowHeight - 4));
     QCOMPARE(shown.list.cursorFor(lastStrip, Qt::AltModifier).shape(), Qt::ArrowCursor);
     session->selectLayer(shown.id(1));
     session->addGroup();
     const QPoint folderBody = shown.list.cells().at(1)->mapTo(&shown.list, QPoint(200, 20));
-    QCOMPARE(shown.list.cursorFor(folderBody, Qt::AltModifier).shape(), Qt::ArrowCursor);
+    QCOMPARE(image(shown.list.cursorFor(folderBody, Qt::AltModifier)), image(CanvasView::duplicateCursor(ratio)));
+    const QPoint folderStrip = shown.list.cells().at(1)->mapTo(&shown.list, QPoint(200, LayerCell::rowHeight - 4));
+    QCOMPARE(image(shown.list.cursorFor(folderStrip, Qt::AltModifier)), image(CanvasView::duplicateCursor(ratio)));
     // A mask thumbnail copies, or loads with Ctrl; busy, nothing.
     session->selectLayer(shown.id(0));
     session->addLayerMask();

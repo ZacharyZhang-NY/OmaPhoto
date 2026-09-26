@@ -9,7 +9,9 @@
 #include "Document/TypeTool.h"
 #include "IO/ImageImporter.h"
 #include <QString>
+#include <QHash>
 #include <QUuid>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -40,6 +42,8 @@ struct ImageLayer {
     QPointF origin() const { return transform.origin; }
     QSizeF size() const { return transform.size; }
     ProjectLayerRecord hierarchyRecord() const;
+    // Drawn opacity, folders included (LayerOpacity).
+    double effectiveOpacity(const std::map<QUuid, ImageLayer> &byID) const;
     LayerTransform maskTransform() const;
     // The shape this layer still is: none once repainted otherwise.
     std::optional<LayerShape> liveShape() const;
@@ -70,6 +74,7 @@ struct CanvasDocument {
     static std::optional<int> validDimension(const QString &value);
     std::vector<LayerHierarchy::Entry> hierarchyEntries() const;
     QSet<QUuid> effectiveVisibleIDs() const;
+    QHash<QUuid, double> effectiveOpacities() const;
     std::vector<ImageLayer> renderLayers() const;
     friend bool operator==(const CanvasDocument &lhs, const CanvasDocument &rhs) = default;
 };

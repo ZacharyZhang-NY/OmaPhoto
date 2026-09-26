@@ -75,7 +75,7 @@ try {
                               const std::optional<LayerMask> mask = snapshot.mask(layer);
                               const std::optional<QImage> shown =
                                   mask ? mask->clipImage(mask->placement, layer.transform, pixels.width(), pixels.height()) : std::nullopt;
-                              const double opacity = layer.opacity.value_or(1);
+                              const double opacity = layer.effectiveOpacity(records);
                               const LayerBlendMode mode = layer.blendMode.value_or(LayerBlendMode::normal);
                               // With effects the mask is in their image already.
                               if (const auto effects = LayerEffectsRenderer::cached(pixels, shown, layer.effects)) {
@@ -87,7 +87,7 @@ try {
                                                   {.opacity = opacity, .blendMode = mode, .mask = shown.value_or(QImage()), .clip = clip});
                           });
     live.adjustment = [&](QUuid id) { return records.contains(id) ? records.at(id).adjustment : std::nullopt; };
-    live.adjustmentOpacity = [&](QUuid id) { return records.at(id).opacity.value_or(1); };
+    live.adjustmentOpacity = [&](QUuid id) { return records.at(id).effectiveOpacity(records); };
     live.adjustmentClip = [&](QUuid id, const QPainter &context, QImage &coverage) {
         const ProjectLayerRecord &layer = records.at(id);
         const std::optional<LayerMask> mask = snapshot.mask(layer);

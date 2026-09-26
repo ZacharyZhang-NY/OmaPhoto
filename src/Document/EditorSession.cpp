@@ -318,6 +318,14 @@ void EditorSession::setShowsPixelGrid(bool shows)
     notify();
 }
 
+void EditorSession::setSnappingEnabled(bool enabled)
+{
+    m_snappingEnabled = enabled;
+    if (!enabled)
+        snapGuides = {};
+    notify();
+}
+
 void EditorSession::setCropRect(std::optional<QRectF> rect)
 {
     if (std::exchange(m_cropRect, rect) != rect)

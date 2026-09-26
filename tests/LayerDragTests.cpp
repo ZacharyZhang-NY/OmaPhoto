@@ -125,11 +125,25 @@ void LayerDragTests::anAltDragDropsDuplicates()
     QCOMPARE(session->history.undoName(), QString("Duplicate Layers"));
     session->undo();
     QCOMPARE(shown.names().size(), size_t(3));
-    // A folder among the dragged rows: no copy at all.
-    session->selectLayer(shown.id(2));
+    // A folder among the dragged rows copies with its contents.
+    const QUuid held = shown.id(2);
+    session->selectLayer(held);
     session->addGroup();
-    QVERIFY(!shown.drop(shown.rows({0, 2}), Qt::CopyAction, shown.below()));
+    QVERIFY(session->placeLayer(held, session->activeLayerID().value()));
     QCOMPARE(shown.names().size(), size_t(4));
+    QVERIFY(session->document().value().layers[size_t(indexOf(session->document().value().layers, shown.id(2)))].isGroup);
+    QVERIFY(shown.drop(shown.rows({0, 2}), Qt::CopyAction, shown.below()));
+    QCOMPARE(session->history.undoName(), QString("Duplicate Layers"));
+    const std::vector<ImageLayer> &layers = session->document().value().layers;
+    QCOMPARE(int(layers.size()), 7);
+    std::vector<QUuid> folders;
+    for (const ImageLayer &layer : layers) {
+        if (layer.isGroup)
+            folders.push_back(layer.id);
+    }
+    QCOMPARE(int(folders.size()), 2);
+    for (const QUuid &folder : folders)
+        QCOMPARE(int(session->descendantIDs(folder).size()), 1);
 }
 
 void LayerDragTests::aMaskDragCopiesTheMaskOntoTheRowUnderIt()

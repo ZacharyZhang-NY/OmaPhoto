@@ -22,14 +22,17 @@ private:
         std::function<void(LayerEffects &, double)> change;
         double low;
         double high;
+        // What a field or step may reach, past the slider.
+        double typedHigh;
         QSlider *slider;
         PickerField *field;
     };
     void header(const QString &title, bool position);
     void colour(bool labelled);
     void slider(const QString &title, std::function<std::optional<double>(const LayerEffects &)> value,
-                std::function<void(LayerEffects &, double)> change, double low, double high, const QString &unit);
-    // A value clamped to the slider's range, as Swift's binding.
+                std::function<void(LayerEffects &, double)> change, double low, double high, const QString &unit,
+                std::optional<double> typedHigh = std::nullopt);
+    // A value clamped to the typed range, as Swift's setAmount.
     void apply(const Slider &control, double value);
     void synchronize();
 

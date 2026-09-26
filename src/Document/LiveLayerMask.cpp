@@ -42,14 +42,14 @@ void EditorSession::drawLiveComposite(const CanvasDocument &document, QPainter &
                               if (const auto effects = LayerEffectsRenderer::cached(image, mask, layer.effects)) {
                                   const LayerTransform grown = LayerEffectsRenderer::placed(transform, effects->image, effects->inset);
                                   LayerRenderer::draw(effects->image, grown, grown.center(), target,
-                                                      {.opacity = layer.opacity, .blendMode = displayedBlendMode(layer), .clip = clip});
+                                                      {.opacity = layer.effectiveOpacity(records), .blendMode = displayedBlendMode(layer), .clip = clip});
                                   return;
                               }
                               LayerRenderer::draw(image, transform, transform.center(), target,
-                                                  {.opacity = layer.opacity, .blendMode = displayedBlendMode(layer), .mask = mask.value_or(QImage()), .clip = clip});
+                                                  {.opacity = layer.effectiveOpacity(records), .blendMode = displayedBlendMode(layer), .mask = mask.value_or(QImage()), .clip = clip});
                           });
     live.adjustment = [&](QUuid id) { return records.contains(id) ? records.at(id).adjustment : std::nullopt; };
-    live.adjustmentOpacity = [&](QUuid id) { return records.at(id).opacity; };
+    live.adjustmentOpacity = [&](QUuid id) { return records.at(id).effectiveOpacity(records); };
     live.adjustmentClip = [&](QUuid id, const QPainter &painter, QImage &coverage) {
         const ImageLayer &layer = records.at(id);
         if (const std::optional<QImage> image = layer.mask ? layer.mask->enabledImage() : std::nullopt)
@@ -116,6 +116,14 @@ std::optional<ImportedImage> LiveMaskBaker::bake(const ProjectSnapshot &snapshot
             throw std::logic_error("a snapshot to bake repeats a layer id");
         records.insert(layer.id, &layer);
     }
+    // A source dims with its folders, as exported.
+    const auto folded = [&records](const ProjectLayerRecord &layer) {
+        return LayerOpacity::effective(layer.opacity.value_or(1), layer.parentID, [&records](QUuid id) -> std::optional<std::pair<double, std::optional<QUuid>>> {
+            if (!records.contains(id))
+                return std::nullopt;
+            return std::pair(records.value(id)->opacity.value_or(1), records.value(id)->parentID);
+        });
+    };
     LiveMaskRenderer live([&](QUuid id) { return records.contains(id) ? records.value(id)->maskSourceID : std::nullopt; },
                           [&](QUuid id, QPainter &context, const QImage &clip) {
                               // `at` is checked: end() would read wild memory.
@@ -135,7 +143,7 @@ std::optional<ImportedImage> LiveMaskBaker::bake(const ProjectSnapshot &snapshot
                               context.save();
                               context.setTransform(inverse, true);
                               LayerRenderer::draw(pixels, layer.transform, layer.transform.center(), context,
-                                                  {.opacity = layer.opacity.value_or(1), .mask = shown.value_or(QImage()), .clip = clip});
+                                                  {.opacity = folded(layer), .mask = shown.value_or(QImage()), .clip = clip});
                               context.restore();
                           });
     {

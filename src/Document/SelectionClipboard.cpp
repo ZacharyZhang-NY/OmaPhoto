@@ -317,28 +317,54 @@ QString EditorSession::nextLayerName() const
 void EditorSession::duplicateActiveLayer()
 {
     const int index = canEditLayers() ? indexOf(m_document->layers, m_activeLayerID) : -1;
-    if (index < 0 || m_document->layers[index].isGroup)
+    if (index < 0)
         return;
-    ImageLayer copy = m_document->layers[index];
-    copy.id = QUuid::createUuid();
-    copy.name = copy.name + QStringLiteral(" copy");
+    // A folder carries its whole tree, links kept inside it.
+    const QUuid id = *m_activeLayerID;
+    QSet<QUuid> included = descendantIDs(id);
+    included.insert(id);
+    std::vector<ImageLayer> copies;
+    for (const ImageLayer &layer : m_document->layers) {
+        if (included.contains(layer.id))
+            copies.push_back(layer);
+    }
+    if (m_document->layers.size() + copies.size() > 10'000)
+        return;
+    QHash<QUuid, QUuid> mapping;
+    for (const ImageLayer &copy : copies)
+        mapping.insert(copy.id, QUuid::createUuid());
+    const auto renamed = [&mapping](std::optional<QUuid> &link) {
+        if (link && mapping.contains(*link))
+            link = mapping.value(*link);
+    };
+    for (ImageLayer &copy : copies) {
+        if (copy.id == id)
+            copy.name += QStringLiteral(" copy");
+        copy.id = mapping.value(copy.id);
+        renamed(copy.parentID);
+        renamed(copy.maskSourceID);
+    }
     beginEdit(QStringLiteral("Duplicate Layer"));
-    m_document->layers.insert(m_document->layers.begin() + index + 1, copy);
-    setActiveLayerID(copy.id);
+    m_document->layers.insert(m_document->layers.begin() + index + 1, copies.begin(), copies.end());
+    for (auto original = mapping.cbegin(); original != mapping.cend(); ++original) {
+        if (m_collapsedGroupIDs.contains(original.key()))
+            m_collapsedGroupIDs.insert(original.value());
+    }
+    setActiveLayerID(mapping.value(id));
     endEdit();
 }
 
 // Alt-drag in the Layers panel: a copy placed where dropped.
 bool EditorSession::duplicateLayer(QUuid id, std::optional<QUuid> parent, std::optional<QUuid> above, bool atBottom)
 {
-    const int index = canEditLayers() ? indexOf(m_document->layers, id) : -1;
-    if (index < 0 || m_document->layers[index].isGroup || !canPlaceLayer(id, parent))
+    // canPlaceLayer reads canEditLayers, Swift's first term.
+    if (!canPlaceLayer(id, parent))
         return false;
     beginEdit(QStringLiteral("Duplicate Layer"));
     selectLayer(id);
     duplicateActiveLayer();
-    // The copy is active: nothing above refuses it.
-    const bool placed = placeLayer(*m_activeLayerID, parent, above, atBottom);
+    // Past the layer limit no copy was made.
+    const bool placed = m_activeLayerID != id && placeLayer(*m_activeLayerID, parent, above, atBottom);
     endEdit();
     return placed;
 }

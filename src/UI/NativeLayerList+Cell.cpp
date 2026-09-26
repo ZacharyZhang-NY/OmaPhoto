@@ -157,7 +157,7 @@ void LayerCell::configure(const ImageLayer &layer, bool enabled, int depth, bool
     // A pending rename closes the edits: rows never move.
     if (!m_renaming)
         m_name->setText((layer.maskSourceID ? QStringLiteral("↳ ") : QString()) + layer.name);
-    m_dimensions->setText(m_editableText   ? QStringLiteral("Text · Double-click to edit")
+    m_dimensions->setText(m_editableText   ? QStringLiteral("Text")
                           : m_isAdjustment ? QStringLiteral("Adjustment · Double-click to edit")
                           : layer.isGroup  ? QStringLiteral("Folder")
                                           : QStringLiteral("%1 × %2 px").arg(std::lround(layer.size().width())).arg(std::lround(layer.size().height())));

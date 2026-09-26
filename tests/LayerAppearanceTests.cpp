@@ -119,7 +119,7 @@ void LayerAppearanceTests::appearancePersistsThroughSaveResizeAndTransparentExpo
     const QString path = folder.filePath("Appearance.comp");
     ProjectStore::save(snapshot, path);
     const ProjectSnapshot loaded = ProjectStore::load(path);
-    QCOMPARE(loaded.manifest.version, qint64(7));
+    QCOMPARE(loaded.manifest.version, qint64(8));
     const ProjectSnapshot resized = ImageResizer::resize(loaded, {.width = 8, .height = 8, .resolution = 72});
     const ProjectSnapshot canvas = CanvasResizer::resize(resized, {.width = 12, .height = 12});
     const auto record = std::find_if(canvas.manifest.layers.begin(), canvas.manifest.layers.end(),
@@ -253,7 +253,8 @@ void LayerAppearanceTests::selectedLayersTakeOneOpacityInOneStep()
     session.setSelectedLayersOpacity(0.5);
     QCOMPARE(layerWith(session, first).opacity, 0.5);
     QCOMPARE(layerWith(session, second).opacity, 0.5);
-    QCOMPARE(layerWith(session, folder).opacity, 1.0);
+    // A selected folder takes it too.
+    QCOMPARE(layerWith(session, folder).opacity, 0.5);
     QCOMPARE(layerWith(session, apart).opacity, 1.0);
     QCOMPARE(session.history.undoCount(), count + 1);
     QCOMPARE(session.history.undoName(), QString("Layer Opacity"));
@@ -326,13 +327,27 @@ void LayerAppearanceTests::onlyOnePixelLayerHasAnAppearanceToEdit()
     QVERIFY(session.canEditAppearance());
     session.addGroup();
     const QUuid folder = session.activeLayerID().value();
+    // A folder takes an opacity; blending stays per layer.
     QVERIFY(!session.canEditAppearance());
+    QVERIFY(session.canEditOpacity());
     session.setLayerBlendMode(LayerBlendMode::screen);
-    session.setLayerOpacity(0.5);
     session.previewBlendMode(LayerBlendMode::screen, folder);
     QVERIFY(!session.blendPreview().has_value());
     QCOMPARE(layerWith(session, folder).blendMode, LayerBlendMode::normal);
-    QCOMPARE(layerWith(session, folder).opacity, 1.0);
+    session.setLayerOpacity(0.5);
+    QCOMPARE(layerWith(session, folder).opacity, 0.5);
+    QCOMPARE(session.history.undoName(), QString("Layer Opacity"));
+    session.beginOpacityEdit();
+    session.setLayerOpacity(0.25);
+    session.setLayerOpacity(0.2);
+    session.finishOpacityEdit();
+    QCOMPARE(layerWith(session, folder).opacity, 0.2);
+    session.undo();
+    QCOMPARE(layerWith(session, folder).opacity, 0.5);
+    // Two layers selected: neither gate holds.
+    session.selectLayers({folder, session.document().value().layers.front().id}, folder);
+    QVERIFY(!session.canEditOpacity());
+    session.selectLayer(folder);
     session.addBlankLayer();
     QVERIFY(session.canEditAppearance());
     session.setShowsImporter(true);
@@ -441,10 +456,9 @@ void LayerAppearanceTests::moveToolNumberKeysSetSelectedLayersOpacityAsOneUndo()
     const int count = session.history.undoCount();
     session.typeOpacityDigit(5, 10);
     for (const ImageLayer &layer : session.document().value().layers) {
-        if (layer.id == first || layer.id == second)
+        // The folder takes it too, since 1.1.6.
+        if (layer.id == first || layer.id == second || layer.id == folder)
             QCOMPARE(layer.opacity, 0.5);
-        if (layer.id == folder)
-            QCOMPARE(layer.opacity, 1.0);
     }
     QCOMPARE(session.history.undoCount(), count + 1);
 }

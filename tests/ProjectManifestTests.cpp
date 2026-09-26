@@ -309,10 +309,10 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions_data()
     QTest::addColumn<std::optional<ProjectError::Kind>>("refused");
     const auto invalid = std::optional(ProjectError::Kind::invalid), tooLarge = std::optional(ProjectError::Kind::tooLarge);
     const std::optional<ProjectError::Kind> fine;
-    for (int version = 1; version <= 7; ++version)
+    for (int version = 1; version <= 8; ++version)
         QTest::addRow("plain at version %d", version) << "" << version << fine;
     QTest::newRow("version 0") << "" << 0 << std::optional(ProjectError::Kind::version);
-    QTest::newRow("version 8") << "" << 8 << std::optional(ProjectError::Kind::version);
+    QTest::newRow("version 9") << "" << 9 << std::optional(ProjectError::Kind::version);
     QTest::newRow("another format") << "format" << 7 << invalid;
     QTest::newRow("another colour space") << "colorSpace" << 7 << invalid;
     QTest::newRow("resolution 0.5") << "resolution=0.5" << 7 << invalid;
@@ -349,7 +349,9 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions_data()
     QTest::newRow("an empty folder at version 1") << "folderEmpty" << 1 << invalid;
     QTest::newRow("an empty folder at version 2") << "folderEmpty" << 2 << fine;
     QTest::newRow("a folder that blends") << "folderBlend" << 7 << invalid;
-    QTest::newRow("a folder that fades") << "folderOpacity" << 7 << invalid;
+    QTest::newRow("a folder that fades before version 8") << "folderOpacity" << 7 << invalid;
+    QTest::newRow("a folder that fades at version 8") << "folderOpacity" << 8 << fine;
+    QTest::newRow("a folder that blends at version 8") << "folderBlend" << 8 << invalid;
     QTest::newRow("a folder with pixels") << "folderPixels" << 7 << invalid;
     QTest::newRow("a folder mask before version 6") << "folderMask" << 5 << invalid;
     QTest::newRow("a folder mask at version 6") << "folderMask" << 6 << fine;

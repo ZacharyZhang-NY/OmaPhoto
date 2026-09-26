@@ -100,7 +100,7 @@ void EditorSession::setLocksTransformRatio(bool locks)
     notify();
 }
 
-// A folder has no pixels to copy: it just moves.
+// Alt-drag copies selected roots with their contents.
 void EditorSession::beginDuplicateTransform()
 {
     if (m_transformDuplicate || !m_activeLayerID)
@@ -110,10 +110,14 @@ void EditorSession::beginDuplicateTransform()
     if (!canTransform())
         return;
     const QSet<QUuid> selection = m_selectedLayerIDs;
+    // A selected folder carries its selected contents along.
+    QSet<QUuid> carried;
+    for (const QUuid &id : selection)
+        carried.unite(descendantIDs(id));
     // Bottom to top: the copies keep their order.
     std::vector<QUuid> targets;
     for (const ImageLayer &layer : m_document->layers) {
-        if (selection.contains(layer.id) && !layer.isGroup)
+        if (selection.contains(layer.id) && !carried.contains(layer.id))
             targets.push_back(layer.id);
     }
     if (targets.empty())
@@ -123,7 +127,14 @@ void EditorSession::beginDuplicateTransform()
     for (const QUuid &id : targets) {
         selectLayer(id);
         duplicateActiveLayer();
-        copies.push_back(m_activeLayerID.value());
+        if (m_activeLayerID != id)
+            copies.push_back(m_activeLayerID.value());
+    }
+    // Past the layer limit nothing was copied.
+    if (copies.empty()) {
+        endEdit();
+        selectLayers(selection, primary);
+        return;
     }
     m_transformDuplicate = TransformDuplicate{copies, selection, primary};
     selectLayers(QSet<QUuid>(copies.begin(), copies.end()), copies.back());
@@ -206,9 +217,11 @@ void EditorSession::cancelTransform()
     if (m_transformDuplicate) {
         // The copies go and the old selection returns.
         const TransformDuplicate duplicate = *m_transformDuplicate;
-        std::erase_if(m_document->layers, [&](const ImageLayer &layer) {
-            return std::find(duplicate.copies.begin(), duplicate.copies.end(), layer.id) != duplicate.copies.end();
-        });
+        QSet<QUuid> removed(duplicate.copies.begin(), duplicate.copies.end());
+        for (const QUuid &copy : duplicate.copies)
+            removed.unite(descendantIDs(copy));
+        std::erase_if(m_document->layers, [&](const ImageLayer &layer) { return removed.contains(layer.id); });
+        m_collapsedGroupIDs.subtract(removed);
         selectLayers(duplicate.source, duplicate.primary);
         endDuplicateTransform();
     }

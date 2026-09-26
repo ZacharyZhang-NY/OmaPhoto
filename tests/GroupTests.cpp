@@ -261,7 +261,7 @@ void GroupTests::projectErrorsCarryTheirMessages()
     const ProjectError version = ProjectError::unsupportedVersion(9);
     QCOMPARE(version.kind, ProjectError::Kind::version);
     QCOMPARE(version.version, std::optional<int>(9));
-    QCOMPARE(QString(version.what()), QString("This project uses format version 9. This app supports versions 1–7."));
+    QCOMPARE(QString(version.what()), QString("This project uses format version 9. This app supports versions 1–8."));
     QVERIFY_THROWS_EXCEPTION(std::logic_error, ProjectError(ProjectError::Kind::version));
 
     const ProjectError missingImage(ProjectError::Kind::missingImage);

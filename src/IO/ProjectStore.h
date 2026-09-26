@@ -40,6 +40,9 @@ struct ProjectLayerRecord {
     // What the layer draws round itself; its pixels stay.
     std::optional<LayerEffects> effects = std::nullopt;
     std::optional<LayerTextStyle> text = std::nullopt;
+
+    // Drawn opacity, folders included; defined in LayerGroups.cpp.
+    double effectiveOpacity(const std::map<QUuid, ProjectLayerRecord> &byID) const;
 };
 
 // A UUID as Swift writes it: upper case, no braces.
@@ -48,7 +51,7 @@ QString uuidString(const QUuid &id);
 struct ProjectManifest {
     QString format = QStringLiteral("com.compositor.project");
     // Swift's Int: a wild number must reach validation whole.
-    qint64 version = 7;
+    qint64 version = 8;
     QString colorSpace = QStringLiteral("sRGB");
     // Version-1 projects carry none: 72 pixels per inch.
     std::optional<double> resolution = std::nullopt;

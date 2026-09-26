@@ -124,6 +124,7 @@ public:
     void beginRenaming();
     bool isOnControl(QPoint point) const;
     bool isRenaming() const { return m_renaming; }
+    bool isGroup() const { return m_isGroup; }
     QUuid layerID() const { return m_layerID; }
     LayerThumbnailButton &thumbnail() { return *m_thumbnail; }
     LayerThumbnailButton &maskThumbnail() { return *m_maskThumbnail; }

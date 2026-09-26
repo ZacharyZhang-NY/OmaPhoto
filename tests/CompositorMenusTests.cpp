@@ -15,8 +15,6 @@ private slots:
     void fileEntriesFollowTheControllersGate();
     void undoAndRedoCarryTheirNamesAndKeepAFieldsOwn();
     void theMenuBarBorrowsFocusAndTheFieldKeepsUndo();
-    void viewEntriesZoomTheFrontSession();
-    void thePixelGridEntryTogglesTheSession();
     void layerEntriesFollowTheActiveLayer();
     void duplicateMergeAndFlipEntriesActOnTheLayers();
     void transformEntriesFollowTheMoveTool();
@@ -32,7 +30,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         {"newCanvas", "Ctrl+N"}, {"openProject", "Ctrl+O"}, {"importImages", ""}, {"save", "Ctrl+S"}, {"saveAs", "Ctrl+Shift+S"},
         {"exportPNG", "Ctrl+Shift+E"}, {"exportJPEG", "Ctrl+Alt+Shift+S"},
         {"closeProject", "Ctrl+W"}, {"undo", "Ctrl+Z"}, {"redo", "Ctrl+Shift+Z"}, {"fit", "Ctrl+0"}, {"actualPixels", "Ctrl+1"},
-        {"zoomIn", "Ctrl+="}, {"zoomOut", "Ctrl+-"}, {"pixelGrid", ""}, {"transformControls", "Ctrl+H"}, {"transformLayer", "Ctrl+T"},
+        {"zoomIn", "Ctrl+="}, {"zoomOut", "Ctrl+-"}, {"pixelGrid", ""}, {"snap", ""}, {"transformControls", "Ctrl+H"}, {"transformLayer", "Ctrl+T"},
         {"layerViaCopy", "Ctrl+J"}, {"cut", "Ctrl+X"}, {"copy", "Ctrl+C"}, {"copyMerged", "Ctrl+Shift+C"}, {"paste", "Ctrl+V"}, {"fillForeground", "Alt+Backspace"}, {"fillBackground", "Ctrl+Backspace"}, {"clearSelectionPixels", ""}, {"contentAwareFill", "Shift+Backspace"}, {"clippingMask", "Ctrl+Alt+G"}, {"groupLayers", "Ctrl+G"},
         {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
         {"mergeLayers", "Ctrl+E"}, {"flipHorizontal", ""}, {"flipVertical", ""}, {"deleteLayer", ""},
@@ -53,7 +51,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     QCOMPARE(titles, (QStringList{"&File", "&Edit", "&View", "&Select", "&Image", "Fil&ter", "&Layer"}));
     QCOMPARE(menus[0]->actions().size(), 11);
     QCOMPARE(menus[1]->actions().size(), 12);
-    QCOMPARE(menus[2]->actions().size(), 6);
+    QCOMPARE(menus[2]->actions().size(), 7);
     QCOMPARE(menus[3]->actions().size(), 10);
     QCOMPARE(menus[4]->actions().size(), 13);
     QCOMPARE(menus[5]->actions().size(), 5);
@@ -224,43 +222,6 @@ void CompositorMenusTests::theMenuBarBorrowsFocusAndTheFieldKeepsUndo()
     QCOMPARE(undo.text(), QString("Undo"));
     zoom.clearFocus();
     QTRY_COMPARE(undo.text(), QString("Undo New Blank Layer"));
-}
-
-void CompositorMenusTests::viewEntriesZoomTheFrontSession()
-{
-    Bar bar;
-    for (const char *name : {"fit", "actualPixels", "zoomIn", "zoomOut"})
-        QVERIFY(!bar.action(name).isEnabled());
-    bar.session().createDocument(400, 300);
-    for (const char *name : {"fit", "actualPixels", "zoomIn", "zoomOut"})
-        QVERIFY(bar.action(name).isEnabled());
-    bar.session().zoom(0.5);
-    bar.action("actualPixels").trigger();
-    QCOMPARE(bar.session().viewport.zoom(), 1.0);
-    bar.action("zoomIn").trigger();
-    QCOMPARE(bar.session().viewport.zoom(), 1.25);
-    bar.action("zoomOut").trigger();
-    bar.action("zoomOut").trigger();
-    QCOMPARE(bar.session().viewport.zoom(), 0.8);
-    bar.action("fit").trigger();
-    QVERIFY(bar.session().viewport.followsFit());
-}
-
-void CompositorMenusTests::thePixelGridEntryTogglesTheSession()
-{
-    Bar bar;
-    QAction &grid = bar.action("pixelGrid");
-    QVERIFY(grid.isCheckable() && grid.isChecked() && grid.isEnabled());
-    QCOMPARE(grid.text(), QString("Pixel Grid (800% and above)"));
-    grid.trigger();
-    QVERIFY(!bar.session().showsPixelGrid() && !grid.isChecked());
-    grid.trigger();
-    QVERIFY(bar.session().showsPixelGrid() && grid.isChecked());
-    // The session's own change reaches the mark.
-    bar.session().setShowsPixelGrid(false);
-    QVERIFY(!grid.isChecked());
-    bar.workspace.newCanvas();
-    QVERIFY(grid.isChecked() && grid.isEnabled());
 }
 
 void CompositorMenusTests::layerEntriesFollowTheActiveLayer()

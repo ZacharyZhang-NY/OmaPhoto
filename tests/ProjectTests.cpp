@@ -167,7 +167,7 @@ void ProjectTests::unsupportedCorruptAndUnsafeMetadataAreRejected()
     };
     // A version out of range is named whatever else fails.
     const QByteArray future = R"({"format": "com.compositor.project", "version": 42, "layers": "from the future"})";
-    for (const qint64 strange : {qint64(42), qint64(8), qint64(0)}) {
+    for (const qint64 strange : {qint64(42), qint64(9), qint64(0)}) {
         try {
             overwrite(metadata, QByteArray(future).replace("42", QByteArray::number(strange)));
             ProjectStore::load(path);
@@ -182,12 +182,12 @@ void ProjectTests::unsupportedCorruptAndUnsafeMetadataAreRejected()
     QCOMPARE(loading(QByteArray(future).replace("42", "1")), std::optional(ProjectError::Kind::invalid));
     // Another format is invalid whatever version it claims.
     QCOMPARE(loading(QByteArray(future).replace("compositor", "example")), std::optional(ProjectError::Kind::invalid));
-    QCOMPARE(loading(QByteArray(good).replace("\"version\": 7", "\"version\": 0")), std::optional(ProjectError::Kind::version));
+    QCOMPARE(loading(QByteArray(good).replace("\"version\": 8", "\"version\": 0")), std::optional(ProjectError::Kind::version));
     // Swift's Int holds 64 bits, each one: no double between.
     const qint64 most = std::numeric_limits<qint64>::max(), least = std::numeric_limits<qint64>::min();
     for (const qint64 wild : {qint64(2147483648), qint64(-2147483648), qint64(-1), qint64(9007199254740993), most, least}) {
         try {
-            overwrite(metadata, QByteArray(good).replace("\"version\": 7", "\"version\": " + QByteArray::number(wild)));
+            overwrite(metadata, QByteArray(good).replace("\"version\": 8", "\"version\": " + QByteArray::number(wild)));
             ProjectStore::load(path);
             QFAIL("a wild version opened");
         } catch (const ProjectError &error) {
@@ -197,19 +197,19 @@ void ProjectTests::unsupportedCorruptAndUnsafeMetadataAreRejected()
         }
     }
     QCOMPARE(loading(QByteArray(good).replace("\"width\": 100", "\"width\": 3000000000")), std::optional(ProjectError::Kind::tooLarge));
-    QCOMPARE(loading(QByteArray(good).replace("\"version\": 7", "\"version\": 9223372036854775808")), std::optional(ProjectError::Kind::invalid));
+    QCOMPARE(loading(QByteArray(good).replace("\"version\": 8", "\"version\": 9223372036854775808")), std::optional(ProjectError::Kind::invalid));
     // Declared: Qt rounds a token just past Int64's minimum.
     try {
-        overwrite(metadata, QByteArray(good).replace("\"version\": 7", "\"version\": -9223372036854775809"));
+        overwrite(metadata, QByteArray(good).replace("\"version\": 8", "\"version\": -9223372036854775809"));
         ProjectStore::load(path);
         QFAIL("a version below every integer opened");
     } catch (const ProjectError &error) {
         QCOMPARE(error.version, std::optional(least));
     }
-    QCOMPARE(loading(QByteArray(good).replace("\"version\": 7", "\"version\": 1e19")), std::optional(ProjectError::Kind::invalid));
-    QCOMPARE(loading(QByteArray(good).replace("\"version\": 7", "\"version\": 7.5")), std::optional(ProjectError::Kind::invalid));
-    QCOMPARE(loading(QByteArray(good).replace("\"version\": 7", "\"version\": 1e300")), std::optional(ProjectError::Kind::invalid));
-    QCOMPARE(loading(QByteArray(good).replace("\"version\": 7", "\"version\": \"7\"")), std::optional(ProjectError::Kind::invalid));
+    QCOMPARE(loading(QByteArray(good).replace("\"version\": 8", "\"version\": 1e19")), std::optional(ProjectError::Kind::invalid));
+    QCOMPARE(loading(QByteArray(good).replace("\"version\": 8", "\"version\": 7.5")), std::optional(ProjectError::Kind::invalid));
+    QCOMPARE(loading(QByteArray(good).replace("\"version\": 8", "\"version\": 1e300")), std::optional(ProjectError::Kind::invalid));
+    QCOMPARE(loading(QByteArray(good).replace("\"version\": 8", "\"version\": \"7\"")), std::optional(ProjectError::Kind::invalid));
     QCOMPARE(loading(QByteArray(good).replace("com.compositor.project", "com.example.project")), std::optional(ProjectError::Kind::invalid));
     QCOMPARE(loading("not json"), std::optional(ProjectError::Kind::invalid));
     QCOMPARE(loading("[1, 2]"), std::optional(ProjectError::Kind::invalid));

@@ -168,9 +168,12 @@ void TransformOverlayTests::handlesAndGuidesArePaintedWhereTheyBelong()
     QCOMPARE(shot.pixelColor(190, 140), QColor(Qt::white));
     QCOMPARE(shot.pixelColor(210, 160), QColor(Qt::white));
     QCOMPARE(shot.pixelColor(200, 112), QColor(Qt::white));
-    // The accent outline runs between the handles, over the red.
-    QVERIFY(shot.pixelColor(190, 145) != QColor(Qt::red));
-    QVERIFY(shot.pixelColor(190, 145).blue() > shot.pixelColor(190, 145).red());
+    // The accent alone runs between handles, half over red.
+    const QColor accent = canvas.palette().color(QPalette::Highlight);
+    const QColor edge = shot.pixelColor(190, 145);
+    QVERIFY2(std::abs(edge.red() - (accent.red() + 255) / 2) <= 2 && std::abs(edge.green() - accent.green() / 2) <= 2
+                 && std::abs(edge.blue() - accent.blue() / 2) <= 2,
+             qPrintable(edge.name()));
     session.setShowsTransformControls(false);
     QVERIFY(overlay.drawnRect(canvas.rect()).isEmpty());
     shot = canvas.grab().toImage();

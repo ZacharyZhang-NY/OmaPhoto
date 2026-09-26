@@ -404,7 +404,7 @@ void TypeControlsTests::aTextRowShowsAndOpensItsText()
     QVERIFY(QTest::qWaitForWindowActive(&list));
     LayerCell &textRow = *list.cells().at(0), &blankRow = *list.cells().at(1);
     const auto dimensions = [](LayerCell &row) { return row.findChild<QLabel *>("layerDimensions")->text(); };
-    QCOMPARE(dimensions(textRow), QString("Text · Double-click to edit"));
+    QCOMPARE(dimensions(textRow), QString("Text"));
     QCOMPARE(dimensions(blankRow), QString("400 × 300 px"));
     QCOMPARE(textRow.thumbnail().toolTip(), QString("Editable text layer"));
     QCOMPARE(textRow.thumbnail().accessibleName(), QString("Select text: Row"));

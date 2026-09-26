@@ -3,6 +3,8 @@ public:
     LayerBlendMode displayedBlendMode(const ImageLayer &layer) const;
     void previewBlendMode(std::optional<LayerBlendMode> mode, std::optional<QUuid> id);
     bool canEditAppearance() const;
+    // A folder dims what it holds; blending stays per layer.
+    bool canEditOpacity() const;
     // A slider drag: many values, one undo step.
     void beginOpacityEdit();
     void finishOpacityEdit();
