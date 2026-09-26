@@ -31,6 +31,11 @@ public:
     bool canModifySelection() const;
     void expandSelection(int amount);
     void contractSelection(int amount);
+    // Menu commands ask an amount; the bar applies directly.
+    void promptSelectionAmount(SelectionAmountOperation operation);
+    void confirmSelectionAmount(int amount);
+    // Softens the edge further each time, as blurs stack.
+    void featherSelection(int amount);
     void selectAll();
     void deselect();
     void invertSelection();

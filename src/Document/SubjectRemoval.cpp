@@ -1,10 +1,14 @@
 #include "Document/SubjectRemoval.h"
+#include "Document/BrushStroke.h"
+#include "Document/EditorSession.h"
+#include "Document/MaskTracing.h"
 #include "Document/GuidedMatte.h"
 #include "Document/PixelAdjust.h"
 #include "IO/ImageExporter.h"
 #include "Logging.h"
 #include <QMutex>
 #include <QStandardPaths>
+#include <QtConcurrent>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -235,4 +239,66 @@ QImage SubjectRemoval::run(const QImage &image, const FilterSettings &settings)
             row[x] = uchar((int(row[x]) * coverage[x / 4] + 127) / 255);
     }
     return result;
+}
+
+bool EditorSession::canSelectSubject() const
+{
+    // canEditLayers reads the document and the busy project.
+    return canEditSelection();
+}
+
+void EditorSession::selectSubject(SelectionMode mode, std::function<void()> done)
+{
+    // The caller resumes from the event loop, as after await.
+    const auto finish = [this, &done] {
+        if (done)
+            QMetaObject::invokeMethod(this, done, Qt::QueuedConnection);
+    };
+    if (!canSelectSubject()) {
+        finish();
+        return;
+    }
+    QImage shown;
+    try {
+        shown = BrushRaster::context(m_document->width, m_document->height, false);
+        QPainter painter(&shown);
+        drawLiveComposite(*m_document, painter);
+    } catch (const ExportError &error) {
+        qCWarning(lcApp) << "Select Subject cannot draw the canvas:" << error.what();
+        finish();
+        return;
+    }
+    setIsProjectBusy(true);
+    m_subjecting = Subjecting{mode, m_document->id, std::move(done)};
+    m_subject.setFuture(QtConcurrent::run([shown]() -> Subjected {
+        try {
+            return Subjected{SubjectRemoval::subjectMask(shown, std::nullopt, FilterSettings()), std::nullopt};
+        } catch (const SubjectRemovalError &error) {
+            return Subjected{std::nullopt, QString::fromUtf8(error.what())};
+        } catch (const ExportError &error) {
+            return Subjected{std::nullopt, QString::fromUtf8(error.what())};
+        }
+    }));
+}
+
+void EditorSession::finishSubject()
+{
+    const Subjected result = m_subject.result();
+    const Subjecting pending = std::exchange(m_subjecting, std::nullopt).value();
+    setIsProjectBusy(false);
+    if (m_document && m_document->id == pending.documentID) {
+        if (result.failure) {
+            qCWarning(lcApp).noquote() << "Select Subject failed:" << *result.failure;
+            setBrushError(result.failure);
+        } else if (const std::optional<QPainterPath> traced = MaskTracing::whitePixels(*result.mask)) {
+            // White where the subject is: its outline is the selection.
+            const QTransform toDocument = BrushRaster::pixelToDocument(LayerTransform{.origin = QPointF(0, 0), .size = m_document->size()},
+                                                                       result.mask->width(), result.mask->height());
+            applySelection(toDocument.map(*traced), pending.mode, QStringLiteral("Select Subject"));
+        } else {
+            qCWarning(lcApp) << "Select Subject traced no outline";
+        }
+    }
+    if (pending.done)
+        QMetaObject::invokeMethod(this, pending.done, Qt::QueuedConnection);
 }

@@ -1,4 +1,7 @@
 #include "UI/TypeControls.h"
+#include <QAbstractItemView>
+#include <QStylePainter>
+#include <QSignalBlocker>
 #include "UI/ColorPaletteControls.h"
 #include "Document/EditorSession.h"
 #include "Rendering/TextLayout.h"
@@ -82,8 +85,52 @@ void TextStyleField::focusOutEvent(QFocusEvent *event)
     QLineEdit::focusOutEvent(event);
 }
 
+TypeFontPicker::TypeFontPicker(QWidget *parent) : QComboBox(parent)
+{
+    setAccessibleName(QStringLiteral("Font"));
+}
+
+void TypeFontPicker::sync(const QString &name)
+{
+    if (view()->isVisible())
+        return;
+    if (findText(name) < 0)
+        addItem(name);
+    setCurrentIndex(findText(name));
+}
+
+void TypeFontPicker::showPopup()
+{
+    if (!m_loaded) {
+        // Every installed face, and the style's own though missing.
+        const QString selected = currentText();
+        QStringList names = TextLayout::availableFonts();
+        if (!names.contains(selected))
+            names << selected;
+        names.sort();
+        const QSignalBlocker quiet(this);
+        clear();
+        addItems(names);
+        setCurrentIndex(findText(selected));
+        m_loaded = true;
+    }
+    QComboBox::showPopup();
+}
+
+void TypeFontPicker::paintEvent(QPaintEvent *)
+{
+    QStylePainter painter(this);
+    QStyleOptionComboBox option;
+    initStyleOption(&option);
+    painter.drawComplexControl(QStyle::CC_ComboBox, option);
+    const QRect field = style()->subControlRect(QStyle::CC_ComboBox, &option, QStyle::SC_ComboBoxEditField, this);
+    // The label draws inset a pixel each side.
+    option.currentText = fontMetrics().elidedText(option.currentText, Qt::ElideRight, field.width() - 2);
+    painter.drawControl(QStyle::CE_ComboBoxLabel, option);
+}
+
 TypeControls::TypeControls(EditorSession &session, QWidget *parent)
-    : ToolHeaderBar(QStringLiteral("Type"), parent), m_session(session), m_font(new QComboBox),
+    : ToolHeaderBar(QStringLiteral("Type"), parent), m_session(session), m_font(new TypeFontPicker),
       m_size(new TextStyleField(
           [this] { return number(m_session.currentTextStyle().fontSize, locale()); },
           [this](const QString &text) {
@@ -136,10 +183,13 @@ TypeControls::TypeControls(EditorSession &session, QWidget *parent)
     fields->setContentsMargins(0, 0, 0, 0);
     fields->setSpacing(10);
     m_font->setObjectName(QStringLiteral("typeFont"));
-    m_font->setFixedWidth(185);
+    m_font->setFixedWidth(210);
     m_font->setToolTip(QStringLiteral("Font face, including bold and italic variants"));
     connect(m_font, &QComboBox::activated, this, [this](int index) {
         const QString name = m_font->itemText(index);
+        // The face already shown changes nothing, as Swift's choose.
+        if (name == m_session.currentTextStyle().fontName)
+            return;
         m_session.changeTextStyle([&name](LayerTextStyle &style) { style.fontName = name; });
     });
     m_size->setObjectName(QStringLiteral("typeSize"));
@@ -223,16 +273,7 @@ QToolButton *TypeControls::alignment(TextAlignment value)
 void TypeControls::synchronize()
 {
     const LayerTextStyle style = m_session.currentTextStyle();
-    // Every installed face, and the style's own though missing.
-    QStringList names = TextLayout::availableFonts();
-    if (!names.contains(style.fontName))
-        names << style.fontName;
-    names.sort();
-    if (m_font->count() != names.size() || m_font->findText(style.fontName) < 0) {
-        m_font->clear();
-        m_font->addItems(names);
-    }
-    m_font->setCurrentIndex(m_font->findText(style.fontName));
+    m_font->sync(style.fontName);
     for (size_t index = 0; index < m_alignments.size(); ++index)
         m_alignments[index]->setChecked(style.alignment == allTextAlignments[index]);
     for (TextStyleField *field : {m_size, m_tracking, m_leading})

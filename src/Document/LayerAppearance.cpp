@@ -6,9 +6,9 @@
 #include <utility>
 
 namespace {
-const std::array<std::pair<LayerBlendMode, const char *>, 13> names{{
+const std::array<std::pair<LayerBlendMode, const char *>, 14> names{{
     {LayerBlendMode::normal, "Normal"}, {LayerBlendMode::multiply, "Multiply"}, {LayerBlendMode::screen, "Screen"},
-    {LayerBlendMode::overlay, "Overlay"}, {LayerBlendMode::darken, "Darken"}, {LayerBlendMode::lighten, "Lighten"},
+    {LayerBlendMode::overlay, "Overlay"}, {LayerBlendMode::softLight, "Soft Light"}, {LayerBlendMode::darken, "Darken"}, {LayerBlendMode::lighten, "Lighten"},
     {LayerBlendMode::difference, "Difference"}, {LayerBlendMode::colorDodge, "Color Dodge"},
     {LayerBlendMode::colorBurn, "Color Burn"}, {LayerBlendMode::hue, "Hue"}, {LayerBlendMode::saturation, "Saturation"},
     {LayerBlendMode::color, "Color"}, {LayerBlendMode::luminosity, "Luminosity"},

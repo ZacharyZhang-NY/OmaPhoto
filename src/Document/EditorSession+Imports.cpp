@@ -4,8 +4,8 @@
 
 bool EditorSession::canStartProjectOperation() const
 {
-    return !m_textDraft && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_warpStroke && !m_showsNewDocument && !m_showsImporter
-        && !m_renamingLayerID && !m_importError && !m_levels && !m_adjustmentEditingID;
+    return !m_selectionAmountOperation && !m_textDraft && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_warpStroke && !m_showsNewDocument
+        && !m_showsImporter && !m_renamingLayerID && !m_importError && !m_levels && !m_adjustmentEditingID;
 }
 
 void EditorSession::waitForFileRequest(std::function<void()> ready)

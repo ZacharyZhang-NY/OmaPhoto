@@ -1,12 +1,12 @@
 #pragma once
 #include "Document/TypeTool.h"
 #include "UI/ToolHeaderStyle.h"
+#include <QComboBox>
 #include <QLineEdit>
 #include <array>
 #include <functional>
 
 class EditorSession;
-class QComboBox;
 class QPushButton;
 class QToolButton;
 class SwatchButton;
@@ -32,6 +32,23 @@ private:
     bool m_borrowed = false;
 };
 
+// Swift's TypeFontPicker: the catalog loads when the menu opens.
+class TypeFontPicker : public QComboBox {
+    Q_OBJECT
+public:
+    explicit TypeFontPicker(QWidget *parent = nullptr);
+    // Shows `name`; an open menu is left alone.
+    void sync(const QString &name);
+    void showPopup() override;
+
+protected:
+    // A long name is cut short, never widening the control.
+    void paintEvent(QPaintEvent *event) override;
+
+private:
+    bool m_loaded = false;
+};
+
 // Swift's TypeControls: font, size, alignment, spacing, Done.
 class TypeControls : public ToolHeaderBar {
     Q_OBJECT
@@ -47,7 +64,7 @@ private:
     void synchronize();
 
     EditorSession &m_session;
-    QComboBox *const m_font;
+    TypeFontPicker *const m_font;
     TextStyleField *const m_size;
     // Open text's colour, else the next text's: the foreground.
     SwatchButton *const m_colour;

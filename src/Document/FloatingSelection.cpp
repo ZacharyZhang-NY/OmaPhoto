@@ -122,9 +122,9 @@ void EditorSession::mergeFloatingTransform(const TransformEdit &edit, const Floa
         if (current && edit.corners) {
             const QTransform placement = BrushRaster::pixelToDocument(floating.original, int(floating.pixelSize.width()), int(floating.pixelSize.height()));
             if (const std::optional<QPainterPath> path = DistortWarp::mapPath(current->path, placement, floating.pixelSize, edit.draft, *edit.corners))
-                moved = DocumentSelection{*path, current->antialiased};
+                moved = DocumentSelection{*path, current->antialiased, current->feather};
         } else if (const std::optional<QTransform> shift = floatingSelectionTransform(edit); current && shift) {
-            moved = DocumentSelection{shift->map(current->path), current->antialiased};
+            moved = DocumentSelection{shift->map(current->path), current->antialiased, current->feather};
         }
         std::erase_if(m_document->layers, [&](const ImageLayer &layer) { return layer.id == edit.layerID; });
         ImageLayer &layer = m_document->layers[indexOf(m_document->layers, source.id)];

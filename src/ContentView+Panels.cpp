@@ -1,4 +1,5 @@
 #include "ContentView.h"
+#include "UI/LassoControls.h"
 #include "UI/EffectsSheet.h"
 #include "UI/FilterSheet.h"
 #include "UI/HueSaturationSheet.h"
@@ -25,6 +26,17 @@ void ContentView::synchronizePanels()
             m_adjustmentPanel.show(QStringLiteral("Hue/Saturation"), new HueSaturationSheet(m_session));
         } else {
             m_adjustmentPanel.close();
+        }
+    }
+    // Swift's onChange of the amount's question: a sheet per question.
+    if (m_selectionAmountShown != m_session.selectionAmountOperation()) {
+        m_selectionAmountShown = m_session.selectionAmountOperation();
+        if (m_selectionAmountShown) {
+            m_selectionAmountPanel.onClose = [this] { m_session.setSelectionAmountOperation(std::nullopt); };
+            m_selectionAmountPanel.show(rawValue(*m_selectionAmountShown) + QStringLiteral(" Selection"),
+                                        new SelectionAmountSheet(m_session, *m_selectionAmountShown));
+        } else {
+            m_selectionAmountPanel.close();
         }
     }
     if (m_filterShown != m_session.filterEdit().has_value()) {

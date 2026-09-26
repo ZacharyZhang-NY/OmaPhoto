@@ -56,6 +56,15 @@ struct SessionJobs {
         std::optional<QPainterPath> path;
         std::optional<QString> failure;
     };
+    struct Subjecting {
+        SelectionMode mode;
+        QUuid documentID;
+        std::function<void()> done;
+    };
+    struct Subjected {
+        std::optional<QImage> mask;
+        std::optional<QString> failure;
+    };
     // The last stroke's end, for a Shift-click's line.
     struct LastBrushPoint {
         QPointF point;

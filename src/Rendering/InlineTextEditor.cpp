@@ -37,7 +37,15 @@ void InlineTextEditor::synchronize(const TextDraft &draft)
     }
     const LayerTextStyle &style = draft.style;
     // Point text has no box: it is what is typed.
-    m_logicalSize = EditorSession::textBoxSize(style);
+    if (style.boxSize) {
+        m_logicalSize = *style.boxSize;
+    } else {
+        if (m_measuredStyle != style) {
+            m_measuredSize = EditorSession::textBoxSize(style);
+            m_measuredStyle = style;
+        }
+        m_logicalSize = m_measuredSize;
+    }
     LayerTransform transform = draft.transform.value_or(LayerTransform{.origin = draft.origin, .size = m_logicalSize});
     // Point text grows at its layer's scale, corner kept.
     const int index = draft.layerID ? indexOf(document.layers, *draft.layerID) : -1;

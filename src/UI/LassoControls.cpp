@@ -1,5 +1,8 @@
 #include "UI/LassoControls.h"
+#include <QBoxLayout>
 #include <QFrame>
+#include <QLabel>
+#include <QSignalBlocker>
 #include <QRegularExpressionValidator>
 #include <QFocusEvent>
 #include <QKeyEvent>
@@ -98,6 +101,9 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
       m_contract(new QPushButton(QStringLiteral("Contract"), this)),
       m_contractAmount(new SelectionAmountField(session, 1, 500, [this] { return double(m_session.selectionContractAmount()); },
                                                 [this](double amount) { m_session.setSelectionContractAmount(int(std::lround(amount))); }, this)),
+      m_feather(new QPushButton(QStringLiteral("Feather"), this)),
+      m_featherAmount(new SelectionAmountField(session, 1, 250, [this] { return double(m_session.selectionFeatherAmount()); },
+                                               [this](double amount) { m_session.setSelectionFeatherAmount(int(std::lround(amount))); }, this)),
       m_empty(new QLabel(QStringLiteral("Empty selection"), this)), m_deselect(new QPushButton(QStringLiteral("Deselect"), this))
 {
     m_toleranceLabel->setFont(ToolHeaderStyle::controlFont());
@@ -132,6 +138,11 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
     connect(m_contract, &QPushButton::clicked, this, [this] { m_session.contractSelection(m_session.selectionContractAmount()); });
     m_contractAmount->setObjectName(QStringLiteral("selectionContractAmount"));
     m_contractAmount->setToolTip(m_contract->toolTip());
+    m_feather->setObjectName(QStringLiteral("featherSelection"));
+    m_feather->setToolTip(QStringLiteral("Fade the edge of the selection by this many pixels"));
+    connect(m_feather, &QPushButton::clicked, this, [this] { m_session.featherSelection(m_session.selectionFeatherAmount()); });
+    m_featherAmount->setObjectName(QStringLiteral("selectionFeatherAmount"));
+    m_featherAmount->setToolTip(m_feather->toolTip());
     m_empty->setObjectName(QStringLiteral("emptySelection"));
     m_empty->setFont(ToolHeaderStyle::controlFont());
     m_empty->setForegroundRole(QPalette::PlaceholderText);
@@ -141,6 +152,7 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
     for (QWidget *widget : std::initializer_list<QWidget *>{m_rectangle, m_ellipse, m_freehand, m_polygonal, m_replace, m_add, m_subtract, m_toleranceLabel,
                                                              m_tolerance, m_sampleSize, m_thisLayer, m_allLayers, m_contiguous, m_antialias,
                                                              divider, m_expand, m_expandAmount, new QLabel(QStringLiteral("px"), this), m_contract, m_contractAmount,
+                                                             new QLabel(QStringLiteral("px"), this), m_feather, m_featherAmount,
                                                              new QLabel(QStringLiteral("px"), this)})
         row->insertWidget(row->count() - 1, widget);
     row->addWidget(m_empty);
@@ -202,13 +214,105 @@ void LassoControls::synchronize()
     if (m_antialias->isChecked() != m_session.selectionAntialiased())
         m_antialias->setChecked(m_session.selectionAntialiased());
     const bool modifies = m_session.canModifySelection();
-    for (QWidget *widget : std::initializer_list<QWidget *>{m_expand, m_expandAmount, m_contract, m_contractAmount})
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_expand, m_expandAmount, m_contract, m_contractAmount, m_feather, m_featherAmount})
         widget->setEnabled(modifies);
     m_expandAmount->sync(m_session.selectionExpandAmount());
     m_contractAmount->sync(m_session.selectionContractAmount());
+    m_featherAmount->sync(m_session.selectionFeatherAmount());
     const std::optional<DocumentSelection> selection = m_session.selection();
     m_empty->setVisible(selection && selection->isEmpty());
     m_deselect->setVisible(selection.has_value());
     m_deselect->setEnabled(m_session.canEditSelection());
     setEnabled(!m_session.showsBusy() && m_session.document().has_value());
+}
+
+SelectionAmountSheet::SelectionAmountSheet(EditorSession &session, SelectionAmountOperation operation, QWidget *parent)
+    : QWidget(parent), m_session(session), m_maximum(operation == SelectionAmountOperation::feather ? 250 : 500),
+      m_slider(new QSlider(Qt::Horizontal, this)), m_input(new QLineEdit(this)),
+      m_note(new QLabel(QStringLiteral("Enter a whole number from 1 to %1 px.").arg(m_maximum), this)), m_ok(new QPushButton(QStringLiteral("OK"), this))
+{
+    const int start = operation == SelectionAmountOperation::expand     ? session.selectionExpandAmount()
+                      : operation == SelectionAmountOperation::contract ? session.selectionContractAmount()
+                                                                         : session.selectionFeatherAmount();
+    setFixedWidth(380);
+    auto *column = new QVBoxLayout(this);
+    column->setContentsMargins(24, 24, 24, 24);
+    column->setSpacing(16);
+    auto *row = new QHBoxLayout;
+    row->setSpacing(10);
+    auto *title = new QLabel(QStringLiteral("Amount"), this);
+    title->setMinimumWidth(60);
+    title->setBuddy(m_slider);
+    m_slider->setObjectName(QStringLiteral("amountSlider"));
+    m_slider->setRange(1, m_maximum);
+    m_input->setObjectName(QStringLiteral("amountField"));
+    m_input->setAccessibleName(QStringLiteral("Amount"));
+    m_input->setPlaceholderText(QStringLiteral("Amount"));
+    m_input->setFixedWidth(56);
+    m_input->setAlignment(Qt::AlignRight);
+    m_input->setText(QString::number(start));
+    row->addWidget(title);
+    row->addWidget(m_slider, 1);
+    row->addWidget(m_input);
+    row->addSpacing(2);
+    row->addWidget(new QLabel(QStringLiteral("px"), this));
+    column->addLayout(row);
+    m_note->setObjectName(QStringLiteral("amountNote"));
+    m_note->setForegroundRole(QPalette::PlaceholderText);
+    QFont callout = m_note->font();
+    callout.setPixelSize(12);
+    m_note->setFont(callout);
+    // Hidden, the note keeps its room, as SwiftUI's opacity does.
+    QSizePolicy kept = m_note->sizePolicy();
+    kept.setRetainSizeWhenHidden(true);
+    m_note->setSizePolicy(kept);
+    column->addWidget(m_note);
+    auto *divider = new QFrame(this);
+    divider->setFrameShape(QFrame::HLine);
+    divider->setForegroundRole(QPalette::Mid);
+    column->addWidget(divider);
+    auto *buttons = new QHBoxLayout;
+    auto *cancel = new QPushButton(QStringLiteral("Cancel"), this);
+    cancel->setObjectName(QStringLiteral("amountCancel"));
+    cancel->setAutoDefault(false);
+    m_ok->setObjectName(QStringLiteral("amountOK"));
+    m_ok->setDefault(true);
+    buttons->addWidget(cancel);
+    buttons->addStretch(1);
+    buttons->addWidget(m_ok);
+    column->addLayout(buttons);
+    connect(m_slider, &QSlider::valueChanged, this, [this](int value) {
+        m_input->setText(QString::number(value));
+    });
+    connect(m_input, &QLineEdit::textChanged, this, [this] { refresh(); });
+    connect(cancel, &QPushButton::clicked, this, [this] { m_session.setSelectionAmountOperation(std::nullopt); });
+    connect(m_ok, &QPushButton::clicked, this, [this] {
+        if (const std::optional<int> chosen = amount())
+            m_session.confirmSelectionAmount(*chosen);
+    });
+    refresh();
+}
+
+void SelectionAmountSheet::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    m_input->setFocus();
+}
+
+std::optional<int> SelectionAmountSheet::amount() const
+{
+    bool ok = false;
+    const int value = m_input->text().toInt(&ok);
+    if (!ok || value < 1 || value > m_maximum)
+        return std::nullopt;
+    return value;
+}
+
+void SelectionAmountSheet::refresh()
+{
+    const std::optional<int> chosen = amount();
+    const QSignalBlocker quiet(m_slider);
+    m_slider->setValue(chosen.value_or(1));
+    m_note->setVisible(!chosen);
+    m_ok->setEnabled(chosen.has_value());
 }

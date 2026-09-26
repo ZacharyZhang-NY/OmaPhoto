@@ -89,6 +89,11 @@ std::optional<QPainterPath> MaskTracing::darkPixels(const QImage &image)
     return trace(image, false, [](uchar value) { return value < 128; });
 }
 
+std::optional<QPainterPath> MaskTracing::whitePixels(const QImage &image)
+{
+    return trace(image, false, [](uchar value) { return value >= 128; });
+}
+
 std::optional<QPainterPath> MaskTracing::opaquePixels(const QImage &image)
 {
     return trace(image, true, [](uchar value) { return value >= 128; });

@@ -36,8 +36,8 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         {"layerViaCopy", "Ctrl+J"}, {"cut", "Ctrl+X"}, {"copy", "Ctrl+C"}, {"copyMerged", "Ctrl+Shift+C"}, {"paste", "Ctrl+V"}, {"fillForeground", "Alt+Backspace"}, {"fillBackground", "Ctrl+Backspace"}, {"clearSelectionPixels", ""}, {"contentAwareFill", "Shift+Backspace"}, {"clippingMask", "Ctrl+Alt+G"}, {"groupLayers", "Ctrl+G"},
         {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
         {"mergeLayers", "Ctrl+E"}, {"flipHorizontal", ""}, {"flipVertical", ""}, {"deleteLayer", ""},
-        {"selectAll", "Ctrl+A"}, {"deselect", "Ctrl+D"}, {"inverse", "Ctrl+Shift+I"}, {"layerPixels", ""}, {"maskBlackAreas", ""},
-        {"expandSelection", ""}, {"contractSelection", ""}, {"curves", "Ctrl+M"}, {"levels", "Ctrl+L"}, {"hueSaturation", "Ctrl+U"}, {"exposure", ""}, {"gradientMap", ""}, {"grain", ""}, {"invert", "Ctrl+I"},
+        {"selectAll", "Ctrl+A"}, {"deselect", "Ctrl+D"}, {"inverse", "Ctrl+Shift+I"}, {"layerPixels", ""}, {"subject", "Ctrl+Alt+A"}, {"maskBlackAreas", ""},
+        {"expandSelection", ""}, {"contractSelection", ""}, {"featherSelection", ""}, {"curves", "Ctrl+M"}, {"levels", "Ctrl+L"}, {"hueSaturation", "Ctrl+U"}, {"exposure", ""}, {"gradientMap", ""}, {"grain", ""}, {"invert", "Ctrl+I"},
         {"canvasSize", "Ctrl+Alt+C"}, {"imageSize", "Ctrl+Alt+I"}, {"flipCanvasHorizontal", ""}, {"flipCanvasVertical", ""},
         {"gaussianBlur", ""}, {"motionBlur", ""}, {"addNoise", ""}, {"lensCorrection", ""}, {"removeBackground", ""}, {"newAdjustmentLayer", ""}, {"editAdjustment", ""},
         {"newHueSaturationAdjustment", ""}, {"newLevelsAdjustment", ""}, {"newCurvesAdjustment", ""}, {"newExposureAdjustment", ""},
@@ -54,7 +54,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     QCOMPARE(menus[0]->actions().size(), 11);
     QCOMPARE(menus[1]->actions().size(), 12);
     QCOMPARE(menus[2]->actions().size(), 6);
-    QCOMPARE(menus[3]->actions().size(), 8);
+    QCOMPARE(menus[3]->actions().size(), 10);
     QCOMPARE(menus[4]->actions().size(), 13);
     QCOMPARE(menus[5]->actions().size(), 5);
     QCOMPARE(menus[6]->actions().size(), 22);

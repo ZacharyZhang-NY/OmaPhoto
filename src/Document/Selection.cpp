@@ -1,6 +1,7 @@
 #include "Document/Selection.h"
 #include "Document/BrushStroke.h"
 #include "Document/EditorSession.h"
+#include "Document/PixelAdjust.h"
 #include <QPainterPathStroker>
 #include <cmath>
 #include <stdexcept>
@@ -40,6 +41,19 @@ QString rawValue(LassoKind kind)
     throw std::logic_error("unknown lasso kind");
 }
 
+QString rawValue(SelectionAmountOperation operation)
+{
+    switch (operation) {
+    case SelectionAmountOperation::expand:
+        return QStringLiteral("Expand");
+    case SelectionAmountOperation::contract:
+        return QStringLiteral("Contract");
+    case SelectionAmountOperation::feather:
+        return QStringLiteral("Feather");
+    }
+    throw std::logic_error("unknown selection amount operation");
+}
+
 QString rawValue(SelectionMode mode)
 {
     switch (mode) {
@@ -61,22 +75,31 @@ bool DocumentSelection::isEmpty() const
 QImage DocumentSelection::coverage(int width, int height) const
 {
     QImage image = BrushRaster::context(width, height, true);
-    QPainter painter(&image);
-    fill(painter, path, antialiased);
-    return image;
+    {
+        QPainter painter(&image);
+        fill(painter, path, antialiased || feather > 0);
+    }
+    if (!(feather > 0))
+        return image;
+    // A feathered edge fades either side of the outline.
+    return PixelAdjust::gaussianBlur(image, feather / 2, true);
+}
+
+QRectF DocumentSelection::coverageBounds() const
+{
+    // Four standard deviations keep the falloff past the outline.
+    const double reach = std::ceil(feather * 2);
+    return path.boundingRect().adjusted(-reach, -reach, reach, reach);
 }
 
 SelectionClip DocumentSelection::clip(QSizeF canvas) const
 {
-    const QRect region = path.boundingRect().adjusted(-1, -1, 1, 1).toAlignedRect()
+    const QRect region = coverageBounds().adjusted(-1, -1, 1, 1).toAlignedRect()
         .intersected(QRect(0, 0, int(canvas.width()), int(canvas.height())));
     if (isEmpty() || region.isEmpty())
         return SelectionClip{QRectF(), std::nullopt};
-    QImage image = BrushRaster::context(region.width(), region.height(), true);
-    QPainter painter(&image);
-    painter.translate(-region.x(), -region.y());
-    fill(painter, path, antialiased);
-    return SelectionClip{QRectF(region), image};
+    const DocumentSelection local{path.translated(-region.x(), -region.y()), antialiased, feather};
+    return SelectionClip{QRectF(region), local.coverage(region.width(), region.height())};
 }
 
 QRectF DragBox::rect(QPointF anchor, QPointF point, bool square, bool fromCenter)
@@ -159,6 +182,19 @@ void EditorSession::setSelectionExpandAmount(int amount)
 void EditorSession::setSelectionContractAmount(int amount)
 {
     m_selectionContractAmount = amount;
+    notify();
+}
+
+void EditorSession::setSelectionFeatherAmount(int amount)
+{
+    m_selectionFeatherAmount = amount;
+    notify();
+}
+
+void EditorSession::setSelectionAmountOperation(std::optional<SelectionAmountOperation> operation)
+{
+    m_selectionAmountOperation = operation;
+    resumeFileRequests();
     notify();
 }
 
@@ -344,7 +380,7 @@ void EditorSession::moveSelection(QSizeF offset)
         return;
     // Whole pixels, so edges stay crisp; not re-clipped.
     m_document->selection = DocumentSelection{m_selectionMoveOrigin->path.translated(std::round(offset.width()), std::round(offset.height())),
-                                              m_selectionMoveOrigin->antialiased};
+                                              m_selectionMoveOrigin->antialiased, m_selectionMoveOrigin->feather};
     notify();
 }
 
@@ -380,6 +416,45 @@ void EditorSession::contractSelection(int amount)
     resizeSelection(-amount, QStringLiteral("Contract Selection"));
 }
 
+void EditorSession::promptSelectionAmount(SelectionAmountOperation operation)
+{
+    if (!canModifySelection())
+        return;
+    setSelectionAmountOperation(operation);
+}
+
+void EditorSession::confirmSelectionAmount(int amount)
+{
+    const std::optional<SelectionAmountOperation> operation = m_selectionAmountOperation;
+    if (!operation || amount < 1 || amount > (*operation == SelectionAmountOperation::feather ? 250 : 500))
+        return;
+    setSelectionAmountOperation(std::nullopt);
+    switch (*operation) {
+    case SelectionAmountOperation::expand:
+        setSelectionExpandAmount(amount);
+        expandSelection(amount);
+        break;
+    case SelectionAmountOperation::contract:
+        setSelectionContractAmount(amount);
+        contractSelection(amount);
+        break;
+    case SelectionAmountOperation::feather:
+        setSelectionFeatherAmount(amount);
+        featherSelection(amount);
+        break;
+    }
+}
+
+void EditorSession::featherSelection(int amount)
+{
+    const std::optional<DocumentSelection> current = selection();
+    if (!canModifySelection() || !current || amount <= 0)
+        return;
+    // Two soft edges spread less than their sum.
+    const double softened = std::sqrt(current->feather * current->feather + double(amount) * amount);
+    setSelection(DocumentSelection{current->path, current->antialiased, std::min(250.0, softened)}, QStringLiteral("Feather Selection"));
+}
+
 void EditorSession::resizeSelection(double delta, const QString &name)
 {
     const std::optional<DocumentSelection> current = selection();
@@ -392,7 +467,7 @@ void EditorSession::resizeSelection(double delta, const QString &name)
     stroker.setJoinStyle(Qt::RoundJoin);
     const QPainterPath band = stroker.createStroke(current->path);
     const QPainterPath result = delta > 0 ? current->path.united(band).intersected(canvasPath(*m_document)) : current->path.subtracted(band);
-    setSelection(DocumentSelection{result, current->antialiased}, name);
+    setSelection(DocumentSelection{result, current->antialiased, current->feather}, name);
 }
 
 void EditorSession::selectAll()
@@ -414,5 +489,5 @@ void EditorSession::invertSelection()
     const std::optional<DocumentSelection> current = selection();
     if (!m_document || !current)
         return;
-    setSelection(DocumentSelection{canvasPath(*m_document).subtracted(current->path), current->antialiased}, QStringLiteral("Inverse"));
+    setSelection(DocumentSelection{canvasPath(*m_document).subtracted(current->path), current->antialiased, current->feather}, QStringLiteral("Inverse"));
 }

@@ -136,6 +136,9 @@ private:
     QUuid m_draftID;
     std::optional<LayerTextStyle> m_shownStyle;
     QSizeF m_logicalSize{360, 160};
+    // Point text's measure, kept while its style holds.
+    std::optional<LayerTextStyle> m_measuredStyle;
+    QSizeF m_measuredSize;
     LayerTransform m_shownTransform;
     double m_handleSize = 6;
     std::unique_ptr<TextLines> m_lines;

@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSlider>
 #include <QToolButton>
 #include <functional>
 
@@ -70,6 +71,30 @@ private:
     SelectionAmountField *const m_expandAmount;
     QPushButton *const m_contract;
     SelectionAmountField *const m_contractAmount;
+    QPushButton *const m_feather;
+    SelectionAmountField *const m_featherAmount;
     QLabel *const m_empty;
     QPushButton *const m_deselect;
+};
+
+// Select's Expand, Contract or Feather amount, in a floating panel.
+class SelectionAmountSheet : public QWidget {
+    Q_OBJECT
+public:
+    SelectionAmountSheet(EditorSession &session, SelectionAmountOperation operation, QWidget *parent = nullptr);
+
+protected:
+    void showEvent(QShowEvent *event) override;
+
+private:
+    // A whole number in range, else none; toInt trims spaces.
+    std::optional<int> amount() const;
+    void refresh();
+
+    EditorSession &m_session;
+    const int m_maximum;
+    QSlider *const m_slider;
+    QLineEdit *const m_input;
+    QLabel *const m_note;
+    QPushButton *const m_ok;
 };

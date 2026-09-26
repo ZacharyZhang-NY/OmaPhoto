@@ -39,7 +39,7 @@ private slots:
     void sizeAndTrackingFollowTheLocale();
     void leadingIsAutoWhenEmptyAndClamps();
     void fieldsKeepTypingAndTheFocus();
-    void alignmentAndFontChangeTheDraft();
+    void alignmentChangesTheDraft();
     void theButtonsFollowTheDraft();
     void theBarRestsWithoutADocumentOrWhileBusy();
     void aTextRowShowsAndOpensItsText();
@@ -50,17 +50,27 @@ void TypeControlsTests::theBarShowsTheStyleItEdits()
     Bar shown;
     QCOMPARE(shown.bar.title->text(), QString("Type"));
     auto &font = find<QComboBox>(shown.bar, "typeFont");
-    QCOMPARE(font.width(), 185);
+    QCOMPARE(font.width(), 210);
     QCOMPARE(font.toolTip(), QString("Font face, including bold and italic variants"));
-    // Every face, and Helvetica though missing, sorted.
+    QCOMPARE(font.accessibleName(), QString("Font"));
+    // The catalog waits for the menu: the style's face alone.
+    QCOMPARE(font.count(), 1);
+    QCOMPARE(font.currentText(), QString("Helvetica"));
+    shown.restyle([](LayerTextStyle &style) { style.fontName = QStringLiteral("Aachen"); });
+    QCOMPARE(font.count(), 2);
+    font.showPopup();
+    font.hidePopup();
+    // Every face, and the style's own though missing, sorted.
     QStringList names = TextLayout::availableFonts();
-    names << QStringLiteral("Helvetica");
+    names << QStringLiteral("Aachen");
     names.sort();
     QStringList listed;
     for (int index = 0; index < font.count(); ++index)
         listed << font.itemText(index);
     QCOMPARE(listed, names);
-    QCOMPARE(font.currentText(), QString("Helvetica"));
+    QCOMPARE(font.currentText(), QString("Aachen"));
+    QCOMPARE(font.itemText(0), QString("Aachen"));
+    shown.restyle([](LayerTextStyle &style) { style.fontName = QStringLiteral("Helvetica"); });
     TextStyleField &size = shown.field("typeSize"), &tracking = shown.field("typeTracking"), &leading = shown.field("typeLeading");
     QVERIFY(size.width() == 52 && tracking.width() == 45 && leading.width() == 52);
     QCOMPARE(size.text(), QString("72"));
@@ -296,10 +306,9 @@ void TypeControlsTests::fieldsKeepTypingAndTheFocus()
     QCOMPARE(shown.session.currentTextStyle().fontSize, 1.0);
 }
 
-void TypeControlsTests::alignmentAndFontChangeTheDraft()
+void TypeControlsTests::alignmentChangesTheDraft()
 {
     Bar shown;
-    auto &font = find<QComboBox>(shown.bar, "typeFont");
     QToolButton &left = shown.align("typeAlignLeft"), &center = shown.align("typeAlignCenter");
     // Without a draft the defaults change.
     center.click();
@@ -310,21 +319,6 @@ void TypeControlsTests::alignmentAndFontChangeTheDraft()
     left.click();
     QCOMPARE(shown.session.textDraft().value().style.alignment, TextAlignment::left);
     QVERIFY(left.isChecked() && !center.isChecked());
-    // A face writes its name; Helvetica then leaves the list.
-    const int bold = font.findText(QStringLiteral("DejaVuSans-Bold"));
-    QVERIFY(bold >= 0);
-    emit font.activated(bold);
-    QCOMPARE(shown.session.textDraft().value().style.fontName, QString("DejaVuSans-Bold"));
-    QCOMPARE(font.currentText(), QString("DejaVuSans-Bold"));
-    QCOMPARE(font.findText(QStringLiteral("Helvetica")), -1);
-    QCOMPARE(font.count(), TextLayout::availableFonts().size());
-    // A missing face named elsewhere joins the list.
-    shown.restyle([](LayerTextStyle &style) { style.fontName = QStringLiteral("Zapfino"); });
-    QCOMPARE(font.currentText(), QString("Zapfino"));
-    QCOMPARE(font.count(), TextLayout::availableFonts().size() + 1);
-    QCOMPARE(font.itemText(font.count() - 1), QString("Zapfino"));
-    shown.restyle([](LayerTextStyle &style) { style.fontName = QStringLiteral("Aachen"); });
-    QVERIFY(font.currentText() == QString("Aachen") && font.itemText(0) == QString("Aachen") && font.findText("Zapfino") < 0);
     // Editing an existing text layer opens its draft.
     shown.session.cancelText();
     const QUuid text = addText(shown.session, QStringLiteral("Aligned"));

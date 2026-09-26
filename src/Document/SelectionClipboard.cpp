@@ -49,7 +49,7 @@ std::optional<QRectF> EditorSession::selectionCopyRegion() const
         return std::nullopt;
     const QRectF canvas(QPointF(0, 0), m_document->size());
     const std::optional<DocumentSelection> current = selection();
-    const QRectF bounds = current ? current->path.boundingRect() : canvas;
+    const QRectF bounds = current ? current->coverageBounds() : canvas;
     // Path operations leave float noise: round with a tolerance.
     constexpr double tolerance = 0.001;
     const double minX = std::floor(bounds.left() + tolerance), minY = std::floor(bounds.top() + tolerance);

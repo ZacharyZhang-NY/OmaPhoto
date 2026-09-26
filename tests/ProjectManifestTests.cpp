@@ -202,7 +202,7 @@ void ProjectManifestTests::encodingWritesSwiftsKeysAndLeavesAbsentOnesOut()
 
 void ProjectManifestTests::everyRawValueRoundTrips()
 {
-    const QStringList blends{"Normal", "Multiply", "Screen", "Overlay", "Darken", "Lighten", "Difference", "Color Dodge", "Color Burn",
+    const QStringList blends{"Normal", "Multiply", "Screen", "Overlay", "Soft Light", "Darken", "Lighten", "Difference", "Color Dodge", "Color Burn",
                              "Hue", "Saturation", "Color", "Luminosity"};
     for (int index = 0; index < blends.size(); ++index) {
         QCOMPARE(rawValue(LayerBlendMode(index)), blends[index]);

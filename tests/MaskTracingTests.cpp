@@ -63,6 +63,7 @@ private slots:
     void everyPatternFillsBackToItself_data();
     void everyPatternFillsBackToItself();
     void darkMeansBelowHalfGray();
+    void whiteMeansAtLeastHalfGray();
     void opaqueMeansAtLeastHalfAlpha();
     void nothingToTraceIsNil();
     void otherPixelFormatsAreConverted();
@@ -127,6 +128,12 @@ void MaskTracingTests::darkMeansBelowHalfGray()
 {
     QCOMPARE(filled(MaskTracing::darkPixels(mask({"#.", ".."}, 127, 128)).value(), 2, 2), QStringList({"#.", ".."}));
     QVERIFY(!MaskTracing::darkPixels(mask({"#.", ".."}, 128, 255)).has_value());
+}
+
+void MaskTracingTests::whiteMeansAtLeastHalfGray()
+{
+    QCOMPARE(filled(MaskTracing::whitePixels(mask({"#.", ".."}, 128, 127)).value(), 2, 2), QStringList({"#.", ".."}));
+    QVERIFY(!MaskTracing::whitePixels(mask({"#.", ".."}, 127, 0)).has_value());
 }
 
 void MaskTracingTests::opaqueMeansAtLeastHalfAlpha()

@@ -62,8 +62,11 @@ std::optional<LayerText> ImageLayer::liveText() const
 
 void EditorSession::setTextDraft(std::optional<TextDraft> draft)
 {
+    // Only a draft that ends frees waiting file requests.
+    const bool ended = m_textDraft && !draft;
     m_textDraft = std::move(draft);
-    resumeFileRequests();
+    if (ended)
+        resumeFileRequests();
     notify();
 }
 

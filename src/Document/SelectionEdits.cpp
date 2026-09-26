@@ -234,7 +234,7 @@ PixelMove::PixelMove(std::shared_ptr<BrushStroke> raster, DocumentSelection orig
 
 DocumentSelection PixelMove::movedSelection() const
 {
-    return DocumentSelection{QTransform::fromTranslate(offset.width(), offset.height()).map(origin.path), origin.antialiased};
+    return DocumentSelection{QTransform::fromTranslate(offset.width(), offset.height()).map(origin.path), origin.antialiased, origin.feather};
 }
 
 // Ctrl-drag: starts moving the selected pixels; false with none.
@@ -292,7 +292,7 @@ std::optional<DocumentSelection> EditorSession::displayedSelection() const
     const std::optional<DocumentSelection> current = selection();
     if (m_transformEdit && current) {
         if (const std::optional<QTransform> matrix = floatingSelectionTransform(*m_transformEdit))
-            return DocumentSelection{matrix->map(current->path), current->antialiased};
+            return DocumentSelection{matrix->map(current->path), current->antialiased, current->feather};
     }
     return current;
 }

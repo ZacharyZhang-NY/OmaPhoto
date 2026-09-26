@@ -18,11 +18,15 @@ struct SelectionClip {
 struct DocumentSelection {
     QPainterPath path;
     bool antialiased = true;
+    // How far the edge fades, in pixels; 0 is hard.
+    double feather = 0;
 
     // An explicit empty selection: later edits touch nothing.
     bool isEmpty() const;
     // Gray coverage at document resolution, white where selected.
     QImage coverage(int width, int height) const;
+    // The outline's box, grown by the feather's visible falloff.
+    QRectF coverageBounds() const;
     SelectionClip clip(QSizeF canvas) const;
     friend bool operator==(const DocumentSelection &, const DocumentSelection &) = default;
 };
@@ -34,6 +38,10 @@ QString rawValue(LassoKind kind);
 
 enum class SelectionMode { replace, add, subtract };
 QString rawValue(SelectionMode mode);
+
+// What Select's Expand, Contract and Feather ask an amount for.
+enum class SelectionAmountOperation { expand, contract, feather };
+QString rawValue(SelectionAmountOperation operation);
 
 // A drag's box in whole pixels; shared with Shape.
 namespace DragBox {

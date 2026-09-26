@@ -311,7 +311,7 @@ void LayerAppearanceTests::theBlendModeCyclesBothWaysAndWraps()
     QCOMPARE(session.blendPreview(), std::optional(EditorSession::BlendPreview{top, LayerBlendMode::hue}));
     QCOMPARE(int(changes.count()), 0);
     QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::overlay);
-    QCOMPARE(int(allLayerBlendModes.size()), 13);
+    QCOMPARE(int(allLayerBlendModes.size()), 14);
     for (size_t index = 0; index < allLayerBlendModes.size(); ++index)
         QCOMPARE(int(allLayerBlendModes[index]), int(index));
 }

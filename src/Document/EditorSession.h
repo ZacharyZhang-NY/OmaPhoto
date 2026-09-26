@@ -139,6 +139,11 @@ public:
     void setSelectionExpandAmount(int amount);
     int selectionContractAmount() const { return m_selectionContractAmount; }
     void setSelectionContractAmount(int amount);
+    int selectionFeatherAmount() const { return m_selectionFeatherAmount; }
+    void setSelectionFeatherAmount(int amount);
+    // The amount sheet's question, open while set.
+    std::optional<SelectionAmountOperation> selectionAmountOperation() const { return m_selectionAmountOperation; }
+    void setSelectionAmountOperation(std::optional<SelectionAmountOperation> operation);
     const std::optional<DocumentSelection> &selectionMoveOrigin() const { return m_selectionMoveOrigin; }
     const WandSettings &wandSettings() const { return m_wandSettings; }
     void setWandSettings(const WandSettings &settings);
@@ -267,6 +272,7 @@ public:
 #include "Document/LayerFlip+Session.h"
 #include "Document/Selection+Session.h"
 #include "Document/MagicWand+Session.h"
+#include "Document/SubjectRemoval+Session.h"
 #include "Document/EditorSession+Brush.h"
 #include "Document/CloneStamp+Session.h"
 #include "Document/ColorPalette+Session.h"
@@ -356,6 +362,8 @@ private:
     WandSettings m_wandSettings;
     std::optional<Wanding> m_wanding;
     QFutureWatcher<Wanded> m_wand;
+    std::optional<Subjecting> m_subjecting;
+    QFutureWatcher<Subjected> m_subject;
     std::unique_ptr<BrushStroke> m_brushStroke;
     std::unique_ptr<PixelMove> m_pixelMove;
     BrushSettings m_brushSettings;
@@ -434,4 +442,6 @@ private:
     bool m_selectionAntialiased = true;
     int m_selectionExpandAmount = 1;
     int m_selectionContractAmount = 1;
+    int m_selectionFeatherAmount = 2;
+    std::optional<SelectionAmountOperation> m_selectionAmountOperation;
 };

@@ -16,6 +16,7 @@ EditorSession::EditorSession(QObject *parent) : QObject(parent), m_busyTimer(thi
     connect(&m_baker, &QFutureWatcher<Baked>::finished, this, &EditorSession::finishBake);
     connect(&m_inverter, &QFutureWatcher<Inverted>::finished, this, &EditorSession::finishInvert);
     connect(&m_wand, &QFutureWatcher<Wanded>::finished, this, &EditorSession::finishWand);
+    connect(&m_subject, &QFutureWatcher<Subjected>::finished, this, &EditorSession::finishSubject);
     connect(&m_filterPreview, &QFutureWatcher<Filtered>::finished, this, &EditorSession::finishFilterPreview);
     connect(&m_filterCommit, &QFutureWatcher<FilterMade>::finished, this, &EditorSession::finishFilterCommit);
     connect(&m_cropCommit, &QFutureWatcher<Cropped>::finished, this, &EditorSession::finishCropCommit);
@@ -183,8 +184,8 @@ void EditorSession::cycleToolMode()
 
 bool EditorSession::canUseHistory() const
 {
-    return !m_textDraft && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_warpStroke && !m_showsNewDocument && !m_showsImporter
-        && !m_renamingLayerID && !m_importError && !m_transformEdit && !m_levels;
+    return !m_selectionAmountOperation && !m_textDraft && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_warpStroke && !m_showsNewDocument
+        && !m_showsImporter && !m_renamingLayerID && !m_importError && !m_transformEdit && !m_levels;
 }
 
 void EditorSession::undo()
@@ -241,7 +242,8 @@ void EditorSession::endEdit()
 
 bool EditorSession::canEditLayers() const
 {
-    return !m_textDraft && m_document && !m_brushStroke && !m_warpStroke && !m_isProjectBusy && !m_isImporting && !m_showsNewDocument && !m_showsImporter
+    return !m_selectionAmountOperation && !m_textDraft && m_document && !m_brushStroke && !m_warpStroke && !m_isProjectBusy && !m_isImporting
+        && !m_showsNewDocument && !m_showsImporter
         && !m_renamingLayerID && !m_transformEdit && !m_cropRect && !m_gradientEdit && !m_filterEdit && !m_pixelMove && !m_levels
         && !m_hueSaturation && !m_adjustmentEditingID;
 }

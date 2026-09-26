@@ -89,5 +89,7 @@ private:
     FloatingPanel m_filterPanel{QStringLiteral("filterPanel"), *this};
     bool m_filterShown = false;
     FloatingPanel m_effectsPanel{QStringLiteral("effectsPanel"), *this};
+    FloatingPanel m_selectionAmountPanel{QStringLiteral("selectionAmountPanel"), *this};
+    std::optional<SelectionAmountOperation> m_selectionAmountShown;
     std::optional<LayerEffectSelection> m_effectsShown;
 };

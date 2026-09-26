@@ -139,13 +139,19 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
         if (const std::optional<QUuid> id = session().activeLayerID())
             session().loadLayerSelection(*id);
     });
+    add(select, QStringLiteral("subject"), QStringLiteral("Subject"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A),
+        [this] { session().selectSubject(SelectionMode::replace, {}); });
     add(select, QStringLiteral("maskBlackAreas"), QStringLiteral("Mask's Black Areas"), QKeySequence(), [this] {
         if (const std::optional<QUuid> id = session().activeLayerID())
             session().loadMaskSelection(*id);
     });
     select->addSeparator();
-    add(select, QStringLiteral("expandSelection"), QStringLiteral("Expand by 1 px"), QKeySequence(), [this] { session().expandSelection(session().selectionExpandAmount()); });
-    add(select, QStringLiteral("contractSelection"), QStringLiteral("Contract by 1 px"), QKeySequence(), [this] { session().contractSelection(session().selectionContractAmount()); });
+    add(select, QStringLiteral("expandSelection"), QStringLiteral("Expand…"), QKeySequence(),
+        [this] { session().promptSelectionAmount(SelectionAmountOperation::expand); });
+    add(select, QStringLiteral("contractSelection"), QStringLiteral("Contract…"), QKeySequence(),
+        [this] { session().promptSelectionAmount(SelectionAmountOperation::contract); });
+    add(select, QStringLiteral("featherSelection"), QStringLiteral("Feather…"), QKeySequence(),
+        [this] { session().promptSelectionAmount(SelectionAmountOperation::feather); });
 
     QMenu *image = bar.addMenu(QStringLiteral("&Image"));
     add(image, QStringLiteral("curves"), QStringLiteral("Curves…"), QKeySequence(Qt::CTRL | Qt::Key_M), [this] { session().beginFilter(FilterKind::curves); });
@@ -277,10 +283,9 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("inverse"))->setEnabled(selected && s.canEditSelection());
     action(QStringLiteral("layerPixels"))->setEnabled(active && active->asset && s.canEditSelection());
     action(QStringLiteral("maskBlackAreas"))->setEnabled(active && active->mask && s.canEditSelection());
-    action(QStringLiteral("expandSelection"))->setText(QStringLiteral("Expand by %1 px").arg(s.selectionExpandAmount()));
-    action(QStringLiteral("expandSelection"))->setEnabled(s.canModifySelection());
-    action(QStringLiteral("contractSelection"))->setText(QStringLiteral("Contract by %1 px").arg(s.selectionContractAmount()));
-    action(QStringLiteral("contractSelection"))->setEnabled(s.canModifySelection());
+    action(QStringLiteral("subject"))->setEnabled(s.canSelectSubject());
+    for (const char *name : {"expandSelection", "contractSelection", "featherSelection"})
+        action(QString::fromLatin1(name))->setEnabled(s.canModifySelection());
     action(QStringLiteral("levels"))->setEnabled(s.canAdjustColors() && !s.hueSaturation());
     for (const FilterKind kind : allFilterKinds) {
         if (kind != FilterKind::contentAwareFill)

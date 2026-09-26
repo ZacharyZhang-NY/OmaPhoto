@@ -23,9 +23,11 @@ private slots:
 void SelectMenuTests::selectEntriesFollowTheSelectionAndActOnIt()
 {
     Bar bar;
-    for (const char *name : {"selectAll", "deselect", "inverse", "layerPixels", "maskBlackAreas", "expandSelection", "contractSelection"})
+    for (const char *name : {"selectAll", "deselect", "inverse", "layerPixels", "subject", "maskBlackAreas", "expandSelection", "contractSelection",
+                             "featherSelection"})
         QVERIFY2(!bar.action(name).isEnabled(), name);
     bar.session().createDocument(50, 50, true);
+    QVERIFY(bar.action("subject").isEnabled());
     QVERIFY(bar.action("selectAll").isEnabled());
     // A blank layer has no pixels and no mask.
     QVERIFY(!bar.action("layerPixels").isEnabled() && !bar.action("maskBlackAreas").isEnabled());
@@ -34,18 +36,25 @@ void SelectMenuTests::selectEntriesFollowTheSelectionAndActOnIt()
     QCOMPARE(bar.session().history.undoName(), QString("Select All"));
     QVERIFY(bar.action("deselect").isEnabled() && bar.action("inverse").isEnabled());
     QVERIFY(bar.action("expandSelection").isEnabled() && bar.action("contractSelection").isEnabled());
-    QCOMPARE(bar.action("expandSelection").text(), QString("Expand by 1 px"));
-    QCOMPARE(bar.action("contractSelection").text(), QString("Contract by 1 px"));
-    bar.session().setSelectionExpandAmount(3);
-    bar.session().setSelectionContractAmount(7);
-    QCOMPARE(bar.action("expandSelection").text(), QString("Expand by 3 px"));
-    QCOMPARE(bar.action("contractSelection").text(), QString("Contract by 7 px"));
+    QCOMPARE(bar.action("expandSelection").text(), QString("Expand…"));
+    QCOMPARE(bar.action("contractSelection").text(), QString("Contract…"));
+    QCOMPARE(bar.action("featherSelection").text(), QString("Feather…"));
+    // Each asks for its amount, which the sheet confirms.
     bar.action("contractSelection").trigger();
+    QCOMPARE(bar.session().selectionAmountOperation(), std::optional(SelectionAmountOperation::contract));
+    QVERIFY(!bar.action("contractSelection").isEnabled() && !bar.action("subject").isEnabled());
+    bar.session().confirmSelectionAmount(7);
     QCOMPARE(bar.session().history.undoName(), QString("Contract Selection"));
     QCOMPARE(bar.session().selection().value().path.boundingRect(), QRectF(7, 7, 36, 36));
     bar.action("expandSelection").trigger();
+    QCOMPARE(bar.session().selectionAmountOperation(), std::optional(SelectionAmountOperation::expand));
+    bar.session().confirmSelectionAmount(3);
     QCOMPARE(bar.session().history.undoName(), QString("Expand Selection"));
     QCOMPARE(bar.session().selection().value().path.boundingRect(), QRectF(4, 4, 42, 42));
+    bar.action("featherSelection").trigger();
+    QCOMPARE(bar.session().selectionAmountOperation(), std::optional(SelectionAmountOperation::feather));
+    bar.session().confirmSelectionAmount(2);
+    QCOMPARE(bar.session().history.undoName(), QString("Feather Selection"));
     bar.action("inverse").trigger();
     QCOMPARE(bar.session().history.undoName(), QString("Inverse"));
     bar.action("deselect").trigger();
@@ -65,10 +74,17 @@ void SelectMenuTests::selectEntriesFollowTheSelectionAndActOnIt()
     QCOMPARE(bar.session().history.undoName(), QString("Load Mask Selection"));
     // Busy, every entry waits; a draft holds Expand and Contract.
     bar.session().setIsProjectBusy(true);
-    for (const char *name : {"deselect", "inverse", "layerPixels", "maskBlackAreas", "expandSelection", "contractSelection"})
+    for (const char *name : {"deselect", "inverse", "layerPixels", "subject", "maskBlackAreas", "expandSelection", "contractSelection", "featherSelection"})
         QVERIFY2(!bar.action(name).isEnabled(), name);
     QVERIFY(bar.action("selectAll").isEnabled());
     bar.session().setIsProjectBusy(false);
+    // Subject runs the model on what the canvas shows.
+    bar.action("subject").trigger();
+    QVERIFY(bar.session().isProjectBusy());
+    QTRY_VERIFY_WITH_TIMEOUT(!bar.session().isProjectBusy(), 20000);
+    // A white layer has no subject, and says so.
+    QVERIFY(bar.session().brushError().has_value());
+    bar.session().setBrushError(std::nullopt);
     bar.session().selectTool(NavigationTool::lasso);
     bar.session().beginLasso(QPointF(1, 1), SelectionMode::replace);
     QVERIFY(!bar.action("expandSelection").isEnabled() && bar.action("deselect").isEnabled());

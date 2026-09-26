@@ -1,5 +1,6 @@
 #include "Document/Distort.h"
 #include "Document/LayerMask.h"
+#include "Document/PixelAdjust.h"
 #include "Document/BrushStroke.h"
 #include "Document/EditorSession.h"
 #include "IO/ImageExporter.h"
@@ -281,12 +282,11 @@ void EditorSession::addMask(bool revealing)
     try {
         if (width <= 0 || height <= 0 || qint64(width) * height > 100'000'000)
             throw ProjectError(ProjectError::Kind::tooLarge);
-        QImage image = BrushRaster::context(width, height, true);
-        image.fill(revealing ? Qt::white : Qt::black);
-        const QTransform toPixels = BrushRaster::pixelToDocument(active->transform, width, height).inverted();
-        QPainter painter(&image);
-        painter.setRenderHint(QPainter::Antialiasing, current->antialiased);
-        painter.fillPath(toPixels.map(current->path), revealing ? Qt::black : Qt::white);
+        // The selection's coverage, soft where it is feathered.
+        QImage image = PixelAdjust::coverage(current->clip(m_document->size()), width, height,
+                                             BrushRaster::pixelToDocument(active->transform, width, height));
+        if (revealing)
+            image.invertPixels();
         const LayerMask mask(LayerMask::assetFrom(image));
         finishOpacityEdit();
         beginEdit(QStringLiteral("Add Mask from Selection"));
