@@ -108,6 +108,8 @@ add_library(compositor_core STATIC
     src/UI/EffectsSheet.cpp
     src/UI/FilterSheet.cpp
     src/UI/FloatingPanel.cpp
+    src/UI/KeyboardShortcuts.cpp
+    src/UI/KeyboardShortcuts+Sheet.cpp
     src/UI/NewCanvasSheet.cpp
     src/UI/OmarchyTheme.cpp
     src/UI/ProjectTabs.cpp
@@ -135,6 +137,7 @@ add_library(compositor_core STATIC
     src/Rendering/EditorCanvas+Crop.cpp
     src/Rendering/EditorCanvas+Effects.cpp
     src/Rendering/EditorCanvas+Grid.cpp
+    src/Rendering/EditorCanvas+Keys.cpp
     src/Rendering/EditorCanvas+Gradient.cpp
     src/Rendering/EditorCanvas+Cursors.cpp
     src/Rendering/BrushCursorOverlay.cpp
@@ -332,6 +335,9 @@ compositor_test(ClippingStackTests)
 compositor_test(CompositorTests)
 compositor_test(CompositorMenusTests)
 compositor_test(ViewMenuTests)
+compositor_test(KeyboardShortcutsTests)
+compositor_test(KeyboardShortcutsSheetTests)
+compositor_test(RemappedKeysTests)
 compositor_test(CompositorUITestsLaunchTests)
 compositor_test(ContentViewTests)
 compositor_test(ContentViewStatusTests)

@@ -1,4 +1,5 @@
 #include "UI/EffectsSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/ColorPickerSheet.h"
 #include <QButtonGroup>
@@ -91,6 +92,8 @@ EffectsSheet::EffectsSheet(EditorSession &session, LayerEffectKind kind, QWidget
     auto *ok = new QPushButton(QStringLiteral("OK"), this);
     ok->setObjectName(QStringLiteral("effectsOK"));
     ok->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, ok, cancel);
     connect(cancel, &QPushButton::clicked, this, [this] { m_session.finishEffectsEditing(false); });
     connect(ok, &QPushButton::clicked, this, [this] { m_session.finishEffectsEditing(true); });
     auto *buttons = new QHBoxLayout;

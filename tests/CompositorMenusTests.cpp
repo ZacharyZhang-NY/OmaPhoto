@@ -31,7 +31,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         {"exportPNG", "Ctrl+Shift+E"}, {"exportJPEG", "Ctrl+Alt+Shift+S"},
         {"closeProject", "Ctrl+W"}, {"undo", "Ctrl+Z"}, {"redo", "Ctrl+Shift+Z"}, {"fit", "Ctrl+0"}, {"actualPixels", "Ctrl+1"},
         {"zoomIn", "Ctrl+="}, {"zoomOut", "Ctrl+-"}, {"pixelGrid", ""}, {"snap", ""}, {"transformControls", "Ctrl+H"}, {"transformLayer", "Ctrl+T"},
-        {"layerViaCopy", "Ctrl+J"}, {"cut", "Ctrl+X"}, {"copy", "Ctrl+C"}, {"copyMerged", "Ctrl+Shift+C"}, {"paste", "Ctrl+V"}, {"fillForeground", "Alt+Backspace"}, {"fillBackground", "Ctrl+Backspace"}, {"clearSelectionPixels", ""}, {"contentAwareFill", "Shift+Backspace"}, {"clippingMask", "Ctrl+Alt+G"}, {"groupLayers", "Ctrl+G"},
+        {"layerViaCopy", "Ctrl+J"}, {"cut", "Ctrl+X"}, {"copy", "Ctrl+C"}, {"copyMerged", "Ctrl+Shift+C"}, {"paste", "Ctrl+V"}, {"keyboardShortcuts", ""}, {"fillForeground", "Alt+Backspace"}, {"fillBackground", "Ctrl+Backspace"}, {"clearSelectionPixels", ""}, {"contentAwareFill", "Shift+Backspace"}, {"clippingMask", "Ctrl+Alt+G"}, {"groupLayers", "Ctrl+G"},
         {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
         {"mergeLayers", "Ctrl+E"}, {"flipHorizontal", ""}, {"flipVertical", ""}, {"deleteLayer", ""},
         {"selectAll", "Ctrl+A"}, {"deselect", "Ctrl+D"}, {"inverse", "Ctrl+Shift+I"}, {"layerPixels", ""}, {"subject", "Ctrl+Alt+A"}, {"maskBlackAreas", ""},
@@ -50,7 +50,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         titles << menu->title();
     QCOMPARE(titles, (QStringList{"&File", "&Edit", "&View", "&Select", "&Image", "Fil&ter", "&Layer"}));
     QCOMPARE(menus[0]->actions().size(), 11);
-    QCOMPARE(menus[1]->actions().size(), 12);
+    QCOMPARE(menus[1]->actions().size(), 13);
     QCOMPARE(menus[2]->actions().size(), 7);
     QCOMPARE(menus[3]->actions().size(), 10);
     QCOMPARE(menus[4]->actions().size(), 13);

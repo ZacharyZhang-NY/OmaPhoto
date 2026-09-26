@@ -1,4 +1,5 @@
 #include "UI/NewCanvasSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include <QApplication>
 #include <QBuffer>
 #include <QClipboard>
@@ -32,6 +33,8 @@ NewCanvasSheet::NewCanvasSheet(EditorSession &session, std::function<void(int, i
     m_note->setObjectName(QStringLiteral("canvasNote"));
     m_create->setObjectName(QStringLiteral("createCanvas"));
     m_create->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_create, nullptr);
     auto *open = new QPushButton(QStringLiteral("Open project"), this);
     open->setObjectName(QStringLiteral("openProject"));
     auto *import = new QPushButton(QStringLiteral("Import image"), this);
@@ -70,8 +73,16 @@ NewCanvasSheet::NewCanvasSheet(EditorSession &session, std::function<void(int, i
     connect(m_width, &QLineEdit::textChanged, this, &NewCanvasSheet::validate);
     connect(m_height, &QLineEdit::textChanged, this, &NewCanvasSheet::validate);
     // Return anywhere on the sheet is the default action.
+    std::vector<QShortcut *> returns;
     for (const Qt::Key key : {Qt::Key_Return, Qt::Key_Enter})
-        new QShortcut(QKeySequence(key), this, this, &NewCanvasSheet::create, Qt::WidgetWithChildrenShortcut);
+        returns.push_back(new QShortcut(QKeySequence(key), this, this, &NewCanvasSheet::create, Qt::WidgetWithChildrenShortcut));
+    // Until Apply is moved elsewhere, as Swift's native shortcut.
+    const auto follow = [returns] {
+        for (QShortcut *shortcut : returns)
+            shortcut->setEnabled(ShortcutSettings::shared().native(ShortcutChord(QStringLiteral("\r"))) == ShortcutChord(QStringLiteral("\r")));
+    };
+    connect(&ShortcutSettings::shared(), &ShortcutSettings::changed, this, follow);
+    follow();
     connect(m_create, &QPushButton::clicked, this, &NewCanvasSheet::create);
     connect(open, &QPushButton::clicked, this, [onOpen = std::move(onOpen)] { onOpen(); });
     connect(import, &QPushButton::clicked, this, [this] { m_session.setShowsImporter(true); });

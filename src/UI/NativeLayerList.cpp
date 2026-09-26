@@ -1,4 +1,5 @@
 #include "UI/NativeLayerList.h"
+#include "UI/KeyboardShortcuts.h"
 #include <QEvent>
 #include <QKeyEvent>
 #include <QScrollBar>
@@ -168,6 +169,16 @@ bool NativeLayerList::event(QEvent *event)
 }
 
 void NativeLayerList::keyPressEvent(QKeyEvent *event)
+{
+    // Remapped keys arrive as the keys they stand for.
+    const std::unique_ptr<QKeyEvent> typed = ShortcutSettings::shared().canvasEvent(*event);
+    if (!typed)
+        return;
+    pressKey(typed.get());
+    event->setAccepted(typed->isAccepted());
+}
+
+void NativeLayerList::pressKey(QKeyEvent *event)
 {
     const bool plain = !(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
     const int key = event->key();

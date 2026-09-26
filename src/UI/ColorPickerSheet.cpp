@@ -1,4 +1,5 @@
 #include "UI/ColorPickerSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include <QFontDatabase>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -183,6 +184,8 @@ ColorPickerSheet::ColorPickerSheet(EditorSession &session, std::function<void(bo
     m_preview->setAccessibleName(QStringLiteral("New color"));
     m_ok->setObjectName(QStringLiteral("pickerOK"));
     m_ok->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_ok, m_cancel);
     m_ok->setFixedWidth(90);
     m_cancel->setObjectName(QStringLiteral("pickerCancel"));
     m_cancel->setAutoDefault(false);

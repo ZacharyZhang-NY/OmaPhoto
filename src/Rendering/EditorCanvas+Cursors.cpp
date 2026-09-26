@@ -1,4 +1,5 @@
 #include "Rendering/EditorCanvas.h"
+#include "UI/KeyboardShortcuts.h"
 #include "Rendering/EyedropperIcon.h"
 #include <QApplication>
 #include <QKeyEvent>
@@ -314,6 +315,11 @@ bool CanvasView::eventFilter(QObject *watched, QEvent *event)
     const auto *widget = qobject_cast<QWidget *>(watched);
     if (!widget || widget->window() != window())
         return false;
+    // Remapped keys stand for theirs; a moved key passes on.
+    const std::unique_ptr<QKeyEvent> typed = ShortcutSettings::shared().canvasEvent(*key);
+    if (!typed)
+        return false;
+    key = typed.get();
     // Shift-+ and Shift-− step the blend mode, except while typing.
     const bool typing = qobject_cast<QLineEdit *>(QApplication::focusWidget()) || (m_inlineTextEditor && hasFocus());
     if (event->type() != QEvent::KeyPress || typing || key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))

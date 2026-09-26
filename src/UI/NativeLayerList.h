@@ -238,6 +238,7 @@ public:
 protected:
     bool event(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void pressKey(QKeyEvent *event);
     // Below every row: Swift's table lets go of everything.
     void mousePressEvent(QMouseEvent *event) override;
     void changeEvent(QEvent *event) override;

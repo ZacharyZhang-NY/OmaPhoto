@@ -187,6 +187,8 @@ private:
     bool moveSelectionTool(QPointF point, Qt::KeyboardModifiers modifiers);
     void releaseSelectionTool();
     bool selectionKey(const QKeyEvent &key);
+    // The keys as the canvas reads them, after remapping.
+    void pressKey(QKeyEvent *event, int physical);
     void endSelectionGestures();
     void dragSelection(QPointF point, Qt::KeyboardModifiers modifiers);
     void dragMarqueeDraft(QPointF pixel, Qt::KeyboardModifiers modifiers);
@@ -255,6 +257,8 @@ private:
     std::optional<NavigationTool> m_displayedTool;
     int m_lastFocusRequest = 0;
     bool m_spaceHeld = false;
+    // The key that began the pan, when Space is remapped.
+    std::optional<int> m_panKey;
     bool m_optionHeld = false;
     std::optional<QPointF> m_lastDragPoint;
     std::optional<ZoomDrag> m_zoomDrag;

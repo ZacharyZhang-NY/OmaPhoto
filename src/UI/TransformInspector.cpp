@@ -1,4 +1,5 @@
 #include "UI/TransformInspector.h"
+#include "UI/KeyboardShortcuts.h"
 #include "UI/LayerIcons.h"
 #include <QEvent>
 #include <QKeyEvent>
@@ -147,6 +148,8 @@ TransformInspector::TransformInspector(EditorSession &session, QWidget *parent)
     m_cancel->setObjectName(QStringLiteral("cancelTransform"));
     connect(m_cancel, &QPushButton::clicked, this, [this] { m_session.cancelTransform(); });
     m_apply->setObjectName(QStringLiteral("applyTransform"));
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_apply, m_cancel);
     connect(m_apply, &QPushButton::clicked, this, [this] { m_session.commitTransform(); });
     // Before the stretch ending the row, in Swift's order.
     for (QWidget *widget : std::initializer_list<QWidget *>{m_autoSelect, m_showControls, m_fields, m_cancel, m_apply})

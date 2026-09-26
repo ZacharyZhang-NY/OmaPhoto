@@ -1,4 +1,5 @@
 #include "UI/HueSaturationSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include "Rendering/EyedropperIcon.h"
 #include "UI/ColorPickerSheet.h"
 #include <QCheckBox>
@@ -322,6 +323,8 @@ HueSaturationSheet::HueSaturationSheet(EditorSession &session, QWidget *parent)
     // Return is OK's from anywhere, as Swift's default action.
     m_cancel->setAutoDefault(false);
     m_ok->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_ok, m_cancel);
     connect(m_cancel, &QPushButton::clicked, this, [this] { m_session.cancelHueSaturation(); });
     connect(m_ok, &QPushButton::clicked, this, [this] { m_session.commitHueSaturation(); });
     auto *column = new QVBoxLayout(this);

@@ -1,4 +1,5 @@
 #include "UI/CanvasSizeSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include "UI/ByteCounts.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/ColorPickerSheet.h"
@@ -205,6 +206,8 @@ CanvasSizeSheet::CanvasSizeSheet(const CanvasDocument &document, PaletteColor fo
     connect(cancel, &QPushButton::clicked, this, [this] { m_finish(std::nullopt); });
     m_ok->setObjectName(QStringLiteral("canvasOK"));
     m_ok->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_ok, cancel);
     // OK rests while the draft is invalid: no guard needed.
     connect(m_ok, &QPushButton::clicked, this, [this] {
         m_finish(CanvasSizeOptions{.width = qint64(std::round(m_draft.width)), .height = qint64(std::round(m_draft.height)), .anchor = m_anchor,

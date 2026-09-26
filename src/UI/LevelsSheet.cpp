@@ -1,4 +1,5 @@
 #include "UI/LevelsSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include "Rendering/EyedropperIcon.h"
 #include <QEvent>
 #include <QFrame>
@@ -291,7 +292,7 @@ LevelsSheet::LevelsSheet(EditorSession &session, QWidget *parent)
         connect(m_autos[index], &QPushButton::clicked, this, [this, index] { m_session.autoLevels(allLevelsAutos[index]); });
     }
     m_sampleHint->setWordWrap(true);
-    m_preview->setShortcut(QKeySequence(Qt::ALT | Qt::Key_P));
+    new NativeShortcut(ShortcutChord(QStringLiteral("p"), 2), *this, *m_preview);
     connect(m_preview, &QCheckBox::clicked, this, [this](bool on) { m_session.updateLevels(m_session.levels().value().settings, on); });
     m_reset->setAutoDefault(false);
     connect(m_reset, &QPushButton::clicked, this, [this] {
@@ -300,6 +301,8 @@ LevelsSheet::LevelsSheet(EditorSession &session, QWidget *parent)
     });
     m_cancel->setAutoDefault(false);
     m_ok->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_ok, m_cancel);
     connect(m_cancel, &QPushButton::clicked, this, [this] { m_session.cancelLevels(); });
     connect(m_ok, &QPushButton::clicked, this, [this] { m_session.commitLevels(); });
     m_spinner->setRange(0, 0);

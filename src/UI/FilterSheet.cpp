@@ -1,4 +1,5 @@
 #include "UI/FilterSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/ColorPickerSheet.h"
 #include "UI/CurvesControls.h"
@@ -213,6 +214,8 @@ FilterSheet::FilterSheet(EditorSession &session, QWidget *parent)
     m_cancel->setAutoDefault(false);
     m_ok->setObjectName(QStringLiteral("filterOK"));
     m_ok->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_ok, m_cancel);
     connect(m_preview, &QCheckBox::clicked, this, [this](bool on) { m_session.updateFilter(settings(), on); });
     connect(m_cancel, &QPushButton::clicked, this, [this] { m_session.cancelFilter(); });
     connect(m_ok, &QPushButton::clicked, this, [this] { m_session.commitFilter(); });

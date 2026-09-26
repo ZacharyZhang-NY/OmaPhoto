@@ -1,4 +1,5 @@
 #include "UI/LassoControls.h"
+#include "UI/KeyboardShortcuts.h"
 #include <QBoxLayout>
 #include <QFrame>
 #include <QLabel>
@@ -277,6 +278,8 @@ SelectionAmountSheet::SelectionAmountSheet(EditorSession &session, SelectionAmou
     cancel->setAutoDefault(false);
     m_ok->setObjectName(QStringLiteral("amountOK"));
     m_ok->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_ok, cancel);
     buttons->addWidget(cancel);
     buttons->addStretch(1);
     buttons->addWidget(m_ok);

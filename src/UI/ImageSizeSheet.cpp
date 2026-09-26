@@ -1,4 +1,5 @@
 #include "UI/ImageSizeSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include "UI/ColorPickerSheet.h"
 #include <QCheckBox>
 #include <QComboBox>
@@ -143,6 +144,8 @@ ImageSizeSheet::ImageSizeSheet(const CanvasDocument &document, std::function<voi
     connect(cancel, &QPushButton::clicked, this, [this] { m_finish(std::nullopt); });
     m_resize->setObjectName(QStringLiteral("imageResize"));
     m_resize->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_resize, cancel);
     // Resize rests while the size is invalid: no guard needed.
     connect(m_resize, &QPushButton::clicked, this, [this] {
         m_finish(ImageSizeOptions{.width = qint64(std::round(m_width)), .height = qint64(std::round(m_height)), .resolution = m_resolution,

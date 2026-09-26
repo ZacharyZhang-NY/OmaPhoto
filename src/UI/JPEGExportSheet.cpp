@@ -1,4 +1,5 @@
 #include "UI/JPEGExportSheet.h"
+#include "UI/KeyboardShortcuts.h"
 #include "UI/ByteCounts.h"
 #include "UI/ColorPaletteControls.h"
 #include <QColorDialog>
@@ -148,6 +149,8 @@ JPEGExportSheet::JPEGExportSheet(ExportRaster raster, std::function<void(std::op
     connect(cancel, &QPushButton::clicked, this, [this] { m_finish(std::nullopt); });
     m_export->setObjectName(QStringLiteral("jpegExport"));
     m_export->setDefault(true);
+    // Swift's configuredNativeShortcut: Return and Escape, as remapped.
+    NativeShortcut::bind(*this, m_export, cancel);
     // Export rests until a result is ready.
     connect(m_export, &QPushButton::clicked, this, [this] {
         QSettings().setValue(qualityKey, m_options.quality);

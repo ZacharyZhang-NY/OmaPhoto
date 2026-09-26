@@ -1,6 +1,7 @@
 #pragma once
 #include "Document/ProjectWorkspace.h"
 #include "Rendering/EditorCanvas.h"
+#include "UI/FloatingPanel.h"
 #include <QAction>
 #include <QLineEdit>
 #include <QMenuBar>
@@ -24,8 +25,12 @@ private:
     ProjectController &projects() const { return m_workspace.current().controller; }
     QAction *add(QMenu *menu, const QString &name, const QString &text, const QKeySequence &shortcut, const std::function<void()> &run);
 
+    // Each entry's own key, remapped from ShortcutSettings.
+    void remap();
+
     ProjectWorkspace &m_workspace;
     QWidget &m_window;
+    FloatingPanel m_shortcutsPanel{QStringLiteral("keyboardShortcuts"), m_window};
     QMetaObject::Connection m_sessionWatch;
     std::optional<QUuid> m_watchedTab;
     // The field whose undo the Edit entries drive.

@@ -1,5 +1,6 @@
 #include "UI/CompositorMenus.h"
 #include "Logging.h"
+#include "UI/KeyboardShortcuts.h"
 #include <QApplication>
 #include <QMenu>
 
@@ -88,6 +89,10 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
             qCWarning(lcApp) << "nothing to paste";
     });
     edit->addSeparator();
+    add(edit, QStringLiteral("keyboardShortcuts"), QStringLiteral("Keyboard Shortcuts…"), QKeySequence(), [this] {
+        m_shortcutsPanel.onClose = [this] { m_shortcutsPanel.close(); };
+        m_shortcutsPanel.show(QStringLiteral("Keyboard Shortcuts"), new KeyboardShortcutsSheet([this] { m_shortcutsPanel.close(); }));
+    });
     // Text fields delete the selection, else back from the caret.
     add(edit, QStringLiteral("fillForeground"), QStringLiteral("Fill with Foreground Color"), QKeySequence(Qt::ALT | Qt::Key_Backspace), [this] {
         if (!m_field) {
@@ -215,6 +220,7 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     connect(&m_workspace, &ProjectWorkspace::changed, this, &CompositorMenus::watchFront);
     // A field gaining or losing focus changes Undo's meaning.
     connect(qApp, &QApplication::focusChanged, this, &CompositorMenus::focusMoved);
+    connect(&ShortcutSettings::shared(), &ShortcutSettings::changed, this, &CompositorMenus::remap);
     watchFront();
 }
 
@@ -222,9 +228,19 @@ QAction *CompositorMenus::add(QMenu *menu, const QString &name, const QString &t
 {
     QAction *made = menu->addAction(text);
     made->setObjectName(name);
-    made->setShortcut(shortcut);
+    made->setProperty("originalShortcut", shortcut);
+    made->setShortcut(ShortcutSettings::shared().menu(shortcut));
     connect(made, &QAction::triggered, this, run);
     return made;
+}
+
+void CompositorMenus::remap()
+{
+    for (QAction *entry : parent()->findChildren<QAction *>()) {
+        const QVariant original = entry->property("originalShortcut");
+        if (original.isValid())
+            entry->setShortcut(ShortcutSettings::shared().menu(original.value<QKeySequence>()));
+    }
 }
 
 QAction *CompositorMenus::action(const QString &name) const
