@@ -195,7 +195,7 @@ install(CODE "
         find_program(UPDATE_MIME update-mime-database REQUIRED)
         execute_process(COMMAND \${UPDATE_MIME} \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/mime\" COMMAND_ERROR_IS_FATAL ANY)
     endif()")
-# Ubuntu 24.04 packages no ONNX Runtime: its package carries one.
+# Packages carry their ONNX Runtime; each release renames its symbols.
 option(OMAPHOTO_BUNDLE_ORT "Install ONNX Runtime beside the app" OFF)
 set(OMAPHOTO_ORT_NOTICES /usr/local/share/doc/onnxruntime CACHE PATH "ONNX Runtime's LICENSE and notices")
 if(OMAPHOTO_BUNDLE_ORT)
@@ -208,6 +208,8 @@ if(OMAPHOTO_BUNDLE_ORT)
     endforeach()
     install(IMPORTED_RUNTIME_ARTIFACTS onnxruntime::onnxruntime LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/omaphoto)
     set_target_properties(omaphoto PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/omaphoto")
+    # rpmbuild would offer the bundled library to the system.
+    set(CPACK_RPM_SPEC_MORE_DEFINE "%global __provides_exclude_from ^%{_libdir}/omaphoto/.*$\n%global __requires_exclude ^libonnxruntime[.]so")
 endif()
 # Debian and Fedora packages; each built on its own system.
 set(CPACK_PACKAGE_NAME omaphoto)

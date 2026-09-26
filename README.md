@@ -26,13 +26,13 @@ Arch and Omarchy:
 curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scripts/install/arch.sh && bash arch.sh
 ```
 
-Ubuntu 24.04 LTS and systems built on it (Linux Mint 22, Pop!_OS 24.04):
+Ubuntu 24.04 or 26.04 LTS and systems built on them (Linux Mint 22, Pop!_OS 24.04):
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scripts/install/ubuntu.sh && bash ubuntu.sh
 ```
 
-The DEB names Ubuntu 24.04's libraries, so later Ubuntu releases and Debian build from source (below).
+Each DEB names its Ubuntu release's libraries, so other Ubuntu releases and Debian build from source (below).
 
 Fedora:
 
@@ -62,8 +62,8 @@ scripts/dev.sh test    # every test, headless
 scripts/dev.sh run     # the app on your Wayland display
 ```
 
-By hand: C++20, Qt 6.4 or later (Widgets, Concurrent, image formats), CMake, Ninja, libheif, fontconfig and ONNX Runtime. `-DOMAPHOTO_MODEL=path/to/u2net.onnx` installs Remove Background's model. `scripts/distro-check.sh arch|fedora|nixos` builds and tests on those systems.
+By hand: C++20, Qt 6.4 or later (Widgets, Concurrent, image formats), CMake, Ninja, libheif, fontconfig and ONNX Runtime. `-DOMAPHOTO_MODEL=path/to/u2net.onnx` installs Remove Background's model. `scripts/distro-check.sh arch|fedora|nixos|resolute` builds and tests on those systems (`resolute` is Ubuntu 26.04).
 
 ## Licence
 
-MIT, as Compositor is; see `LICENSE`. Remove Background uses U²-Net (Apache-2.0, `licenses/U-2-Net.txt`) through ONNX Runtime (MIT). The Ubuntu package carries ONNX Runtime with its notices.
+MIT, as Compositor is; see `LICENSE`. Remove Background uses U²-Net (Apache-2.0, `licenses/U-2-Net.txt`) through ONNX Runtime (MIT). Every package carries ONNX Runtime with its notices.

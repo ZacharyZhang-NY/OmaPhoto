@@ -6,14 +6,28 @@ pkgdesc='Layered image editing for Linux, a port of Compositor'
 arch=('x86_64')
 url='https://github.com/ZacharyZhang-NY/OmaPhoto'
 license=('MIT')
-depends=('qt6-base' 'qt6-imageformats' 'libheif' 'libde265' 'fontconfig' 'onnxruntime' 'hicolor-icon-theme' 'shared-mime-info')
+depends=('qt6-base' 'qt6-imageformats' 'libheif' 'libde265' 'fontconfig' 'hicolor-icon-theme' 'shared-mime-info')
 makedepends=('cmake' 'ninja')
-source=('u2net.onnx::https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx')
-sha256sums=('8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491')
+# ONNX Runtime ships inside: Arch's changes its symbols each release.
+source=('u2net.onnx::https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx'
+        'https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz')
+sha256sums=('8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491'
+            '7485c7e7aac6501b27e353dcbe068e45c61ab51fbaf598d13970dfae669d20bf')
 noextract=('u2net.onnx')
 
+# The layout Microsoft's CMake config expects.
+prepare() {
+    local ort="$srcdir/onnxruntime-linux-x64-1.21.0"
+    rm -rf ort
+    mkdir -p ort/include ort/lib/cmake
+    cp -r "$ort/include" ort/include/onnxruntime
+    cp -a "$ort/lib" ort/lib64
+    cp -r "$ort/lib/cmake/onnxruntime" ort/lib/cmake/
+}
+
 build() {
-    cmake -S "$startdir/../.." -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DOMAPHOTO_MODEL="$srcdir/u2net.onnx"
+    cmake -S "$startdir/../.." -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DOMAPHOTO_MODEL="$srcdir/u2net.onnx" \
+        -DOMAPHOTO_BUNDLE_ORT=ON -Donnxruntime_DIR="$srcdir/ort/lib/cmake/onnxruntime" -DOMAPHOTO_ORT_NOTICES="$srcdir/onnxruntime-linux-x64-1.21.0"
     cmake --build build --target omaphoto
 }
 

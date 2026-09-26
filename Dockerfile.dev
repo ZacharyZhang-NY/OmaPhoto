@@ -1,11 +1,12 @@
-FROM ubuntu:24.04
+ARG BASE=ubuntu:24.04
+FROM $BASE
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         g++ cmake ninja-build qt6-base-dev libgl1-mesa-dev qt6-wayland fonts-dejavu-core \
         qt6-image-formats-plugins libheif-dev libheif-plugin-libde265 libfontconfig-dev \
         ca-certificates curl dpkg-dev file fakeroot \
     && rm -rf /var/lib/apt/lists/*
-# Ubuntu 24.04 packages no ONNX Runtime: Microsoft's own build.
+# The ONNX Runtime the packages carry: Microsoft's own build.
 RUN curl -fsSL -o /tmp/ort.tgz \
         https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz \
     && echo "7485c7e7aac6501b27e353dcbe068e45c61ab51fbaf598d13970dfae669d20bf  /tmp/ort.tgz" | sha256sum -c - \

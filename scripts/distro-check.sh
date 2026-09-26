@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Builds and tests the app in one distribution's own container.
 set -euo pipefail
-distro=${1:?"usage: distro-check.sh arch|fedora|nixos"}
+distro=${1:?"usage: distro-check.sh arch|fedora|nixos|resolute"}
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/.." && pwd)
-docker build -t "omaphoto-$distro" "$here/distro/$distro"
+# Ubuntu 26.04 is the dev image on another base.
+if [ "$distro" = resolute ]; then
+    docker build -t omaphoto-resolute --build-arg BASE=ubuntu:26.04 -f "$repo/Dockerfile.dev" "$here"
+else
+    docker build -t "omaphoto-$distro" "$here/distro/$distro"
+fi
 steps="cmake -S . -B /tmp/build -G Ninja -DOMAPHOTO_WERROR=ON && cmake --build /tmp/build && ctest --test-dir /tmp/build --output-on-failure --timeout 120"
 # Not root, as dev.sh: tests refuse what root may do.
 user=1000:1000

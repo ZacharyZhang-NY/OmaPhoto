@@ -21,5 +21,4 @@ curl -fL --proto '=https' -o "$work/$package" "$base/$package"
 curl -fsSL --proto '=https' -o "$work/SHA256SUMS" "$base/SHA256SUMS"
 # The package must match the checksum published beside it.
 (cd "$work" && grep " $package\$" SHA256SUMS | sha256sum -c -)
-# pacman asks which ONNX Runtime build provides onnxruntime.
 sudo pacman -U "$work/$package"

@@ -1,8 +1,21 @@
-# Arch and Omarchy: Qt, GCC and ONNX Runtime as shipped.
+# Arch and Omarchy: Qt and GCC as shipped.
 FROM archlinux:latest
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja pkgconf qt6-base qt6-imageformats libheif libde265 \
-        fontconfig onnxruntime-cpu ttf-dejavu curl \
+        fontconfig ttf-dejavu curl \
     && pacman -Scc --noconfirm
+# The ONNX Runtime the packages carry: Microsoft's own build.
+RUN curl -fsSL -o /tmp/ort.tgz \
+        https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz \
+    && echo "7485c7e7aac6501b27e353dcbe068e45c61ab51fbaf598d13970dfae669d20bf  /tmp/ort.tgz" | sha256sum -c - \
+    && mkdir -p /tmp/ort /usr/local/include/onnxruntime /usr/local/lib64 \
+    && tar -xzf /tmp/ort.tgz -C /tmp/ort --strip-components=1 \
+    && cp -r /tmp/ort/include/. /usr/local/include/onnxruntime/ \
+    && mkdir -p /usr/local/lib/cmake && mv /tmp/ort/lib/cmake/onnxruntime /usr/local/lib/cmake/ \
+    && cp -a /tmp/ort/lib/. /usr/local/lib64/ \
+    && mkdir -p /usr/local/share/doc/onnxruntime \
+    && cp /tmp/ort/LICENSE /tmp/ort/ThirdPartyNotices.txt /usr/local/share/doc/onnxruntime/ \
+    && echo /usr/local/lib64 > /etc/ld.so.conf.d/onnxruntime.conf && ldconfig \
+    && rm -rf /tmp/ort /tmp/ort.tgz
 # U²-Net for Remove Background, pinned by its checksum.
 RUN mkdir -p /usr/local/share/omaphoto \
     && curl -fsSL -o /usr/local/share/omaphoto/u2net.onnx \

@@ -1,4 +1,4 @@
-# A version tag builds the three packages, each on its own system, and publishes them.
+# A version tag builds the four packages, each on its own system, and publishes them.
 name: Release
 on:
   push:
@@ -19,20 +19,28 @@ jobs:
   deb:
     needs: version
     runs-on: ubuntu-24.04
+    # One DEB per Ubuntu LTS: each names its own libraries.
+    strategy:
+      matrix:
+        include:
+          - codename: noble
+            base: ubuntu:24.04
+          - codename: resolute
+            base: ubuntu:26.04
     steps:
       - uses: actions/checkout@v7
       # The dev image carries ONNX Runtime, its notices and the model.
-      - run: docker build -t omaphoto-dev -f Dockerfile.dev .
+      - run: docker build -t omaphoto-dev --build-arg BASE=${{ matrix.base }} -f Dockerfile.dev .
       - run: |
           docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -w /src omaphoto-dev sh -c '
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
               -DOMAPHOTO_BUNDLE_ORT=ON -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
             cmake --build build --target omaphoto && cd build && cpack -G DEB'
-          mv build/omaphoto_*.deb omaphoto_amd64.deb
+          mv build/omaphoto_*.deb omaphoto-${{ matrix.codename }}_amd64.deb
       - uses: actions/upload-artifact@v7
         with:
-          name: deb
-          path: omaphoto_amd64.deb
+          name: deb-${{ matrix.codename }}
+          path: omaphoto-${{ matrix.codename }}_amd64.deb
   rpm:
     needs: version
     runs-on: ubuntu-24.04
@@ -42,7 +50,7 @@ jobs:
       - run: |
           docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -w /src omaphoto-fedora sh -c '
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
-              -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
+              -DOMAPHOTO_BUNDLE_ORT=ON -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
             cmake --build build --target omaphoto && cd build && cpack -G RPM'
           mv build/omaphoto-*.x86_64.rpm omaphoto.x86_64.rpm
       - uses: actions/upload-artifact@v7
@@ -75,7 +83,7 @@ jobs:
           merge-multiple: true
           path: packages
       - working-directory: packages
-        run: sha256sum omaphoto_amd64.deb omaphoto.x86_64.rpm omaphoto-x86_64.pkg.tar.zst > SHA256SUMS
+        run: sha256sum omaphoto-noble_amd64.deb omaphoto-resolute_amd64.deb omaphoto.x86_64.rpm omaphoto-x86_64.pkg.tar.zst > SHA256SUMS
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Installs OmaPhoto's latest DEB on Ubuntu 24.04 and derivatives.
+# Installs OmaPhoto's latest DEB on Ubuntu LTS and derivatives.
 set -euo pipefail
 base=https://github.com/ZacharyZhang-NY/OmaPhoto/releases/latest/download
-package=omaphoto_amd64.deb
 . /etc/os-release
-# The DEB names Ubuntu 24.04's libraries; derivatives name their base.
-if [ "${UBUNTU_CODENAME:-}" != noble ]; then
-    echo "This script is for Ubuntu 24.04 and systems built on it; this system is ${PRETTY_NAME:-unknown}." >&2
+# Each DEB names its LTS's libraries; derivatives name their base.
+case "${UBUNTU_CODENAME:-}" in
+noble | resolute) ;;
+*)
+    echo "This script is for Ubuntu 24.04 or 26.04 and systems built on them; this system is ${PRETTY_NAME:-unknown}." >&2
     exit 1
-fi
+    ;;
+esac
+package=omaphoto-${UBUNTU_CODENAME}_amd64.deb
 if [ "$(uname -m)" != x86_64 ]; then
     echo "OmaPhoto's packages are built for x86_64 alone." >&2
     exit 1
