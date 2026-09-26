@@ -45,6 +45,7 @@ private slots:
     void carriedCornersAndWarpedMasks();
     void nudgesGroupsAndRefusals();
     void mapPathCarriesCurvesFlipsAndTheFillRule();
+    void pointsPastTheHorizonDivideAsSwiftDoes();
 };
 
 void DistortTests::cornersRunClockwiseFromTheTopLeft()
@@ -347,6 +348,29 @@ void DistortTests::mapPathCarriesCurvesFlipsAndTheFillRule()
     const Corners folded = {QPointF(10, 10), QPointF(20, 20), QPointF(20, 10), QPointF(10, 20)};
     QVERIFY(!DistortWarp::mapPath(ellipse, placement, QSizeF(10, 10), transform, folded).has_value());
     QVERIFY(!DistortWarp::mapPath(ellipse, placement, QSizeF(0, 10), transform, box).has_value());
+}
+
+// Past the horizon Swift divides by w; Qt 6.10 clamps.
+void DistortTests::pointsPastTheHorizonDivideAsSwiftDoes()
+{
+    const Corners trapezoid = {QPointF(0, 0), QPointF(40, 0), QPointF(30, 20), QPointF(10, 20)};
+    const QTransform map = DistortWarp::homography(trapezoid);
+    const auto divided = [&map](QPointF p) {
+        const double w = map.m13() * p.x() + map.m23() * p.y() + map.m33();
+        return QPointF((map.m11() * p.x() + map.m21() * p.y() + map.m31()) / w, (map.m12() * p.x() + map.m22() * p.y() + map.m32()) / w);
+    };
+    const LayerTransform unit{.origin = {0, 0}, .size = {1, 1}};
+    const Corners far = DistortWarp::corners({.origin = {0, -3}, .size = {1, 1}});
+    for (const QPointF corner : far)
+        QVERIFY(map.m13() * corner.x() + map.m23() * corner.y() + map.m33() < 0);
+    const Corners carried = DistortWarp::carried({.origin = {0, -3}, .size = {1, 1}}, unit, trapezoid);
+    for (size_t index = 0; index < 4; ++index)
+        QVERIFY(near(carried[index], divided(far[index])));
+    QPainterPath line;
+    line.moveTo(far[0]);
+    line.lineTo(far[2]);
+    const QPainterPath mapped = DistortWarp::mapPath(line, QTransform(), QSizeF(1, 1), unit, trapezoid).value();
+    QVERIFY(near(mapped.elementAt(0), divided(far[0])) && near(mapped.elementAt(1), divided(far[2])));
 }
 
 QTEST_GUILESS_MAIN(DistortTests)

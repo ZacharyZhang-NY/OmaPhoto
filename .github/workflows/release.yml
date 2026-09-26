@@ -6,10 +6,21 @@ on:
 permissions:
   contents: write
 jobs:
-  deb:
+  version:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      # The tag must name the version each build file carries.
+      - run: |
+          v=${GITHUB_REF_NAME#v}
+          grep -qF "project(omaphoto VERSION $v " CMakeLists.txt || { echo "CMakeLists.txt is not $v"; exit 1; }
+          grep -qxF "pkgver=$v" packaging/arch/PKGBUILD || { echo "PKGBUILD is not $v"; exit 1; }
+          grep -qF "version = \"$v\";" flake.nix || { echo "flake.nix is not $v"; exit 1; }
+  deb:
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
       # The dev image carries ONNX Runtime, its notices and the model.
       - run: docker build -t omaphoto-dev -f Dockerfile.dev .
       - run: |
@@ -18,14 +29,15 @@ jobs:
               -DOMAPHOTO_BUNDLE_ORT=ON -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
             cmake --build build --target omaphoto && cd build && cpack -G DEB'
           mv build/omaphoto_*.deb omaphoto_amd64.deb
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: deb
           path: omaphoto_amd64.deb
   rpm:
+    needs: version
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t omaphoto-fedora scripts/distro/fedora
       - run: |
           docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -w /src omaphoto-fedora sh -c '
@@ -33,14 +45,15 @@ jobs:
               -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
             cmake --build build --target omaphoto && cd build && cpack -G RPM'
           mv build/omaphoto-*.x86_64.rpm omaphoto.x86_64.rpm
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: rpm
           path: omaphoto.x86_64.rpm
   arch:
+    needs: version
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t omaphoto-arch scripts/distro/arch
       # makepkg refuses root; a user of the runner's id builds.
       - run: |
@@ -48,7 +61,7 @@ jobs:
             useradd -u $(id -u) builder && chown -R builder /src &&
             su builder -c 'cd /src/packaging/arch && makepkg -f'"
           mv packaging/arch/omaphoto-[0-9]*-x86_64.pkg.tar.zst omaphoto-x86_64.pkg.tar.zst
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: arch
           path: omaphoto-x86_64.pkg.tar.zst
@@ -56,8 +69,8 @@ jobs:
     needs: [deb, rpm, arch]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           path: packages

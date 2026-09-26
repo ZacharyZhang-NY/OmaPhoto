@@ -16,7 +16,7 @@ extern "C" {
 }
 
 namespace {
-// Swift divides by w whatever its sign; Qt 6.11 clips.
+// Swift divides by w whatever its sign; Qt 6.10 clamps.
 QPointF project(const QTransform &map, QPointF point)
 {
     const double w = map.m13() * point.x() + map.m23() * point.y() + map.m33();

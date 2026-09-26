@@ -18,7 +18,7 @@ It is a Linux port of [Compositor](https://github.com/robbietilton/Compositor) b
 
 ## Install
 
-Each script downloads the newest release's package, checks it against the release's `SHA256SUMS` and installs it with your system's package manager. Packages are built for x86_64.
+Each script installs the newest release. The Arch, Ubuntu and Fedora scripts download its package, check it against the release's `SHA256SUMS` and install it with your system's package manager; the NixOS script builds the release's flake. Packages are built for x86_64.
 
 Arch and Omarchy:
 
@@ -26,13 +26,13 @@ Arch and Omarchy:
 curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scripts/install/arch.sh && bash arch.sh
 ```
 
-Ubuntu 24.04 or later, and its derivatives (Linux Mint 22, Pop!_OS 24.04):
+Ubuntu 24.04 LTS and systems built on it (Linux Mint 22, Pop!_OS 24.04):
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scripts/install/ubuntu.sh && bash ubuntu.sh
 ```
 
-The DEB uses Ubuntu's package names, so Debian itself builds from source (below).
+The DEB names Ubuntu 24.04's libraries, so later Ubuntu releases and Debian build from source (below).
 
 Fedora:
 
@@ -42,13 +42,13 @@ curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scri
 
 Fedora's own libheif decodes no HEVC. For HEIC import, add [RPM Fusion](https://rpmfusion.org/Configuration) and install `libheif-freeworld`; the script reminds you.
 
-NixOS installs from the flake into your profile:
+NixOS installs the release's flake into your profile:
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scripts/install/nixos.sh && bash nixos.sh
 ```
 
-Or add `github:ZacharyZhang-NY/OmaPhoto` as a flake input and put its `packages.x86_64-linux.default` in your configuration.
+Or add `github:ZacharyZhang-NY/OmaPhoto/<tag>`, a release tag, as a flake input and put its `packages.x86_64-linux.default` in your configuration.
 
 The packages themselves sit on the [releases page](https://github.com/ZacharyZhang-NY/OmaPhoto/releases).
 

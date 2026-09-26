@@ -1,4 +1,4 @@
-# Built from this checkout: run makepkg in linux/packaging/arch.
+# Built from this checkout: run makepkg in packaging/arch.
 pkgname=omaphoto
 pkgver=1.0.0
 pkgrel=1
