@@ -136,10 +136,13 @@ jobs:
           # Qt's xcb platform plugin itself (not just the app) needs the small xcb-util
           # helper libraries (icccm/wm, image, keysyms, render-util, cursor) - without them
           # dlopen() of libqxcb.so fails and Qt reports "plugin was found" but could not be
-          # initialized.
-          apk add --no-cache libx11 libxcb libxkbcommon libxkbcommon-x11 \
+          # initialized. QT_DEBUG_PLUGINS=1 then showed the plugin still failed to dlopen
+          # because of a missing libSM.so.6 (X11 session-management), which in turn pulls in
+          # libICE.so.6 - install libsm/libice for those. imagemagick is only needed for the
+          # "did the app actually paint anything" check in the next step.
+          apk add --no-cache libx11 libxcb libxkbcommon libxkbcommon-x11 libsm libice \
             xcb-util xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-cursor \
-            mesa-gl mesa-dri-gallium ttf-dejavu xvfb ffmpeg
+            mesa-gl mesa-dri-gallium ttf-dejavu xvfb ffmpeg imagemagick
 
           # The AppImage links against Ubuntu's GLVND libGLX.so.0/libOpenGL.so.0, but
           # Alpine's mesa-gl only ships the classic monolithic libGL.so.1, which already
@@ -173,13 +176,30 @@ jobs:
           export QT_DEBUG_PLUGINS=1
           ./squashfs-root/AppRun &
           APP_PID=$!
-          sleep 8
 
-          ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png
+          # A single fixed sleep-then-grab could catch the window before it has painted
+          # anything, passing `test -s` on a screenshot that is really just a blank/solid
+          # frame. Instead poll for up to 15s, re-grabbing every ~2s, and stop as soon as a
+          # frame's pixel stddev shows it is not flat - i.e. something was actually drawn.
+          START=$(date +%s)
+          STDDEV=0
+          while [ "$(( $(date +%s) - START ))" -lt 15 ]; do
+            sleep 2
+            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png -loglevel error
+            STDDEV=$(identify -format "%[fx:image.stdDev]" screenshot.png 2>/dev/null || echo 0)
+            if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+              break
+            fi
+          done
 
           kill "$APP_PID" 2>/dev/null || true
           kill "$XVFB_PID" 2>/dev/null || true
+
           test -s screenshot.png
+          if ! awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+            echo "screenshot.png still looks blank/flat after 15s (pixel stddev=$STDDEV) - the app did not render" >&2
+            exit 1
+          fi
 
       - name: Upload screenshot
         uses: actions/upload-artifact@v4
