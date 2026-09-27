@@ -144,7 +144,8 @@ void GradientCanvasTests::escapeCancelsAndReturnApplies()
     shown.drag(QPointF(50, 150), QPointF(350, 150));
     QTest::keyClick(shown.canvas, Qt::Key_Return);
     QTRY_COMPARE(shown.session.history.undoCount(), count + 1);
-    QVERIFY(!shown.session.gradientEdit());
+    // The edit goes a turn after its step lands.
+    QTRY_VERIFY(!shown.session.gradientEdit());
     shown.drag(QPointF(50, 150), QPointF(350, 150));
     QTest::keyClick(shown.canvas, Qt::Key_Enter);
     QTRY_COMPARE(shown.session.history.undoCount(), count + 2);

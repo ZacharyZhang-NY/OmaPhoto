@@ -106,17 +106,17 @@ void PSDImportTests::importCreatesDocumentAndExistingCanvasGetsAGroup()
 void PSDImportTests::cancelledConversionLeavesTheDocumentUnchanged()
 {
     const QTemporaryDir folder;
-    const QUrl url = photoshop(folder, "Vivid.psd", {layer("Vivid", QRectF(0, 0, 2, 2), "vLit")}, QSize(2, 2));
+    const QUrl url = photoshop(folder, "Dissolved.psd", {layer("Dissolved", QRectF(0, 0, 2, 2), "diss")}, QSize(2, 2));
     EditorSession session;
     bool done = false;
     session.importImages({url}, std::nullopt, [&done] { done = true; });
     QVERIFY(session.showsConversionSheet() && session.conversionRequest().value().isReading);
     QTRY_VERIFY(!session.conversionRequest().value().isReading);
     const PSDConversionRequest &request = session.conversionRequest().value();
-    QCOMPARE(request.title, QString("Open “Vivid.psd”?"));
+    QCOMPARE(request.title, QString("Open “Dissolved.psd”?"));
     QCOMPARE(request.confirmTitle, QString("Import"));
     QCOMPARE(request.conversions.size(), size_t(1));
-    QCOMPARE(request.conversions[0].layerName, QString("Vivid"));
+    QCOMPARE(request.conversions[0].layerName, QString("Dissolved"));
     QVERIFY(session.isImporting() && !done);
     session.finishConversion(false);
     QVERIFY(!session.showsConversionSheet() && !session.conversionRequest());
@@ -127,14 +127,14 @@ void PSDImportTests::cancelledConversionLeavesTheDocumentUnchanged()
 void PSDImportTests::aConfirmedConversionImportsAndCancelWhileReadingStops()
 {
     const QTemporaryDir folder;
-    const QUrl url = photoshop(folder, "Vivid.psd", {layer("Vivid", QRectF(0, 0, 2, 2), "vLit")}, QSize(2, 2));
+    const QUrl url = photoshop(folder, "Dissolved.psd", {layer("Dissolved", QRectF(0, 0, 2, 2), "diss")}, QSize(2, 2));
     EditorSession session;
     bool done = false;
     session.importImages({url}, std::nullopt, [&done] { done = true; });
     QTRY_VERIFY(session.conversionRequest() && !session.conversionRequest().value().isReading);
     session.finishConversion(true);
     QTRY_VERIFY(done);
-    QCOMPARE(names(session), QStringList{"Vivid"});
+    QCOMPARE(names(session), QStringList{"Dissolved"});
     QVERIFY(session.document().value().layers[0].blendMode == LayerBlendMode::normal);
     // Cancel while reading: nothing lands, nothing is said.
     EditorSession stopped;

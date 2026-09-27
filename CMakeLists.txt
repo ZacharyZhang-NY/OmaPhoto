@@ -174,6 +174,7 @@ add_library(compositor_core STATIC
     src/Rendering/SampleRingOverlay.cpp
     src/Rendering/TransformOverlay.cpp
     src/Rendering/HslBlend.cpp
+    src/Rendering/SeparableBlend.cpp
     src/Rendering/LayerEffectsKernel.cpp
     src/Rendering/LayerEffectsSurface.cpp
     src/Rendering/LayerRenderer.cpp

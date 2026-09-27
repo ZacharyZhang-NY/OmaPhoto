@@ -99,6 +99,13 @@ void ClippingStackTests::aStackBlendsOnceWithItsBasesMode()
     QCOMPARE(drawn.pixel(0, 0), qRgba(100, 50, 25, 255));
     QCOMPARE(drawn.pixel(1, 1), qRgba(200, 100, 50, 255));
     QCOMPARE(drawn.pixel(1, 0), qRgba(150, 75, 37, 255));
+    // A hand-blended mode too, where Swift's group falls to Normal.
+    scene.layers[base].blendMode = LayerBlendMode::linearBurn;
+    const QImage burnt = scene.render({background, base, top});
+    QCOMPARE(burnt.pixel(0, 0), qRgba(73, 0, 0, 255));
+    QCOMPARE(burnt.pixel(1, 1), qRgba(200, 100, 50, 255));
+    QCOMPARE(qRed(burnt.pixel(1, 0)), 136);
+    QCOMPARE(qGreen(burnt.pixel(1, 0)), 50);
 }
 
 void ClippingStackTests::laterChildrenCoverEarlierOnes()

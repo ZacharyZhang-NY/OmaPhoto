@@ -75,6 +75,7 @@ class CanvasDisplayTests : public QObject {
 private slots:
     void theBackgroundCheckerboardShadowAndBorderSurroundTheDocument();
     void layersCompositeAsTheExportDoes();
+    void photoshopsOwnModesShowAsTheExportDoes();
     void blendModesMeetNoCheckerboardButTranslucencyDoes();
     void thePixelGridAppearsFromEightHundredPercent();
     void fromTwoHundredPercentPixelsAreHardEdged();
@@ -188,6 +189,24 @@ void CanvasDisplayTests::layersCompositeAsTheExportDoes()
     QCOMPARE(moved.pixel(int(origin.x()) + 16, int(origin.y()) + 6), hued);
     QCOMPARE(moved.pixel(int(origin.x()) + 16, int(origin.y()) + 4), qRgb(0, 0, 255));
     session.cancelTransform();
+}
+
+void CanvasDisplayTests::photoshopsOwnModesShowAsTheExportDoes()
+{
+    // Blended by hand on the canvas's surface, as exported.
+    for (const LayerBlendMode mode : {LayerBlendMode::linearDodge, LayerBlendMode::subtract, LayerBlendMode::hardMix, LayerBlendMode::hardLight}) {
+        Scene scene(20, 10, 60, 40);
+        scene.session.insert(filled(20, 10, qRgba(90, 140, 200, 255), "Ground"), QPointF(10, 5));
+        scene.session.insert(filled(10, 6, qRgba(120, 60, 160, 255), "Top"), QPointF(8, 5));
+        scene.session.setLayerBlendMode(mode);
+        scene.session.zoom(1);
+        const QImage exported = ImageExporter::render(scene.session.projectSnapshot().value()).image.convertToFormat(QImage::Format_ARGB32);
+        const QImage shot = scene.shot();
+        const QPointF origin = scene.origin();
+        for (const QPoint at : {QPoint(5, 4), QPoint(16, 4)})
+            QCOMPARE(shot.pixel(int(origin.x()) + at.x(), int(origin.y()) + at.y()), exported.pixel(at));
+        QVERIFY(exported.pixel(5, 4) != qRgb(120, 60, 160) && exported.pixel(5, 4) != qRgb(90, 140, 200));
+    }
 }
 
 void CanvasDisplayTests::blendModesMeetNoCheckerboardButTranslucencyDoes()

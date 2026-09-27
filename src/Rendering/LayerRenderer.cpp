@@ -32,6 +32,10 @@ QPainter::CompositionMode compositionMode(LayerBlendMode mode)
         return QPainter::CompositionMode_ColorDodge;
     case LayerBlendMode::colorBurn:
         return QPainter::CompositionMode_ColorBurn;
+    case LayerBlendMode::hardLight:
+        return QPainter::CompositionMode_HardLight;
+    case LayerBlendMode::exclusion:
+        return QPainter::CompositionMode_Exclusion;
     default:
         throw std::logic_error("QPainter has no composition mode for this blend mode");
     }
@@ -214,7 +218,7 @@ void LayerRenderer::composite(QPainter &context, const QTransform &placement, co
     if (byHand) {
         const QImage *target = dynamic_cast<const QImage *>(context.device());
         if (!target)
-            throw std::logic_error("hue, saturation, color and luminosity need an image-backed painter");
+            throw std::logic_error("modes blended by hand need an image-backed painter");
         const QImage backdrop = target->copy(area).convertToFormat(QImage::Format_RGBA8888_Premultiplied);
         if (backdrop.isNull())
             throw ExportError(ExportError::Kind::render);

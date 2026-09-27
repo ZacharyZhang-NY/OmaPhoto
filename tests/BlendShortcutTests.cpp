@@ -29,8 +29,9 @@ void BlendShortcutTests::shiftPlusAndMinusStepTheActiveLayersBlendModeWhereverFo
     session.selectTool(NavigationTool::brush);
     canvas->setFocus();
     QTRY_VERIFY(canvas->hasFocus());
+    // Photoshop's order: the first darkening mode follows Normal.
     QTest::keyClick(canvas, Qt::Key_Plus, Qt::ShiftModifier);
-    QCOMPARE(mode(), LayerBlendMode::multiply);
+    QCOMPARE(mode(), LayerBlendMode::darken);
     // From the list, back past Normal to the last mode.
     session.selectTool(NavigationTool::lasso);
     list->setFocus();

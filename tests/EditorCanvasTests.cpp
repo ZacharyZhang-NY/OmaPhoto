@@ -319,7 +319,7 @@ void EditorCanvasTests::shiftPlusAndMinusCycleTheBlendModeAcrossTheWindow()
     const auto mode = [&] { return session.activeLayer().value().blendMode; };
     QCOMPARE(mode(), LayerBlendMode::normal);
     QTest::keyClick(canvas, Qt::Key_Plus, Qt::ShiftModifier);
-    QCOMPARE(mode(), LayerBlendMode::multiply);
+    QCOMPARE(mode(), LayerBlendMode::darken);
     QTest::keyClick(canvas, Qt::Key_Underscore, Qt::ShiftModifier);
     QCOMPARE(mode(), LayerBlendMode::normal);
     QTest::keyClick(canvas, Qt::Key_Underscore, Qt::ShiftModifier);

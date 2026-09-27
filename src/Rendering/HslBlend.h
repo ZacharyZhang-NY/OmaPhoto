@@ -2,7 +2,7 @@
 #include "Document/LayerAppearance.h"
 #include <QImage>
 
-// Hue, Saturation, Color, Luminosity: PDF blend modes QPainter lacks.
+// Blend modes QPainter lacks: the four non-separable, SeparableBlend's eight.
 namespace HslBlend {
 bool handles(LayerBlendMode mode);
 // Source over backdrop, same size, both RGBA8888 premultiplied.

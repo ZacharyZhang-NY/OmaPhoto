@@ -103,7 +103,7 @@ private slots:
     void unusedSpotChannelsAreSkippedBeforeDecode();
     void unsupportedCompressionOnColorChannelsIsStillRejected();
     void matchesRequiresPhotoshopMagic();
-    void unknownBlendProducesConversionReport();
+    void unsupportedBlendProducesConversionReport();
     void softLightImportsWithoutConversion();
     void folderOpacityImportsOntoTheFolder();
     void unsupportedHeadersAreRejected();
@@ -239,16 +239,26 @@ void PSDRoundTripTests::matchesRequiresPhotoshopMagic()
     QVERIFY(PSDReader::matches(QByteArray("8BPS")) && !PSDReader::matches(QByteArray("8BP")));
 }
 
-void PSDRoundTripTests::unknownBlendProducesConversionReport()
+void PSDRoundTripTests::unsupportedBlendProducesConversionReport()
 {
+    // Dissolve scatters pixels by opacity: no twin, so Normal.
     const QImage fill = PSDFixture::colorImage(2, 2, 1, 0, 0);
-    PSDRecord layer = PSDFixture::record("Vivid", fill, QRectF(0, 0, 2, 2));
-    layer.blendKey = "vLit";
+    PSDRecord layer = PSDFixture::record("Dissolved", fill, QRectF(0, 0, 2, 2));
+    layer.blendKey = "diss";
     const PSDImport imported = PSDDocumentBuilder::makeImport(PSDReader::read(PSDFixture::data(PSDDocument{2, 2, 72, {layer}}, fill)));
     QCOMPARE(imported.conversions.size(), size_t(1));
-    QCOMPARE(imported.conversions[0].layerName, QString("Vivid"));
-    QCOMPARE(imported.conversions[0].message, QString("Blend mode “vLit” isn’t supported and will be applied as Normal."));
+    QCOMPARE(imported.conversions[0].layerName, QString("Dissolved"));
+    QCOMPARE(imported.conversions[0].message, QString("Blend mode “diss” isn’t supported and will be applied as Normal."));
     QVERIFY(imported.layers[0].blendMode == LayerBlendMode::normal);
+    for (const char *key : {"dkCl", "lgCl"})
+        QVERIFY2(!fromPSD(key), key);
+    const std::vector<std::pair<const char *, LayerBlendMode>> keys{
+        {"lbrn", LayerBlendMode::linearBurn}, {"lddg", LayerBlendMode::linearDodge}, {"hLit", LayerBlendMode::hardLight},
+        {"vLit", LayerBlendMode::vividLight}, {"lLit", LayerBlendMode::linearLight}, {"pLit", LayerBlendMode::pinLight},
+        {"hMix", LayerBlendMode::hardMix},    {"smud", LayerBlendMode::exclusion}, {"fsub", LayerBlendMode::subtract},
+        {"fdiv", LayerBlendMode::divide}};
+    for (const auto &[key, mode] : keys)
+        QCOMPARE(fromPSD(key), std::optional(mode));
 }
 
 void PSDRoundTripTests::softLightImportsWithoutConversion()

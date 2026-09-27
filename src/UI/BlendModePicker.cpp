@@ -4,8 +4,12 @@ BlendModePicker::BlendModePicker(EditorSession &session, QWidget *parent) : QCom
 {
     setAccessibleName(QStringLiteral("Blend mode"));
     setObjectName(QStringLiteral("blendMode"));
-    for (const LayerBlendMode mode : allLayerBlendModes)
+    // Grouped as Photoshop groups them, a line between.
+    for (const LayerBlendMode mode : allLayerBlendModes) {
+        if (count() && blendGroup(mode) != blendGroup(*layerBlendMode(itemText(count() - 1))))
+            insertSeparator(count());
         addItem(rawValue(mode));
+    }
     connect(this, &QComboBox::highlighted, this, &BlendModePicker::highlight);
     connect(this, &QComboBox::activated, this, &BlendModePicker::choose);
     connect(&m_session, &EditorSession::changed, this, &BlendModePicker::synchronize);

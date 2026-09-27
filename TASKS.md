@@ -337,7 +337,10 @@ The panel of 4.6 shows and edits what the session holds so far. Each item adds i
 - [x] 12.6b Version 1.2.1, part two: middle-button pan, persistent tool settings, Auto Select picking the foreground layer, the reshaped app icon (`45ab8fd`) in `packaging/icons`.
 - 12.6b round 1: FAIL, two findings: the middle pan's per-move point and the Auto Select branch's `underPointer` guard were held by no test (both tested now); the cosmetic notes taken (test order, the distort test's Swift name, the double pan named). A parallel run showed `SelectionCanvasTests` pressing before a nudge's move had ended; it waits for the move now.
 - 12.6b round 2: PASS.
-- [ ] 12.7 Version 1.2.2: Photoshop's remaining blend modes in its groups; Black & White, Color Balance and Invert adjustments.
+- [x] 12.7a Version 1.2.2, part one: Photoshop's remaining blend modes in its groups.
+- 12.7a round 1: FAIL, one finding. A clipping stack's base and an adjustment in one of the eight new modes blend by it in the twin, where Swift's `cgMode` draws them as Normal; AGENTS.md had called Swift's cases dead. Named now as a fix beyond Swift and tested on both paths; three wordings taken. A parallel run showed `GradientCanvasTests` reading the edit a turn early; it waits now.
+- 12.7a round 2: PASS. One note taken: the stack test asserts the exact 136.
+- [ ] 12.7b Version 1.2.2, part two: Black & White, Color Balance and Invert adjustments.
 - [ ] 12.8a Version 1.2.3, part one: the Camera Raw filter's model and pixel kernels.
 - [ ] 12.8b Version 1.2.3, part two: the Camera Raw panel beside the canvas, its grading wheels turning the way their hue runs (1.2.9's `96edd5f`).
 - [ ] 12.8c Version 1.2.3, part three: Inner Glow, Image Trim, blur and noise adjustment layers, the layer context menu without 1.2.5's dropped Layer Effects entry (`5d7adba`).

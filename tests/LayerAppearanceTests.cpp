@@ -287,8 +287,9 @@ void LayerAppearanceTests::theBlendModeCyclesBothWaysAndWraps()
     const QUuid below = session.activeLayerID().value();
     session.insert(asset(0.8));
     const int count = session.history.undoCount();
+    // Photoshop's order: the first darkening mode follows Normal.
     session.cycleBlendMode(true);
-    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::multiply);
+    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::darken);
     // The mode is the active layer's alone.
     QCOMPARE(layerWith(session, below).blendMode, LayerBlendMode::normal);
     session.cycleBlendMode(false);
@@ -302,7 +303,7 @@ void LayerAppearanceTests::theBlendModeCyclesBothWaysAndWraps()
     session.setLayerBlendMode(LayerBlendMode::screen);
     session.previewBlendMode(LayerBlendMode::hue, top);
     session.cycleBlendMode(true);
-    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::overlay);
+    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::colorDodge);
     QVERIFY(!session.blendPreview().has_value());
     // A refused cycle leaves a preview where it was.
     session.previewBlendMode(LayerBlendMode::hue, top);
@@ -311,8 +312,8 @@ void LayerAppearanceTests::theBlendModeCyclesBothWaysAndWraps()
     session.cycleBlendMode(true);
     QCOMPARE(session.blendPreview(), std::optional(EditorSession::BlendPreview{top, LayerBlendMode::hue}));
     QCOMPARE(int(changes.count()), 0);
-    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::overlay);
-    QCOMPARE(int(allLayerBlendModes.size()), 14);
+    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::colorDodge);
+    QCOMPARE(int(allLayerBlendModes.size()), 24);
     for (size_t index = 0; index < allLayerBlendModes.size(); ++index)
         QCOMPARE(int(allLayerBlendModes[index]), int(index));
 }

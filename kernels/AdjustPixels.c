@@ -94,3 +94,94 @@ void rgba_clamp_premultiplied(uint8_t *rgba, size_t count) {
         if (rgba[2] > a) rgba[2] = a;
     }
 }
+
+/// Which of the six ranges a color's primary and secondary fall in, and how much of each it holds.
+/// A color is min(r,g,b) of gray, plus (mid-min) of the secondary between its two brightest channels,
+/// plus (max-mid) of the primary of its brightest — so the weights below are exactly Photoshop's.
+void adjust_black_white(uint8_t *rgba, size_t width, size_t height, size_t stride, const float *weights,
+                        int tint, double tintHue, double tintSaturation) {
+    for (size_t y = 0; y < height; ++y) {
+        uint8_t *row = rgba + y * stride;
+        for (size_t x = 0; x < width; ++x) {
+            uint8_t *p = row + x * 4;
+            float alpha = p[3];
+            if (!alpha) continue;
+            float r = p[0] * 255.0f / alpha, g = p[1] * 255.0f / alpha, b = p[2] * 255.0f / alpha;
+            r = fminf(255.0f, r) / 255.0f; g = fminf(255.0f, g) / 255.0f; b = fminf(255.0f, b) / 255.0f;
+            float mx = fmaxf(r, fmaxf(g, b)), mn = fminf(r, fminf(g, b));
+            float md = r + g + b - mx - mn;
+            // weights: 0 red, 1 yellow, 2 green, 3 cyan, 4 blue, 5 magenta
+            int primary, secondary;
+            if (mx == r)      { primary = 0; secondary = (g >= b) ? 1 : 5; }
+            else if (mx == g) { primary = 2; secondary = (r >= b) ? 1 : 3; }
+            else              { primary = 4; secondary = (g >= r) ? 3 : 5; }
+            float gray = mn + (md - mn) * weights[secondary] + (mx - md) * weights[primary];
+            gray = fminf(1.0f, fmaxf(0.0f, gray));
+            float outR = gray, outG = gray, outB = gray;
+            if (tint && tintSaturation > 0) {
+                // The gray becomes the lightness of a color at the chosen hue.
+                double c = (1.0 - fabs(2.0 * gray - 1.0)) * tintSaturation;
+                double hp = fmod(tintHue, 360.0) / 60.0;
+                double xx = c * (1.0 - fabs(fmod(hp, 2.0) - 1.0));
+                double r1 = 0, g1 = 0, b1 = 0;
+                if (hp < 1)      { r1 = c; g1 = xx; }
+                else if (hp < 2) { r1 = xx; g1 = c; }
+                else if (hp < 3) { g1 = c; b1 = xx; }
+                else if (hp < 4) { g1 = xx; b1 = c; }
+                else if (hp < 5) { r1 = xx; b1 = c; }
+                else             { r1 = c; b1 = xx; }
+                double m = gray - c / 2.0;
+                outR = (float)fmin(1.0, fmax(0.0, r1 + m));
+                outG = (float)fmin(1.0, fmax(0.0, g1 + m));
+                outB = (float)fmin(1.0, fmax(0.0, b1 + m));
+            }
+            p[0] = (uint8_t)fminf(alpha, fmaxf(0.0f, roundf(outR * alpha)));
+            p[1] = (uint8_t)fminf(alpha, fmaxf(0.0f, roundf(outG * alpha)));
+            p[2] = (uint8_t)fminf(alpha, fmaxf(0.0f, roundf(outB * alpha)));
+        }
+    }
+}
+
+/// How much a tone belongs to the shadows, midtones and highlights: three overlapping curves that sum
+/// to about one across the range, so a shift fades in and out rather than banding at a threshold.
+static void tonal_weights(float v, float *shadow, float *mid, float *highlight) {
+    const float a = 0.25f, b = 0.333f, scale = 0.7f;
+    float s = (v - b) / -a + 0.5f;
+    float h = (v + b - 1.0f) / a + 0.5f;
+    s = fminf(1.0f, fmaxf(0.0f, s));
+    h = fminf(1.0f, fmaxf(0.0f, h));
+    float m1 = fminf(1.0f, fmaxf(0.0f, (v - b) / a + 0.5f));
+    float m2 = fminf(1.0f, fmaxf(0.0f, (v + b - 1.0f) / -a + 0.5f));
+    *shadow = s * scale;
+    *mid = m1 * m2 * scale;
+    *highlight = h * scale;
+}
+
+void adjust_color_balance(uint8_t *rgba, size_t width, size_t height, size_t stride, const float *shadows,
+                          const float *midtones, const float *highlights, int preserveLuminosity) {
+    for (size_t y = 0; y < height; ++y) {
+        uint8_t *row = rgba + y * stride;
+        for (size_t x = 0; x < width; ++x) {
+            uint8_t *p = row + x * 4;
+            float alpha = p[3];
+            if (!alpha) continue;
+            float c[3];
+            for (int i = 0; i < 3; ++i) c[i] = fminf(255.0f, p[i] * 255.0f / alpha) / 255.0f;
+            float before = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2];
+            for (int i = 0; i < 3; ++i) {
+                float s, m, h;
+                tonal_weights(c[i], &s, &m, &h);
+                c[i] += shadows[i] * s + midtones[i] * m + highlights[i] * h;
+                c[i] = fminf(1.0f, fmaxf(0.0f, c[i]));
+            }
+            if (preserveLuminosity) {
+                float after = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2];
+                if (after > 0.0001f) {
+                    float ratio = before / after;
+                    for (int i = 0; i < 3; ++i) c[i] = fminf(1.0f, fmaxf(0.0f, c[i] * ratio));
+                }
+            }
+            for (int i = 0; i < 3; ++i) p[i] = (uint8_t)fminf(alpha, fmaxf(0.0f, roundf(c[i] * alpha)));
+        }
+    }
+}

@@ -26,13 +26,16 @@ void BlendModePickerTests::theMenuListsEveryModeAndFollowsTheActiveLayer()
 {
     EditorSession session;
     BlendModePicker picker(session);
-    QCOMPARE(picker.count(), int(allLayerBlendModes.size()));
+    // Photoshop's six groups, a separator between each.
+    QCOMPARE(picker.count(), int(allLayerBlendModes.size()) + 5);
     QStringList titles;
     for (int index = 0; index < picker.count(); ++index)
         titles << picker.itemText(index);
-    QCOMPARE(titles.first(), QString("Normal"));
-    QCOMPARE(titles.last(), QString("Luminosity"));
-    QCOMPARE(titles[1], QString("Multiply"));
+    QCOMPARE(titles, (QStringList{"Normal", "", "Darken", "Multiply", "Color Burn", "Linear Burn", "", "Lighten", "Screen", "Color Dodge",
+                                  "Linear Dodge (Add)", "", "Overlay", "Soft Light", "Hard Light", "Vivid Light", "Linear Light", "Pin Light",
+                                  "Hard Mix", "", "Difference", "Exclusion", "Subtract", "Divide", "", "Hue", "Saturation", "Color", "Luminosity"}));
+    for (const int separator : {1, 6, 11, 19, 24})
+        QCOMPARE(picker.itemData(separator, Qt::AccessibleDescriptionRole).toString(), QString("separator"));
     QVERIFY(!picker.isEnabled());
     session.createDocument(4, 4);
     session.insert(white());
@@ -63,20 +66,20 @@ void BlendModePickerTests::hoveringTriesAModeOnAndChoosingKeepsIt()
     picker.showPopup();
     QTRY_VERIFY(picker.view()->isVisible());
     // Hovering previews on the layer the menu opened for.
-    emit picker.highlighted(1);
+    emit picker.highlighted(3);
     QCOMPARE(session.blendPreview().value().mode, LayerBlendMode::multiply);
     QCOMPARE(session.blendPreview().value().layerID, layer);
     QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::normal);
-    emit picker.highlighted(2);
+    emit picker.highlighted(8);
     QCOMPARE(session.blendPreview().value().mode, LayerBlendMode::screen);
     // The session's news leaves an open menu alone.
-    picker.view()->setCurrentIndex(picker.model()->index(2, 0));
+    picker.view()->setCurrentIndex(picker.model()->index(8, 0));
     session.setLayerOpacity(0.5);
     QVERIFY(session.blendPreview().has_value());
-    QCOMPARE(picker.view()->currentIndex().row(), 2);
+    QCOMPARE(picker.view()->currentIndex().row(), 8);
     // A click closes the menu, then chooses; preview clears after.
     picker.hidePopup();
-    emit picker.activated(2);
+    emit picker.activated(8);
     QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::screen);
     QCOMPARE(picker.currentText(), QString("Screen"));
     QCOMPARE(session.history.undoName(), QString("Layer Blend Mode"));
@@ -85,8 +88,14 @@ void BlendModePickerTests::hoveringTriesAModeOnAndChoosingKeepsIt()
     // Keys on the closed menu choose for the active layer.
     picker.setFocus();
     QTest::keyClick(&picker, Qt::Key_Down);
-    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::overlay);
+    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::colorDodge);
+    QCOMPARE(picker.currentText(), QString("Color Dodge"));
+    // Keys step over the lines between groups.
+    QTest::keyClick(&picker, Qt::Key_Down);
+    QTest::keyClick(&picker, Qt::Key_Down);
     QCOMPARE(picker.currentText(), QString("Overlay"));
+    session.undo();
+    session.undo();
     // Closed, the menu follows the session again.
     session.undo();
     QCOMPARE(picker.currentText(), QString("Screen"));
@@ -104,19 +113,19 @@ void BlendModePickerTests::aMenuClosedWithoutAChoiceLeavesTheLayerAlone()
     picker.show();
     QVERIFY(QTest::qWaitForWindowExposed(&picker));
     picker.showPopup();
-    emit picker.highlighted(4);
+    emit picker.highlighted(3);
     picker.hidePopup();
     QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::normal);
     QTRY_VERIFY(!session.blendPreview().has_value());
     QCOMPARE(picker.currentText(), QString("Normal"));
     // Another layer active at the choice: nothing changes.
     picker.showPopup();
-    emit picker.highlighted(4);
+    emit picker.highlighted(3);
     session.selectLayer(session.document().value().layers.front().id);
     // Open, the menu keeps its text; closed, the active layer.
     QCOMPARE(picker.currentText(), QString("Normal"));
     picker.hidePopup();
-    emit picker.activated(4);
+    emit picker.activated(3);
     QCOMPARE(session.document().value().layers.front().blendMode, LayerBlendMode::multiply);
     QCOMPARE(session.document().value().layers.back().blendMode, LayerBlendMode::normal);
     QCOMPARE(session.history.undoName(), QString("Import Image"));
@@ -131,7 +140,7 @@ void BlendModePickerTests::aMenuClosedWithoutAChoiceLeavesTheLayerAlone()
     session.selectLayer(session.document().value().layers.front().id);
     picker.setFocus();
     QTest::keyClick(&picker, Qt::Key_Down);
-    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::screen);
+    QCOMPARE(session.activeLayer().value().blendMode, LayerBlendMode::colorBurn);
 }
 
 void BlendModePickerTests::theMaskButtonAddsAWhiteMaskOnce()

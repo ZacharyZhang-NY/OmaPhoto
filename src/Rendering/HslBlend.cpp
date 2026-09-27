@@ -1,5 +1,6 @@
 #include "Rendering/HslBlend.h"
 #include "Rendering/PoolMap.h"
+#include "Rendering/SeparableBlend.h"
 #include "IO/ImageExporter.h"
 #include <QtConcurrent>
 #include <algorithm>
@@ -66,7 +67,8 @@ Color mixed(LayerBlendMode mode, const Color &backdrop, const Color &source)
     case LayerBlendMode::luminosity:
         return setLum(backdrop, lum(source));
     default:
-        throw std::logic_error("HslBlend handles only the four non-separable modes");
+        return {SeparableBlend::channel(mode, backdrop[0], source[0]), SeparableBlend::channel(mode, backdrop[1], source[1]),
+                SeparableBlend::channel(mode, backdrop[2], source[2])};
     }
 }
 }
@@ -74,7 +76,7 @@ Color mixed(LayerBlendMode mode, const Color &backdrop, const Color &source)
 bool HslBlend::handles(LayerBlendMode mode)
 {
     return mode == LayerBlendMode::hue || mode == LayerBlendMode::saturation || mode == LayerBlendMode::color
-        || mode == LayerBlendMode::luminosity;
+        || mode == LayerBlendMode::luminosity || SeparableBlend::needsSurface(mode);
 }
 
 QImage HslBlend::blend(const QImage &backdrop, const QImage &source, LayerBlendMode mode, double opacity)
@@ -84,7 +86,7 @@ QImage HslBlend::blend(const QImage &backdrop, const QImage &source, LayerBlendM
         throw std::logic_error("HslBlend needs two RGBA8888 premultiplied images of one size");
     // Checked here: a worker's exception would come back wrapped.
     if (!handles(mode))
-        throw std::logic_error("HslBlend blends hue, saturation, color and luminosity alone");
+        throw std::logic_error("HslBlend blends only the modes QPainter lacks");
     QImage result(backdrop.size(), QImage::Format_RGBA8888_Premultiplied);
     if (result.isNull())
         throw ExportError(ExportError::Kind::render);

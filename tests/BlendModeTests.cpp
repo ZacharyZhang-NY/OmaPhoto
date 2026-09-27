@@ -80,6 +80,20 @@ Rgb reference(LayerBlendMode mode, const Rgb &backdrop, const Rgb &source)
         case LayerBlendMode::difference: result[channel] = std::abs(b - s); break;
         case LayerBlendMode::colorDodge: result[channel] = b == 0 ? 0 : s >= 1 ? 1 : std::min(1.0, b / (1 - s)); break;
         case LayerBlendMode::colorBurn: result[channel] = b >= 1 ? 1 : s <= 0 ? 0 : 1 - std::min(1.0, (1 - b) / s); break;
+        // Photoshop's separable modes that QPainter lacks.
+        case LayerBlendMode::hardLight: result[channel] = hardLight(b, s); break;
+        case LayerBlendMode::exclusion: result[channel] = b + s - 2 * b * s; break;
+        case LayerBlendMode::linearBurn: result[channel] = std::max(0.0, b + s - 1); break;
+        case LayerBlendMode::linearDodge: result[channel] = std::min(1.0, b + s); break;
+        case LayerBlendMode::vividLight:
+            result[channel] = s <= 0.5 ? (b >= 1 ? 1 : s <= 0 ? 0 : 1 - std::min(1.0, (1 - b) / (2 * s)))
+                                       : (b <= 0 ? 0 : s >= 1 ? 1 : std::min(1.0, b / (2 - 2 * s)));
+            break;
+        case LayerBlendMode::linearLight: result[channel] = std::clamp(b + 2 * s - 1, 0.0, 1.0); break;
+        case LayerBlendMode::pinLight: result[channel] = s <= 0.5 ? std::min(b, 2 * s) : std::max(b, 2 * s - 1); break;
+        case LayerBlendMode::hardMix: result[channel] = b + s >= 1 ? 1 : 0; break;
+        case LayerBlendMode::subtract: result[channel] = std::max(0.0, b - s); break;
+        case LayerBlendMode::divide: result[channel] = s <= 0 ? 1 : std::min(1.0, b / s); break;
         default: break;
         }
     }
@@ -140,7 +154,10 @@ void BlendModeTests::everyBlendModeMatchesThePdfFormulas_data()
         {"overlay", LayerBlendMode::overlay}, {"softLight", LayerBlendMode::softLight}, {"darken", LayerBlendMode::darken}, {"lighten", LayerBlendMode::lighten},
         {"difference", LayerBlendMode::difference}, {"colorDodge", LayerBlendMode::colorDodge},
         {"colorBurn", LayerBlendMode::colorBurn}, {"hue", LayerBlendMode::hue}, {"saturation", LayerBlendMode::saturation},
-        {"color", LayerBlendMode::color}, {"luminosity", LayerBlendMode::luminosity}};
+        {"color", LayerBlendMode::color}, {"luminosity", LayerBlendMode::luminosity}, {"hardLight", LayerBlendMode::hardLight},
+        {"exclusion", LayerBlendMode::exclusion}, {"linearBurn", LayerBlendMode::linearBurn}, {"linearDodge", LayerBlendMode::linearDodge},
+        {"vividLight", LayerBlendMode::vividLight}, {"linearLight", LayerBlendMode::linearLight}, {"pinLight", LayerBlendMode::pinLight},
+        {"hardMix", LayerBlendMode::hardMix}, {"subtract", LayerBlendMode::subtract}, {"divide", LayerBlendMode::divide}};
     for (const auto &[name, mode] : modes)
         QTest::newRow(name) << mode;
 }
@@ -224,6 +241,10 @@ void BlendModeTests::hslBlendChecksItsInputs()
     QVERIFY(HslBlend::handles(LayerBlendMode::hue) && HslBlend::handles(LayerBlendMode::saturation));
     QVERIFY(HslBlend::handles(LayerBlendMode::color) && HslBlend::handles(LayerBlendMode::luminosity));
     QVERIFY(!HslBlend::handles(LayerBlendMode::normal) && !HslBlend::handles(LayerBlendMode::colorBurn));
+    QVERIFY(!HslBlend::handles(LayerBlendMode::hardLight) && !HslBlend::handles(LayerBlendMode::exclusion));
+    for (const LayerBlendMode mode : {LayerBlendMode::linearBurn, LayerBlendMode::linearDodge, LayerBlendMode::vividLight, LayerBlendMode::linearLight,
+                                      LayerBlendMode::pinLight, LayerBlendMode::hardMix, LayerBlendMode::subtract, LayerBlendMode::divide})
+        QVERIFY(HslBlend::handles(mode));
 
     const QImage large(8192, 8192, QImage::Format_RGBA8888_Premultiplied), other(8192, 8192, QImage::Format_RGBA8888_Premultiplied);
     std::optional<AddressSpaceLimit> limit(std::in_place, 16 * 1024 * 1024);

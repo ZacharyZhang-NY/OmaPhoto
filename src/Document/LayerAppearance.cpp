@@ -6,18 +6,31 @@
 #include <utility>
 
 namespace {
-const std::array<std::pair<LayerBlendMode, const char *>, 14> names{{
-    {LayerBlendMode::normal, "Normal"}, {LayerBlendMode::multiply, "Multiply"}, {LayerBlendMode::screen, "Screen"},
-    {LayerBlendMode::overlay, "Overlay"}, {LayerBlendMode::softLight, "Soft Light"}, {LayerBlendMode::darken, "Darken"}, {LayerBlendMode::lighten, "Lighten"},
-    {LayerBlendMode::difference, "Difference"}, {LayerBlendMode::colorDodge, "Color Dodge"},
-    {LayerBlendMode::colorBurn, "Color Burn"}, {LayerBlendMode::hue, "Hue"}, {LayerBlendMode::saturation, "Saturation"},
-    {LayerBlendMode::color, "Color"}, {LayerBlendMode::luminosity, "Luminosity"},
+const std::array<std::pair<LayerBlendMode, const char *>, 24> names{{
+    {LayerBlendMode::normal, "Normal"}, {LayerBlendMode::darken, "Darken"}, {LayerBlendMode::multiply, "Multiply"},
+    {LayerBlendMode::colorBurn, "Color Burn"}, {LayerBlendMode::linearBurn, "Linear Burn"}, {LayerBlendMode::lighten, "Lighten"},
+    {LayerBlendMode::screen, "Screen"}, {LayerBlendMode::colorDodge, "Color Dodge"}, {LayerBlendMode::linearDodge, "Linear Dodge (Add)"},
+    {LayerBlendMode::overlay, "Overlay"}, {LayerBlendMode::softLight, "Soft Light"}, {LayerBlendMode::hardLight, "Hard Light"},
+    {LayerBlendMode::vividLight, "Vivid Light"}, {LayerBlendMode::linearLight, "Linear Light"}, {LayerBlendMode::pinLight, "Pin Light"},
+    {LayerBlendMode::hardMix, "Hard Mix"}, {LayerBlendMode::difference, "Difference"}, {LayerBlendMode::exclusion, "Exclusion"},
+    {LayerBlendMode::subtract, "Subtract"}, {LayerBlendMode::divide, "Divide"}, {LayerBlendMode::hue, "Hue"},
+    {LayerBlendMode::saturation, "Saturation"}, {LayerBlendMode::color, "Color"}, {LayerBlendMode::luminosity, "Luminosity"},
 }};
 }
 
 QString rawValue(LayerBlendMode mode)
 {
     return QString::fromLatin1(names.at(size_t(mode)).second);
+}
+
+int blendGroup(LayerBlendMode mode)
+{
+    // Each group's modes sit together in the enum.
+    for (const auto &[first, group] : std::array<std::pair<LayerBlendMode, int>, 5>{{{LayerBlendMode::hue, 5},
+             {LayerBlendMode::difference, 4}, {LayerBlendMode::overlay, 3}, {LayerBlendMode::lighten, 2}, {LayerBlendMode::darken, 1}}})
+        if (mode >= first)
+            return group;
+    return 0;
 }
 
 std::optional<LayerBlendMode> layerBlendMode(const QString &rawValue)

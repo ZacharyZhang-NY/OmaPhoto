@@ -31,6 +31,12 @@ std::optional<LayerBlendMode> fromPSD(const QString &key)
         {QStringLiteral("div "), LayerBlendMode::colorDodge}, {QStringLiteral("idiv"), LayerBlendMode::colorBurn},
         {QStringLiteral("hue "), LayerBlendMode::hue},        {QStringLiteral("sat "), LayerBlendMode::saturation},
         {QStringLiteral("colr"), LayerBlendMode::color},      {QStringLiteral("lum "), LayerBlendMode::luminosity},
+        {QStringLiteral("lbrn"), LayerBlendMode::linearBurn}, {QStringLiteral("lddg"), LayerBlendMode::linearDodge},
+        {QStringLiteral("hLit"), LayerBlendMode::hardLight},  {QStringLiteral("vLit"), LayerBlendMode::vividLight},
+        {QStringLiteral("lLit"), LayerBlendMode::linearLight}, {QStringLiteral("pLit"), LayerBlendMode::pinLight},
+        {QStringLiteral("hMix"), LayerBlendMode::hardMix},    {QStringLiteral("smud"), LayerBlendMode::exclusion},
+        {QStringLiteral("fsub"), LayerBlendMode::subtract},   {QStringLiteral("fdiv"), LayerBlendMode::divide},
+        // Dissolve, Darker Color and Lighter Color have no twin: Normal.
     };
     if (!modes.contains(key))
         return std::nullopt;
