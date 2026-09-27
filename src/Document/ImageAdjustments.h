@@ -74,3 +74,42 @@ struct GrainSettings {
     QImage apply(const QImage &image, QPointF origin = QPointF(), double unitsPerPixel = 1, std::optional<quint32> seed = std::nullopt) const;
     friend bool operator==(const GrainSettings &, const GrainSettings &) = default;
 };
+
+// Photoshop's Black & White: how bright each colour family turns.
+struct BlackWhiteSettings {
+    static constexpr double low = -200, high = 300;
+    // Photoshop's defaults, a percent each.
+    double reds = 40;
+    double yellows = 60;
+    double greens = 40;
+    double cyans = 60;
+    double blues = 20;
+    double magentas = 80;
+    // Colours the result, keeping its tones: sepia, cyanotype.
+    bool tint = false;
+    double tintHue = 40;
+    double tintSaturation = 20;
+    bool isValid() const;
+    QImage apply(const QImage &image) const;
+    friend bool operator==(const BlackWhiteSettings &, const BlackWhiteSettings &) = default;
+};
+
+// Color Balance: each pair shifted in shadows, midtones and highlights.
+struct ColorBalanceSettings {
+    static constexpr double low = -100, high = 100;
+    double shadowCyanRed = 0;
+    double shadowMagentaGreen = 0;
+    double shadowYellowBlue = 0;
+    double midCyanRed = 0;
+    double midMagentaGreen = 0;
+    double midYellowBlue = 0;
+    double highlightCyanRed = 0;
+    double highlightMagentaGreen = 0;
+    double highlightYellowBlue = 0;
+    // Puts each pixel's brightness back, so only colour moves.
+    bool preserveLuminosity = true;
+    bool isValid() const;
+    bool isIdentity() const;
+    QImage apply(const QImage &image) const;
+    friend bool operator==(const ColorBalanceSettings &, const ColorBalanceSettings &) = default;
+};

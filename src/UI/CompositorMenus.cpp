@@ -18,14 +18,14 @@ NativeLayerList *focusedList()
 // An entry's name: Hue/Saturation is newHueSaturationAdjustment.
 QString adjustmentName(AdjustmentKind kind)
 {
-    return QStringLiteral("new%1Adjustment").arg(rawValue(kind).remove(QLatin1Char(' ')).remove(QLatin1Char('/')));
+    return QStringLiteral("new%1Adjustment").arg(rawValue(kind).remove(QLatin1Char(' ')).remove(QLatin1Char('/')).remove(QLatin1Char('&')));
 }
 
 // A filter's entry from Swift's title: gaussianBlur.
 QString filterName(FilterKind kind)
 {
     QString name = rawValue(kind);
-    name.remove(QLatin1Char(' '));
+    name.remove(QLatin1Char(' ')).remove(QLatin1Char('&'));
     name[0] = name[0].toLower();
     return name;
 }
@@ -203,8 +203,8 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     add(image, QStringLiteral("levels"), QStringLiteral("Levels…"), QKeySequence(Qt::CTRL | Qt::Key_L), [this] { session().beginLevels(); });
     add(image, QStringLiteral("hueSaturation"), QStringLiteral("Hue/Saturation…"), QKeySequence(Qt::CTRL | Qt::Key_U),
         [this] { session().beginHueSaturation(); });
-    for (const FilterKind kind : {FilterKind::exposure, FilterKind::gradientMap, FilterKind::grain})
-        add(image, filterName(kind), rawValue(kind) + QStringLiteral("…"), QKeySequence(), [this, kind] { session().beginFilter(kind); });
+    for (const FilterKind kind : {FilterKind::blackWhite, FilterKind::colorBalance, FilterKind::exposure, FilterKind::gradientMap, FilterKind::grain})
+        add(image, filterName(kind), rawValue(kind).replace(QLatin1Char('&'), QStringLiteral("&&")) + QStringLiteral("…"), QKeySequence(), [this, kind] { session().beginFilter(kind); });
     add(image, QStringLiteral("invert"), QStringLiteral("Invert"), QKeySequence(Qt::CTRL | Qt::Key_I), [this] { session().invertPixels(); });
     image->addSeparator();
     add(image, QStringLiteral("canvasSize"), QStringLiteral("Canvas Size…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C), [this] { projects().canvasSize(); });
@@ -223,7 +223,9 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     QMenu *adjustments = layer->addMenu(QStringLiteral("New Adjustment Layer"));
     adjustments->menuAction()->setObjectName(QStringLiteral("newAdjustmentLayer"));
     for (const AdjustmentKind kind : allAdjustmentKinds)
-        add(adjustments, adjustmentName(kind), rawValue(kind) + QStringLiteral("…"), QKeySequence(), [this, kind] { session().addAdjustment(kind); });
+        // A menu reads a lone ampersand as a mnemonic: doubled.
+        add(adjustments, adjustmentName(kind), rawValue(kind).replace(QLatin1Char('&'), QStringLiteral("&&")) + (isEditable(kind) ? QStringLiteral("…") : QString()), QKeySequence(),
+            [this, kind] { session().addAdjustment(kind); });
     add(layer, QStringLiteral("editAdjustment"), QStringLiteral("Edit Adjustment…"), QKeySequence(),
         [this] { session().setAdjustmentEditingID(session().activeLayerID()); });
     layer->addSeparator();
@@ -323,10 +325,12 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("exportPNG"))->setEnabled(drawn && p.canStart());
     action(QStringLiteral("exportJPEG"))->setEnabled(drawn && p.canStart());
     action(QStringLiteral("closeProject"))->setEnabled(p.canStart());
+    // A step's ampersand, doubled: a lone one is a mnemonic.
+    const auto shown = [](QString name) { return name.replace(QLatin1Char('&'), QStringLiteral("&&")); };
     // In a field, Undo is the field's and bare.
-    action(QStringLiteral("undo"))->setText(!typing && s.canUndo() ? QStringLiteral("Undo %1").arg(s.history.undoName()) : QStringLiteral("Undo"));
+    action(QStringLiteral("undo"))->setText(!typing && s.canUndo() ? QStringLiteral("Undo %1").arg(shown(s.history.undoName())) : QStringLiteral("Undo"));
     action(QStringLiteral("undo"))->setEnabled(typing || s.canUndo());
-    action(QStringLiteral("redo"))->setText(!typing && s.canRedo() ? QStringLiteral("Redo %1").arg(s.history.redoName()) : QStringLiteral("Redo"));
+    action(QStringLiteral("redo"))->setText(!typing && s.canRedo() ? QStringLiteral("Redo %1").arg(shown(s.history.redoName())) : QStringLiteral("Redo"));
     action(QStringLiteral("redo"))->setEnabled(typing || s.canRedo());
     for (const char *name : {"fit", "actualPixels", "zoomIn", "zoomOut"})
         action(QString::fromLatin1(name))->setEnabled(drawn);
@@ -364,7 +368,8 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("flipCanvasHorizontal"))->setEnabled(s.canEditLayers());
     action(QStringLiteral("flipCanvasVertical"))->setEnabled(s.canEditLayers());
     action(QStringLiteral("newAdjustmentLayer"))->setEnabled(s.canEditLayers());
-    action(QStringLiteral("editAdjustment"))->setEnabled(s.canEditLayers() && active && active->adjustment);
+    // Beyond Swift: Invert has no editor, so nothing to open.
+    action(QStringLiteral("editAdjustment"))->setEnabled(s.canEditLayers() && active && active->adjustment && isEditable(active->adjustment->kind));
     action(QStringLiteral("transformLayer"))->setText(s.canTransformSelection() ? QStringLiteral("Transform Selection") : QStringLiteral("Transform Layer"));
     action(QStringLiteral("transformLayer"))->setEnabled(s.canTransform() || s.canTransformSelection());
     action(QStringLiteral("clippingMask"))->setText(active && active->maskSourceID ? QStringLiteral("Release Clipping Mask") : QStringLiteral("Create Clipping Mask"));

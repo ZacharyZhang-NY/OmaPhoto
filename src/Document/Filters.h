@@ -14,7 +14,7 @@
 struct ImageLayer;
 
 // The Filter and Image menus' filters.
-enum class FilterKind { gaussianBlur, motionBlur, addNoise, lensCorrection, removeBackground, contentAwareFill, curves, exposure, gradientMap, grain };
+enum class FilterKind { gaussianBlur, motionBlur, addNoise, lensCorrection, removeBackground, contentAwareFill, curves, exposure, gradientMap, grain, blackWhite, colorBalance };
 // The menu's title, Swift's rawValue.
 QString rawValue(FilterKind kind);
 // Made without settings: its preview is its result.
@@ -25,7 +25,7 @@ bool isImageAdjustment(FilterKind kind);
 inline constexpr std::array allFilterKinds{FilterKind::gaussianBlur,     FilterKind::motionBlur,       FilterKind::addNoise,
                                            FilterKind::lensCorrection,   FilterKind::removeBackground, FilterKind::contentAwareFill,
                                            FilterKind::curves,           FilterKind::exposure,         FilterKind::gradientMap,
-                                           FilterKind::grain};
+                                           FilterKind::grain,            FilterKind::blackWhite,       FilterKind::colorBalance};
 
 // Remove Background's mask: the model's alone, or refined.
 enum class BackgroundQuality { basic, advanced };
@@ -50,6 +50,8 @@ struct FilterSettings {
     ExposureSettings exposure{};
     GradientMapSettings gradientMap{};
     GrainSettings grain{};
+    BlackWhiteSettings blackWhite{};
+    ColorBalanceSettings colorBalance{};
     BackgroundQuality backgroundQuality = BackgroundQuality::basic;
     // How far, in pixels, the mask is pulled onto edges.
     double refineEdges = 12;

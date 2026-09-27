@@ -121,6 +121,9 @@ void EditorSession::renderFilterPreview()
                 return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
             } catch (const ExportError &error) {
                 return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
+            } catch (const ProjectError &error) {
+                // Settings past their bounds: Black & White, Color Balance.
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
             }
         }));
     }
@@ -227,6 +230,8 @@ void EditorSession::commitFilter(std::function<void()> done)
         } catch (const ContentFillError &error) {
             return FilterMade{std::nullopt, std::nullopt, QString::fromUtf8(error.what())};
         } catch (const ExportError &error) {
+            return FilterMade{std::nullopt, std::nullopt, QString::fromUtf8(error.what())};
+        } catch (const ProjectError &error) {
             return FilterMade{std::nullopt, std::nullopt, QString::fromUtf8(error.what())};
         }
     }));

@@ -30,6 +30,8 @@ QString rawValue(FilterKind kind)
     case FilterKind::exposure: return QStringLiteral("Exposure");
     case FilterKind::gradientMap: return QStringLiteral("Gradient Map");
     case FilterKind::grain: return QStringLiteral("Grain");
+    case FilterKind::blackWhite: return QStringLiteral("Black & White");
+    case FilterKind::colorBalance: return QStringLiteral("Color Balance");
     }
     throw std::logic_error("unknown filter kind");
 }
@@ -46,7 +48,8 @@ QString rawValue(BackgroundQuality quality)
 
 bool isImageAdjustment(FilterKind kind)
 {
-    return kind == FilterKind::curves || kind == FilterKind::exposure || kind == FilterKind::gradientMap || kind == FilterKind::grain;
+    return kind == FilterKind::curves || kind == FilterKind::exposure || kind == FilterKind::gradientMap || kind == FilterKind::grain
+        || kind == FilterKind::blackWhite || kind == FilterKind::colorBalance;
 }
 
 FilterSettings FilterSettings::normalized() const
@@ -113,6 +116,8 @@ QImage PixelFilter::run(const FilterJob &job)
     case FilterKind::curves: image = settings.curves.apply(job.image); break;
     case FilterKind::exposure: image = settings.exposure.apply(job.image); break;
     case FilterKind::gradientMap: image = settings.gradientMap.apply(job.image); break;
+    case FilterKind::blackWhite: image = settings.blackWhite.apply(job.image); break;
+    case FilterKind::colorBalance: image = settings.colorBalance.apply(job.image); break;
     // Grain sits in layer pixels; the job's seed patterns it.
     case FilterKind::grain: image = settings.grain.apply(job.image, QPointF(), 1 / job.scale, job.seed); break;
     case FilterKind::removeBackground: image = SubjectRemoval::run(job.image, settings); break;

@@ -115,6 +115,7 @@ add_library(compositor_core STATIC
     src/UI/TransformInspector.cpp
     src/UI/EffectsSheet.cpp
     src/UI/FilterSheet.cpp
+    src/UI/FilterSheet+Adjustments.cpp
     src/UI/FloatingPanel.cpp
     src/UI/KeyboardShortcuts.cpp
     src/UI/KeyboardShortcuts+Sheet.cpp

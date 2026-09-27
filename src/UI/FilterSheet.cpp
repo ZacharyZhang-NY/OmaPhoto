@@ -181,6 +181,8 @@ FilterSheet::FilterSheet(EditorSession &session, QWidget *parent)
                 GrainSettings::roughnessLow, GrainSettings::roughnessHigh, QString(), 0, false);
         break;
     case FilterKind::removeBackground: background(); break;
+    case FilterKind::blackWhite: blackWhite(); break;
+    case FilterKind::colorBalance: colorBalance(); break;
     case FilterKind::contentAwareFill:
         m_column->addWidget(words(QStringLiteral("Fill the selection using surrounding pixels from this layer."), false, this));
         break;
@@ -356,7 +358,7 @@ void FilterSheet::background()
     for (qsizetype index = 0; index < helps.size(); ++index) {
         QWidget *advanced = m_controls[size_t(index)].slider->parentWidget();
         advanced->setToolTip(helps[index]);
-        m_advanced.push_back(advanced);
+        m_shownWhen.emplace_back(advanced, [](const FilterSettings &settings) { return settings.backgroundQuality == BackgroundQuality::advanced; });
     }
 }
 
@@ -409,8 +411,12 @@ void FilterSheet::synchronize()
         m_monochromatic->setChecked(edit.settings.monochromatic);
     if (m_quality)
         m_quality->button(int(edit.settings.backgroundQuality))->setChecked(true);
-    for (QWidget *advanced : m_advanced)
-        advanced->setVisible(edit.settings.backgroundQuality == BackgroundQuality::advanced);
+    for (auto &[box, key] : m_flags) {
+        FilterSettings copy = edit.settings;
+        box->setChecked(key(copy));
+    }
+    for (const auto &[row, shows] : m_shownWhen)
+        row->setVisible(shows(edit.settings));
     m_preview->setChecked(edit.preview);
     m_error->setText(edit.previewError.value_or(QString()));
     m_error->setVisible(edit.previewError.has_value());

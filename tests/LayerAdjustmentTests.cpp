@@ -28,6 +28,8 @@ LayerAdjustment full()
     adjustment.setExposure(ExposureSettings{.exposure = 1, .offset = 0.1, .gamma = 2});
     adjustment.setGradientMap(GradientMapSettings{{1, 0, 0}, {0, 0, 1}, true});
     adjustment.setGrain(GrainSettings{.amount = 40, .size = 3, .roughness = 10, .seed = 9});
+    adjustment.setBlackWhite(BlackWhiteSettings{.reds = -50, .magentas = 250, .tint = true, .tintHue = 200, .tintSaturation = 35});
+    adjustment.setColorBalance(ColorBalanceSettings{.shadowYellowBlue = -30, .midCyanRed = 20, .highlightMagentaGreen = 90, .preserveLuminosity = false});
     return adjustment;
 }
 
@@ -95,7 +97,9 @@ void LayerAdjustmentTests::kindsKeepSwiftsNamesAndOrder()
 {
     const std::pair<AdjustmentKind, const char *> kinds[] = {{AdjustmentKind::hsv, "Hue/Saturation"}, {AdjustmentKind::levels, "Levels"},
                                                              {AdjustmentKind::curves, "Curves"},      {AdjustmentKind::exposure, "Exposure"},
-                                                             {AdjustmentKind::gradientMap, "Gradient Map"}, {AdjustmentKind::grain, "Grain"}};
+                                                             {AdjustmentKind::gradientMap, "Gradient Map"}, {AdjustmentKind::grain, "Grain"},
+                                                             {AdjustmentKind::invert, "Invert"},      {AdjustmentKind::blackWhite, "Black & White"},
+                                                             {AdjustmentKind::colorBalance, "Color Balance"}};
     QCOMPARE(allAdjustmentKinds.size(), std::size(kinds));
     for (size_t index = 0; index < std::size(kinds); ++index) {
         const auto &[kind, name] = kinds[index];
@@ -107,7 +111,11 @@ void LayerAdjustmentTests::kindsKeepSwiftsNamesAndOrder()
     // The filter panel edits four; Levels and Hue/Saturation have theirs.
     QVERIFY(filterKind(AdjustmentKind::curves) == FilterKind::curves && filterKind(AdjustmentKind::exposure) == FilterKind::exposure);
     QVERIFY(filterKind(AdjustmentKind::gradientMap) == FilterKind::gradientMap && filterKind(AdjustmentKind::grain) == FilterKind::grain);
-    QVERIFY(!filterKind(AdjustmentKind::levels) && !filterKind(AdjustmentKind::hsv));
+    QVERIFY(filterKind(AdjustmentKind::blackWhite) == FilterKind::blackWhite && filterKind(AdjustmentKind::colorBalance) == FilterKind::colorBalance);
+    QVERIFY(!filterKind(AdjustmentKind::levels) && !filterKind(AdjustmentKind::hsv) && !filterKind(AdjustmentKind::invert));
+    // Every kind but Invert opens an editor.
+    for (const AdjustmentKind kind : allAdjustmentKinds)
+        QCOMPARE(isEditable(kind), kind != AdjustmentKind::invert);
 }
 
 void LayerAdjustmentTests::validityFollowsSwiftsBounds()
@@ -166,8 +174,8 @@ void LayerAdjustmentTests::theOptionalSettingsFallBackToTheirDefaults()
 void LayerAdjustmentTests::theManifestWritesSwiftsKeys()
 {
     const QJsonObject object = ManifestJson::encoded(full());
-    QCOMPARE(object.keys(), (QStringList{"colorize", "curves", "exposureSettings", "gradientMapSettings", "grainSettings", "hsvSettings", "hue", "kind",
-                                         "levels", "lightness", "saturation"}));
+    QCOMPARE(object.keys(), (QStringList{"blackWhiteSettings", "colorBalanceSettings", "colorize", "curves", "exposureSettings", "gradientMapSettings",
+                                         "grainSettings", "hsvSettings", "hue", "kind", "levels", "lightness", "saturation"}));
     QCOMPARE(object.value("kind").toString(), QString("Hue/Saturation"));
     const QJsonObject hsv = object.value("hsvSettings").toObject();
     QCOMPARE(hsv.keys(), (QStringList{"adjustments", "bands", "colorize", "invertRange", "range"}));
@@ -216,7 +224,7 @@ void LayerAdjustmentTests::decodingRefusesWhatSwiftRefuses()
     // Synthesized decoding needs every key but the optionals.
     for (const char *key : {"kind", "hue", "saturation", "lightness", "colorize", "levels", "curves"})
         QVERIFY2(refused(without(key)), key);
-    for (const char *key : {"hsvSettings", "exposureSettings", "gradientMapSettings", "grainSettings"}) {
+    for (const char *key : {"hsvSettings", "exposureSettings", "gradientMapSettings", "grainSettings", "blackWhiteSettings", "colorBalanceSettings"}) {
         QVERIFY2(!refused(without(key)) && !refused(with(key, QJsonValue::Null)), key);
         QVERIFY2(refused(with(key, QJsonArray())), key);
     }

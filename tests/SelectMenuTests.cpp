@@ -218,11 +218,13 @@ void SelectMenuTests::filtersOpenFromTheImageAndFilterMenus()
 {
     Bar bar;
     const std::pair<const char *, FilterKind> entries[] = {
-        {"curves", FilterKind::curves},           {"exposure", FilterKind::exposure},     {"gradientMap", FilterKind::gradientMap},
+        {"curves", FilterKind::curves},           {"blackWhite", FilterKind::blackWhite}, {"colorBalance", FilterKind::colorBalance},
+        {"exposure", FilterKind::exposure},       {"gradientMap", FilterKind::gradientMap},
         {"grain", FilterKind::grain},             {"gaussianBlur", FilterKind::gaussianBlur}, {"motionBlur", FilterKind::motionBlur},
         {"addNoise", FilterKind::addNoise},       {"lensCorrection", FilterKind::lensCorrection}, {"removeBackground", FilterKind::removeBackground}};
     for (const auto &[name, kind] : entries) {
-        QCOMPARE(bar.action(name).text(), rawValue(kind) + QStringLiteral("…"));
+        // A menu doubles an ampersand, else read as a mnemonic.
+        QCOMPARE(bar.action(name).text(), rawValue(kind).replace("&", "&&") + QStringLiteral("…"));
         QVERIFY2(!bar.action(name).isEnabled(), name);
     }
     bar.session().createDocument(8, 8, true);

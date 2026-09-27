@@ -120,6 +120,7 @@ void LayerCell::configure(const ImageLayer &layer, bool enabled, int depth, bool
     const QSizeF canvas = session.document() ? session.document()->size() : QSizeF(1, 1);
     m_editableText = layer.liveText().has_value();
     m_isAdjustment = layer.adjustment.has_value();
+    m_editableAdjustment = m_isAdjustment && isEditable(layer.adjustment->kind);
     m_thumbnailSize = layer.isGroup || m_editableText || m_isAdjustment ? QSize(36, 36) : CanvasThumbnail::fittedSize(canvas, 36);
     const ThumbnailKey key{layer.asset ? std::optional(layer.asset->identity()) : std::nullopt, layer.transform, canvas, ink, m_editableText};
     if (m_layerID != layer.id || m_thumbnailKey != key) {
@@ -306,7 +307,7 @@ void LayerCell::mouseDoubleClickEvent(QMouseEvent *event)
             session.editActiveText();
             return;
         }
-        if (m_isAdjustment) {
+        if (m_editableAdjustment) {
             session.setAdjustmentEditingID(m_layerID);
             return;
         }

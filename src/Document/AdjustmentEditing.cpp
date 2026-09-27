@@ -75,15 +75,21 @@ void EditorSession::openAdjustmentEditor(QUuid id, const LayerAdjustment &origin
                 m_hueSaturation.emplace(layer.id, made.asset.value(), std::nullopt, layer.transform);
                 m_hueSaturation->settings = original.resolvedHSV();
                 break;
+            case AdjustmentKind::invert:
+                throw std::logic_error("Invert has no editor to open");
             case AdjustmentKind::curves:
             case AdjustmentKind::exposure:
             case AdjustmentKind::gradientMap:
-            case AdjustmentKind::grain: {
+            case AdjustmentKind::grain:
+            case AdjustmentKind::blackWhite:
+            case AdjustmentKind::colorBalance: {
                 FilterSettings settings;
                 settings.curves = original.curves;
                 settings.exposure = original.exposure();
                 settings.gradientMap = original.gradientMap();
                 settings.grain = original.grain();
+                settings.blackWhite = original.blackWhite();
+                settings.colorBalance = original.colorBalance();
                 m_filterEdit.emplace(filterKind(original.kind).value(), layer, std::nullopt, settings, std::nullopt);
                 break;
             }
@@ -113,6 +119,9 @@ LayerAdjustment EditorSession::editedAdjustment() const
     case AdjustmentKind::exposure: value.setExposure(m_filterEdit.value().settings.exposure); break;
     case AdjustmentKind::gradientMap: value.setGradientMap(m_filterEdit.value().settings.gradientMap); break;
     case AdjustmentKind::grain: value.setGrain(m_filterEdit.value().settings.grain); break;
+    case AdjustmentKind::blackWhite: value.setBlackWhite(m_filterEdit.value().settings.blackWhite); break;
+    case AdjustmentKind::colorBalance: value.setColorBalance(m_filterEdit.value().settings.colorBalance); break;
+    case AdjustmentKind::invert: throw std::logic_error("Invert has no editor to read");
     }
     return value;
 }

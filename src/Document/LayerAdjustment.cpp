@@ -1,5 +1,6 @@
 #include "Document/LayerAdjustment.h"
 #include "Document/EditorSession.h"
+#include "Document/PixelInvert.h"
 #include <QRandomGenerator>
 #include <cmath>
 
@@ -12,6 +13,9 @@ QString rawValue(AdjustmentKind kind)
     case AdjustmentKind::exposure: return QStringLiteral("Exposure");
     case AdjustmentKind::gradientMap: return QStringLiteral("Gradient Map");
     case AdjustmentKind::grain: return QStringLiteral("Grain");
+    case AdjustmentKind::invert: return QStringLiteral("Invert");
+    case AdjustmentKind::blackWhite: return QStringLiteral("Black & White");
+    case AdjustmentKind::colorBalance: return QStringLiteral("Color Balance");
     }
     throw std::logic_error("unknown adjustment kind");
 }
@@ -32,10 +36,19 @@ std::optional<FilterKind> filterKind(AdjustmentKind kind)
     case AdjustmentKind::exposure: return FilterKind::exposure;
     case AdjustmentKind::gradientMap: return FilterKind::gradientMap;
     case AdjustmentKind::grain: return FilterKind::grain;
+    case AdjustmentKind::blackWhite: return FilterKind::blackWhite;
+    case AdjustmentKind::colorBalance: return FilterKind::colorBalance;
+    // Panels of their own; Invert has nothing to set.
     case AdjustmentKind::hsv:
-    case AdjustmentKind::levels: return std::nullopt;
+    case AdjustmentKind::levels:
+    case AdjustmentKind::invert: return std::nullopt;
     }
     throw std::logic_error("unknown adjustment kind");
+}
+
+bool isEditable(AdjustmentKind kind)
+{
+    return kind != AdjustmentKind::invert;
 }
 
 HueSaturationSettings LayerAdjustment::resolvedHSV() const
@@ -73,6 +86,26 @@ void LayerAdjustment::setGrain(const GrainSettings &value)
     grainSettings = value;
 }
 
+BlackWhiteSettings LayerAdjustment::blackWhite() const
+{
+    return blackWhiteSettings.value_or(BlackWhiteSettings());
+}
+
+void LayerAdjustment::setBlackWhite(const BlackWhiteSettings &value)
+{
+    blackWhiteSettings = value;
+}
+
+ColorBalanceSettings LayerAdjustment::colorBalance() const
+{
+    return colorBalanceSettings.value_or(ColorBalanceSettings());
+}
+
+void LayerAdjustment::setColorBalance(const ColorBalanceSettings &value)
+{
+    colorBalanceSettings = value;
+}
+
 // Bounds refuse what is no number: no isFinite terms.
 bool LayerAdjustment::isValid() const
 {
@@ -96,7 +129,8 @@ bool LayerAdjustment::isValid() const
         if (!(range == range.normalized()))
             return false;
     }
-    return curves.isValid() && exposure().isValid() && gradientMap().isValid() && grain().isValid();
+    return curves.isValid() && exposure().isValid() && gradientMap().isValid() && grain().isValid() && blackWhite().isValid()
+        && colorBalance().isValid();
 }
 
 QImage LayerAdjustment::apply(const QImage &image, std::optional<QRectF> region) const
@@ -108,6 +142,9 @@ QImage LayerAdjustment::apply(const QImage &image, std::optional<QRectF> region)
     case AdjustmentKind::curves: return curves.apply(image);
     case AdjustmentKind::exposure: return exposure().apply(image);
     case AdjustmentKind::gradientMap: return gradientMap().apply(image);
+    case AdjustmentKind::blackWhite: return blackWhite().apply(image);
+    case AdjustmentKind::colorBalance: return colorBalance().apply(image);
+    case AdjustmentKind::invert: return PixelInvert::run(PixelInvert::Job{image, false, QTransform(), std::nullopt});
     case AdjustmentKind::grain: {
         // Grain sits in the document, however the image is cut.
         const QRectF area = region.value_or(QRectF(0, 0, image.width(), image.height()));
@@ -143,7 +180,9 @@ void EditorSession::addAdjustment(AdjustmentKind kind)
         m_collapsedGroupIDs.remove(*layer.parentID);
     setActiveLayerID(layer.id);
     endEdit();
-    setAdjustmentEditingID(layer.id);
+    // Invert has nothing to set: it applies, no editor opens.
+    if (isEditable(kind))
+        setAdjustmentEditingID(layer.id);
 }
 
 void EditorSession::updateAdjustment(QUuid id, const LayerAdjustment &value)

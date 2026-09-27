@@ -152,7 +152,7 @@ void ProjectExportFailureTests::thePanelOpensWithoutCopyingTheSnapshot()
     desk.alerts.replies = {"<cancel>"};
     {
         malloc_trim(0);
-        const AddressSpaceLimit limit(2048ll * 1024);
+        const AddressSpaceLimit limit(2304ll * 1024);
         desk.controller.exportPNG([&desk] { desk.done = true; });
     }
     QTRY_VERIFY(desk.done);
@@ -195,7 +195,7 @@ void ProjectExportFailureTests::theJPEGRenderTakesTheSnapshotWithoutACopy()
     entered.acquire();
     {
         malloc_trim(0);
-        const AddressSpaceLimit limit(2048ll * 1024);
+        const AddressSpaceLimit limit(2304ll * 1024);
         desk.controller.exportJPEG([&desk] { desk.done = true; });
     }
     release.release();

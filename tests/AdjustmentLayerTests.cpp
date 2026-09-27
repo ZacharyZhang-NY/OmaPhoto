@@ -64,6 +64,7 @@ private slots:
     void theLiveCompositeDrawsAsTheExport();
     void opacityMixesAndGrainSitsInTheDocument();
     void everyKindAdjustsThroughItsSettings();
+    void invertAppliesWithoutAnEditor();
     void aFoldersMaskClipsTheAdjustmentsInside();
     void anyImageTargetTakesTheAdjustment();
 };
@@ -310,6 +311,8 @@ void AdjustmentLayerTests::everyKindAdjustsThroughItsSettings()
     kinds[3].setExposure(ExposureSettings{.exposure = 1});
     kinds[4].setGradientMap(GradientMapSettings{{1, 0, 0}, {0, 0, 1}, false});
     kinds[5].setGrain(GrainSettings{.amount = 80, .seed = 4});
+    kinds[7].setBlackWhite(BlackWhiteSettings{.reds = 100});
+    kinds[8].setColorBalance(ColorBalanceSettings{.midCyanRed = 60});
     for (const LayerAdjustment &adjustment : kinds) {
         EditorSession s;
         s.createDocument(2, 2);
@@ -318,6 +321,32 @@ void AdjustmentLayerTests::everyKindAdjustsThroughItsSettings()
         const std::vector<int> made = pixels(adjustment.apply(gray));
         QVERIFY2(made != pixels(gray) && rendered(s) == made, qPrintable(rawValue(adjustment.kind)));
     }
+}
+
+// Swift's: nothing to set, no editor; the pixels invert.
+void AdjustmentLayerTests::invertAppliesWithoutAnEditor()
+{
+    EditorSession session;
+    session.createDocument(2, 2);
+    session.insert(image(PaletteColor::white()));
+    session.addAdjustment(AdjustmentKind::invert);
+    QVERIFY(!session.adjustmentEditingID());
+    QCOMPARE(session.history.undoName(), QString("New Invert Adjustment"));
+    const LayerAdjustment adjustment = session.activeLayer().value().adjustment.value();
+    QVERIFY(adjustment.kind == AdjustmentKind::invert && !isEditable(adjustment.kind));
+    QImage source(2, 2, QImage::Format_RGBA8888_Premultiplied);
+    source.fill(QColor::fromRgbF(0.2f, 0.4f, 0.6f));
+    source.setPixelColor(1, 1, QColor(102, 51, 153, 128));
+    const QImage inverted = adjustment.apply(source);
+    for (const QPoint at : {QPoint(0, 0), QPoint(1, 1)}) {
+        const QColor before = source.pixelColor(at), after = inverted.pixelColor(at);
+        QVERIFY(std::abs(before.red() + after.red() - 255) <= 1 && std::abs(before.green() + after.green() - 255) <= 1);
+        QVERIFY(std::abs(before.blue() + after.blue() - 255) <= 1);
+        // Transparency is left alone.
+        QCOMPARE(after.alpha(), before.alpha());
+    }
+    // The export inverts the white beneath to black.
+    QCOMPARE(ImageExporter::render(session.projectSnapshot().value()).image.pixelColor(0, 0), QColor(0, 0, 0));
 }
 
 void AdjustmentLayerTests::aFoldersMaskClipsTheAdjustmentsInside()

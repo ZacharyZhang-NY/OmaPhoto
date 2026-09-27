@@ -35,11 +35,12 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
         {"mergeLayers", "Ctrl+E"}, {"flipHorizontal", ""}, {"flipVertical", ""}, {"deleteLayer", ""},
         {"selectAll", "Ctrl+A"}, {"deselect", "Ctrl+D"}, {"inverse", "Ctrl+Shift+I"}, {"layerPixels", ""}, {"subject", "Ctrl+Alt+A"}, {"maskBlackAreas", ""},
-        {"expandSelection", ""}, {"contractSelection", ""}, {"featherSelection", ""}, {"curves", "Ctrl+M"}, {"levels", "Ctrl+L"}, {"hueSaturation", "Ctrl+U"}, {"exposure", ""}, {"gradientMap", ""}, {"grain", ""}, {"invert", "Ctrl+I"},
+        {"expandSelection", ""}, {"contractSelection", ""}, {"featherSelection", ""}, {"curves", "Ctrl+M"}, {"levels", "Ctrl+L"}, {"hueSaturation", "Ctrl+U"}, {"blackWhite", ""}, {"colorBalance", ""}, {"exposure", ""}, {"gradientMap", ""}, {"grain", ""}, {"invert", "Ctrl+I"},
         {"canvasSize", "Ctrl+Alt+C"}, {"imageSize", "Ctrl+Alt+I"}, {"flipCanvasHorizontal", ""}, {"flipCanvasVertical", ""},
         {"gaussianBlur", ""}, {"motionBlur", ""}, {"addNoise", ""}, {"lensCorrection", ""}, {"removeBackground", ""}, {"newAdjustmentLayer", ""}, {"editAdjustment", ""},
         {"newHueSaturationAdjustment", ""}, {"newLevelsAdjustment", ""}, {"newCurvesAdjustment", ""}, {"newExposureAdjustment", ""},
-        {"newGradientMapAdjustment", ""}, {"newGrainAdjustment", ""},
+        {"newGradientMapAdjustment", ""}, {"newGrainAdjustment", ""}, {"newInvertAdjustment", ""}, {"newBlackWhiteAdjustment", ""},
+        {"newColorBalanceAdjustment", ""},
     };
     for (const auto &[name, key] : keys)
         QCOMPARE(bar.action(name).shortcut().toString(), QString::fromLatin1(key));
@@ -53,7 +54,12 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     QCOMPARE(menus[1]->actions().size(), 13);
     QCOMPARE(menus[2]->actions().size(), 16);
     QCOMPARE(menus[3]->actions().size(), 10);
-    QCOMPARE(menus[4]->actions().size(), 13);
+    QCOMPARE(menus[4]->actions().size(), 15);
+    // Swift's Image menu: Black & White and Color Balance first.
+    QStringList adjustments;
+    for (int index = 3; index < 8; ++index)
+        adjustments << menus[4]->actions()[index]->objectName();
+    QCOMPARE(adjustments, (QStringList{"blackWhite", "colorBalance", "exposure", "gradientMap", "grain"}));
     QCOMPARE(menus[5]->actions().size(), 5);
     QCOMPARE(menus[6]->actions().size(), 22);
 }

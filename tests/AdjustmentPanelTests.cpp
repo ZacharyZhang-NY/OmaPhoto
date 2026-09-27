@@ -65,11 +65,12 @@ void AdjustmentPanelTests::theFooterAddsEachKindAndItsEditorOpens()
     // Swift's circle.lefthalf.filled, in the footer's ink.
     const QImage icon = LayerIcons::pixmap(LayerIcon::halfFilledCircle, 16, panel.palette().color(QPalette::PlaceholderText), panel.devicePixelRatio()).toImage();
     QCOMPARE(button.icon().pixmap(QSize(16, 16), panel.devicePixelRatio()).toImage().convertToFormat(icon.format()), icon);
-    // Swift's Menu: the six kinds by name, no ellipsis.
+    // Swift's Menu: the kinds by name, no ellipsis, & doubled.
     const QList<QAction *> entries = button.menu()->actions();
     QCOMPARE(entries.size(), qsizetype(allAdjustmentKinds.size()));
     for (size_t index = 0; index < allAdjustmentKinds.size(); ++index)
-        QCOMPARE(entries[qsizetype(index)]->text(), rawValue(allAdjustmentKinds[index]));
+        QCOMPARE(entries[qsizetype(index)]->text(), rawValue(allAdjustmentKinds[index]).replace("&", "&&"));
+    QCOMPARE(entries[7]->text(), QString("Black && White"));
     session.createDocument(4, 4);
     session.insert(whiteImage(4, 4));
     QVERIFY(button.isEnabled());
@@ -106,7 +107,7 @@ void AdjustmentPanelTests::rowsShowTheirGlyphAndOpenOnADoubleClick()
     list.show();
     QVERIFY(QTest::qWaitForWindowActive(&list));
     // Top first: the last kind added heads the list.
-    QCOMPARE(list.cells().size(), size_t(7));
+    QCOMPARE(list.cells().size(), size_t(10));
     for (size_t index = 0; index < allAdjustmentKinds.size(); ++index) {
         LayerCell &row = *list.cells().at(allAdjustmentKinds.size() - 1 - index);
         const QColor ink = row.palette().color(QPalette::WindowText);
@@ -118,7 +119,9 @@ void AdjustmentPanelTests::rowsShowTheirGlyphAndOpenOnADoubleClick()
     // Each kind its own glyph, as Swift's symbols.
     const std::pair<AdjustmentKind, LayerIcon> symbols[] = {{AdjustmentKind::hsv, LayerIcon::halfFilledCircle}, {AdjustmentKind::levels, LayerIcon::sliders},
                                                             {AdjustmentKind::curves, LayerIcon::curvePath}, {AdjustmentKind::exposure, LayerIcon::plusMinusCircle},
-                                                            {AdjustmentKind::gradientMap, LayerIcon::paintPalette}, {AdjustmentKind::grain, LayerIcon::circleGrid}};
+                                                            {AdjustmentKind::gradientMap, LayerIcon::paintPalette}, {AdjustmentKind::grain, LayerIcon::circleGrid},
+                                                            {AdjustmentKind::invert, LayerIcon::rightHalfCircle}, {AdjustmentKind::blackWhite, LayerIcon::hatchedCircle},
+                                                            {AdjustmentKind::colorBalance, LayerIcon::axes}};
     QList<QImage> glyphs;
     for (const auto &[kind, symbol] : symbols) {
         QVERIFY(LayerIcons::symbol(kind) == symbol);
@@ -156,6 +159,13 @@ void AdjustmentPanelTests::rowsShowTheirGlyphAndOpenOnADoubleClick()
     QVERIFY(!session.adjustmentEditingID());
     QTest::keyClick(levels.findChild<QLineEdit *>("layerNameEditor"), Qt::Key_Escape);
     QVERIFY(!session.renamingLayerID());
+    // Invert has no editor: its glyph renames, as Swift's row.
+    LayerCell &invert = *list.cells().at(allAdjustmentKinds.size() - 7);
+    QTest::mouseDClick(&invert.thumbnail(), Qt::LeftButton);
+    QCOMPARE(session.activeLayerID(), std::optional(ids[6]));
+    QVERIFY(!session.adjustmentEditingID());
+    QCOMPARE(session.renamingLayerID(), std::optional(ids[6]));
+    QCOMPARE(invert.findChild<QLabel *>("layerDimensions")->text(), QString("Adjustment · Double-click to edit"));
 }
 
 void AdjustmentPanelTests::theLayerMenuAddsAndEditsAdjustments()
@@ -167,7 +177,9 @@ void AdjustmentPanelTests::theLayerMenuAddsAndEditsAdjustments()
     QVERIFY(!adjustments.isEnabled() && !edit.isEnabled());
     const std::pair<const char *, const char *> entries[] = {{"newHueSaturationAdjustment", "Hue/Saturation…"}, {"newLevelsAdjustment", "Levels…"},
                                                              {"newCurvesAdjustment", "Curves…"}, {"newExposureAdjustment", "Exposure…"},
-                                                             {"newGradientMapAdjustment", "Gradient Map…"}, {"newGrainAdjustment", "Grain…"}};
+                                                             {"newGradientMapAdjustment", "Gradient Map…"}, {"newGrainAdjustment", "Grain…"},
+                                                             {"newInvertAdjustment", "Invert"}, {"newBlackWhiteAdjustment", "Black && White…"},
+                                                             {"newColorBalanceAdjustment", "Color Balance…"}};
     const QList<QAction *> listed = adjustments.menu()->actions();
     QCOMPARE(listed.size(), qsizetype(std::size(entries)));
     for (qsizetype index = 0; index < listed.size(); ++index) {
@@ -192,6 +204,18 @@ void AdjustmentPanelTests::theLayerMenuAddsAndEditsAdjustments()
     bar.session().cancelFilter();
     bar.session().selectLayer(pixels);
     QVERIFY(adjustments.isEnabled() && !edit.isEnabled());
+    // Invert applies at once; beyond Swift, nothing to edit.
+    bar.action("newInvertAdjustment").trigger();
+    QVERIFY(bar.session().activeLayer().value().adjustment.value().kind == AdjustmentKind::invert);
+    QVERIFY(!bar.session().adjustmentEditingID() && adjustments.isEnabled() && !edit.isEnabled());
+    QCOMPARE(bar.session().history.undoName(), QString("New Invert Adjustment"));
+    // Undo and Redo double a step's ampersand, no mnemonic.
+    bar.action("newBlackWhiteAdjustment").trigger();
+    QTRY_VERIFY(bar.session().filterEdit().has_value());
+    bar.session().cancelFilter();
+    QCOMPARE(bar.action("undo").text(), QString("Undo New Black && White Adjustment"));
+    bar.session().undo();
+    QCOMPARE(bar.action("redo").text(), QString("Redo New Black && White Adjustment"));
 }
 
 void AdjustmentPanelTests::theSheetsSayTheyReadWhatLiesBeneath()

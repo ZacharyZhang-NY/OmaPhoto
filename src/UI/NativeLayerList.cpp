@@ -155,6 +155,12 @@ void NativeLayerList::focusList()
     setFocus(Qt::MouseFocusReason);
 }
 
+// Closing hides it: a rename's focus-out commits, unheard here.
+NativeLayerList::~NativeLayerList()
+{
+    disconnect(&m_session, &EditorSession::changed, this, &NativeLayerList::update);
+}
+
 // Tab reaches the keys, not the focus chain, as Swift.
 bool NativeLayerList::event(QEvent *event)
 {

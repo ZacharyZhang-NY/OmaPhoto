@@ -55,6 +55,13 @@ private:
     void noise();
     // Remove Background's words, Quality, and Advanced's three rows.
     void background();
+    // Black & White's six families and Tint; Color Balance's nine.
+    void blackWhite();
+    void colorBalance();
+    // Swift's Toggle over a flag, with its help.
+    void flag(const QString &title, const QString &help, std::function<bool &(FilterSettings &)> key);
+    // Swift's headline over a group of rows.
+    void headline(const QString &title);
     // Swift's `settings` and `update`: the defaults once the edit goes.
     FilterSettings settings() const;
     void update(const std::function<void(FilterSettings &)> &change);
@@ -68,8 +75,9 @@ private:
     QButtonGroup *m_distribution = nullptr;
     QCheckBox *m_monochromatic = nullptr;
     QButtonGroup *m_quality = nullptr;
-    // Shown while the quality is Advanced, as Swift's `if`.
-    std::vector<QWidget *> m_advanced;
+    std::vector<std::pair<QCheckBox *, std::function<bool &(FilterSettings &)>>> m_flags;
+    // Rows under Swift's `if`: Advanced's, Tint's.
+    std::vector<std::pair<QWidget *, std::function<bool(const FilterSettings &)>>> m_shownWhen;
     QCheckBox *const m_preview;
     QLabel *const m_error;
     QLabel *const m_limited;

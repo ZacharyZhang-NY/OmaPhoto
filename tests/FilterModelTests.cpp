@@ -68,7 +68,8 @@ void FilterModelTests::kindsKeepSwiftsNames()
         {FilterKind::gaussianBlur, "Gaussian Blur"}, {FilterKind::motionBlur, "Motion Blur"}, {FilterKind::addNoise, "Add Noise"},
         {FilterKind::lensCorrection, "Lens Correction"}, {FilterKind::removeBackground, "Remove Background"},
         {FilterKind::contentAwareFill, "Content-Aware Fill"}, {FilterKind::curves, "Curves"}, {FilterKind::exposure, "Exposure"},
-        {FilterKind::gradientMap, "Gradient Map"}, {FilterKind::grain, "Grain"}};
+        {FilterKind::gradientMap, "Gradient Map"}, {FilterKind::grain, "Grain"}, {FilterKind::blackWhite, "Black & White"},
+        {FilterKind::colorBalance, "Color Balance"}};
     // Swift's allCases is this order, the menus'.
     QCOMPARE(allFilterKinds.size(), std::size(kinds));
     for (size_t index = 0; index < std::size(kinds); ++index) {

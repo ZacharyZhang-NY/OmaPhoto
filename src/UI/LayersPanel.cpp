@@ -93,7 +93,7 @@ LayersPanel::LayersPanel(EditorSession &session, QWidget *parent)
     m_adjustments = footerButton(QStringLiteral("addAdjustment"), QStringLiteral("New adjustment layer"), QStringLiteral("New adjustment layer"), [] {});
     auto *kinds = new QMenu(m_adjustments);
     for (const AdjustmentKind kind : allAdjustmentKinds)
-        kinds->addAction(rawValue(kind), this, [this, kind] { m_session.addAdjustment(kind); });
+        kinds->addAction(rawValue(kind).replace(QLatin1Char('&'), QStringLiteral("&&")), this, [this, kind] { m_session.addAdjustment(kind); });
     m_adjustments->setMenu(kinds);
     m_adjustments->setPopupMode(QToolButton::InstantPopup);
     footer->addWidget(m_adjustments);

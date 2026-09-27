@@ -2,6 +2,7 @@
 #include "Document/BrushStroke.h"
 #include "IO/ProjectStore.h"
 #include <QPainter>
+#include <algorithm>
 #include <array>
 #include <cmath>
 extern "C" {
@@ -129,5 +130,59 @@ QImage GrainSettings::apply(const QImage &image, QPointF origin, double unitsPer
     const quint32 pattern = seed.value_or(this->seed);
     return ImageAdjustmentPixels::run(image, [&](uchar *pixels, int width, int height, qsizetype stride) {
         adjust_grain(pixels, size_t(width), size_t(height), size_t(stride), amount, size, roughness, pattern, origin.x(), origin.y(), unitsPerPixel);
+    });
+}
+
+bool BlackWhiteSettings::isValid() const
+{
+    const std::array weights{reds, yellows, greens, cyans, blues, magentas};
+    return std::all_of(weights.begin(), weights.end(), [](double weight) { return weight >= low && weight <= high; })
+        && tintHue >= 0 && tintHue <= 360 && tintSaturation >= 0 && tintSaturation <= 100;
+}
+
+QImage BlackWhiteSettings::apply(const QImage &image) const
+{
+    if (!isValid())
+        throw ProjectError(ProjectError::Kind::invalid);
+    // The kernel's order: red, yellow, green, cyan, blue, magenta.
+    const std::array<float, 6> weights{float(reds / 100), float(yellows / 100), float(greens / 100),
+                                       float(cyans / 100), float(blues / 100), float(magentas / 100)};
+    return ImageAdjustmentPixels::run(image, [&](uchar *pixels, int width, int height, qsizetype stride) {
+        adjust_black_white(pixels, size_t(width), size_t(height), size_t(stride), weights.data(), tint ? 1 : 0, tintHue, tintSaturation / 100);
+    });
+}
+
+namespace {
+std::array<double, 9> amounts(const ColorBalanceSettings &settings)
+{
+    return {settings.shadowCyanRed, settings.shadowMagentaGreen, settings.shadowYellowBlue, settings.midCyanRed, settings.midMagentaGreen,
+            settings.midYellowBlue, settings.highlightCyanRed, settings.highlightMagentaGreen, settings.highlightYellowBlue};
+}
+}
+
+bool ColorBalanceSettings::isValid() const
+{
+    const std::array<double, 9> all = amounts(*this);
+    return std::all_of(all.begin(), all.end(), [](double amount) { return amount >= low && amount <= high; });
+}
+
+bool ColorBalanceSettings::isIdentity() const
+{
+    const std::array<double, 9> all = amounts(*this);
+    return std::all_of(all.begin(), all.end(), [](double amount) { return amount == 0; });
+}
+
+QImage ColorBalanceSettings::apply(const QImage &image) const
+{
+    if (!isValid())
+        throw ProjectError(ProjectError::Kind::invalid);
+    if (isIdentity())
+        return image;
+    std::array<float, 9> ranges;
+    const std::array<double, 9> all = amounts(*this);
+    std::transform(all.begin(), all.end(), ranges.begin(), [](double amount) { return float(amount / 100); });
+    return ImageAdjustmentPixels::run(image, [&](uchar *pixels, int width, int height, qsizetype stride) {
+        adjust_color_balance(pixels, size_t(width), size_t(height), size_t(stride), ranges.data(), ranges.data() + 3, ranges.data() + 6,
+                             preserveLuminosity ? 1 : 0);
     });
 }

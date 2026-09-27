@@ -10,15 +10,18 @@
 #include <optional>
 
 // An adjustment layer's kind, in the Layer menu's order.
-enum class AdjustmentKind { hsv, levels, curves, exposure, gradientMap, grain };
+enum class AdjustmentKind { hsv, levels, curves, exposure, gradientMap, grain, invert, blackWhite, colorBalance };
 inline constexpr std::array allAdjustmentKinds{AdjustmentKind::hsv,      AdjustmentKind::levels,      AdjustmentKind::curves,
-                                               AdjustmentKind::exposure, AdjustmentKind::gradientMap, AdjustmentKind::grain};
+                                               AdjustmentKind::exposure, AdjustmentKind::gradientMap, AdjustmentKind::grain,
+                                               AdjustmentKind::invert,   AdjustmentKind::blackWhite,  AdjustmentKind::colorBalance};
 // Swift's rawValue: the new layer's name and the manifest's word.
 QString rawValue(AdjustmentKind kind);
 // The kind a manifest names, or none.
 std::optional<AdjustmentKind> adjustmentKind(const QString &text);
-// The filter panel that edits it; Levels and Hue/Saturation: none.
+// The filter panel that edits it; Levels, Hue/Saturation, Invert: none.
 std::optional<FilterKind> filterKind(AdjustmentKind kind);
+// Every kind but Invert opens an editor.
+bool isEditable(AdjustmentKind kind);
 
 // An adjustment layer's settings; its kind reads only its own.
 struct LayerAdjustment {
@@ -35,6 +38,8 @@ struct LayerAdjustment {
     std::optional<ExposureSettings> exposureSettings = std::nullopt;
     std::optional<GradientMapSettings> gradientMapSettings = std::nullopt;
     std::optional<GrainSettings> grainSettings = std::nullopt;
+    std::optional<BlackWhiteSettings> blackWhiteSettings = std::nullopt;
+    std::optional<ColorBalanceSettings> colorBalanceSettings = std::nullopt;
     HueSaturationSettings resolvedHSV() const;
     // Swift's computed properties over the optional settings.
     ExposureSettings exposure() const;
@@ -43,6 +48,10 @@ struct LayerAdjustment {
     void setGradientMap(const GradientMapSettings &value);
     GrainSettings grain() const;
     void setGrain(const GrainSettings &value);
+    BlackWhiteSettings blackWhite() const;
+    void setBlackWhite(const BlackWhiteSettings &value);
+    ColorBalanceSettings colorBalance() const;
+    void setColorBalance(const ColorBalanceSettings &value);
     bool isValid() const;
     // `region`: the document `image` covers, whole pixels by default.
     QImage apply(const QImage &image, std::optional<QRectF> region = std::nullopt) const;

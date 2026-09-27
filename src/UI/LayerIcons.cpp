@@ -93,6 +93,45 @@ void halfFilledCircle(QPainter &painter)
     painter.drawEllipse(QPointF(9, 9), 7, 7);
 }
 
+// Swift's circle.righthalf.filled: the other half, Invert's.
+void rightHalfCircle(QPainter &painter)
+{
+    QPainterPath half;
+    half.moveTo(9, 2);
+    half.arcTo(QRectF(2, 2, 14, 14), 90, -180);
+    half.closeSubpath();
+    painter.fillPath(half, painter.pen().color());
+    painter.drawEllipse(QPointF(9, 9), 7, 7);
+}
+
+// Swift's circle.filled.pattern.diagonalline.rectangle: Black & White's.
+void hatchedCircle(QPainter &painter)
+{
+    const QRectF frame(2, 4, 14, 10);
+    painter.drawRoundedRect(frame, 2, 2);
+    painter.save();
+    painter.setClipRect(frame);
+    for (double x = -6; x < 16; x += 3)
+        painter.drawLine(QPointF(x, 14), QPointF(x + 10, 4));
+    painter.restore();
+    painter.setBrush(painter.pen().color());
+    painter.drawEllipse(QPointF(9, 9), 3.2, 3.2);
+}
+
+// Swift's scale.3d: three axes from one corner, Color Balance's.
+void axes(QPainter &painter)
+{
+    const QPointF origin(7, 11);
+    const auto arrow = [&](QPointF tip, QPointF back1, QPointF back2) {
+        painter.drawLine(origin, tip);
+        painter.drawLine(tip, back1);
+        painter.drawLine(tip, back2);
+    };
+    arrow(QPointF(7, 2.5), QPointF(5.2, 4.5), QPointF(8.8, 4.5));
+    arrow(QPointF(16, 11), QPointF(14, 9.2), QPointF(14, 12.8));
+    arrow(QPointF(2.5, 15.5), QPointF(2.6, 12.9), QPointF(5.1, 15.4));
+}
+
 // Swift's slider.horizontal.3: three tracks, each with a knob.
 void sliders(QPainter &painter)
 {
@@ -201,6 +240,9 @@ void LayerIcons::paint(QPainter &painter, LayerIcon icon, QPointF origin, double
     case LayerIcon::paintPalette: paintPalette(painter); break;
     case LayerIcon::circleGrid: circleGrid(painter); break;
     case LayerIcon::sparkles: sparkles(painter); break;
+    case LayerIcon::rightHalfCircle: rightHalfCircle(painter); break;
+    case LayerIcon::hatchedCircle: hatchedCircle(painter); break;
+    case LayerIcon::axes: axes(painter); break;
     }
     painter.restore();
 }
@@ -224,6 +266,9 @@ LayerIcon LayerIcons::symbol(AdjustmentKind kind)
     case AdjustmentKind::exposure: return LayerIcon::plusMinusCircle;
     case AdjustmentKind::gradientMap: return LayerIcon::paintPalette;
     case AdjustmentKind::grain: return LayerIcon::circleGrid;
+    case AdjustmentKind::invert: return LayerIcon::rightHalfCircle;
+    case AdjustmentKind::blackWhite: return LayerIcon::hatchedCircle;
+    case AdjustmentKind::colorBalance: return LayerIcon::axes;
     }
     throw std::logic_error("unknown adjustment kind");
 }

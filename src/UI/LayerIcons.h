@@ -7,7 +7,7 @@
 // The layers panel's icons, drawn: SF Symbols have no twin.
 enum class LayerIcon {
     eye, eyeSlash, chevronRight, chevronDown, folder, link, newLayer, newFolder, addMask, trash, layers, text,
-    halfFilledCircle, sliders, curvePath, plusMinusCircle, paintPalette, circleGrid, sparkles
+    halfFilledCircle, sliders, curvePath, plusMinusCircle, paintPalette, circleGrid, sparkles, rightHalfCircle, hatchedCircle, axes
 };
 
 namespace LayerIcons {

@@ -129,6 +129,25 @@ GrainSettings grain(const QJsonValue &value)
             .seed = quint32(seed)};
 }
 
+BlackWhiteSettings blackWhite(const QJsonValue &value)
+{
+    const QJsonObject object = value.toObject();
+    return {.reds = number(object.value("reds")), .yellows = number(object.value("yellows")), .greens = number(object.value("greens")),
+            .cyans = number(object.value("cyans")), .blues = number(object.value("blues")), .magentas = number(object.value("magentas")),
+            .tint = boolean(object.value("tint")), .tintHue = number(object.value("tintHue")),
+            .tintSaturation = number(object.value("tintSaturation"))};
+}
+
+ColorBalanceSettings colorBalance(const QJsonValue &value)
+{
+    const QJsonObject object = value.toObject();
+    return {.shadowCyanRed = number(object.value("shadowCyanRed")), .shadowMagentaGreen = number(object.value("shadowMagentaGreen")),
+            .shadowYellowBlue = number(object.value("shadowYellowBlue")), .midCyanRed = number(object.value("midCyanRed")),
+            .midMagentaGreen = number(object.value("midMagentaGreen")), .midYellowBlue = number(object.value("midYellowBlue")),
+            .highlightCyanRed = number(object.value("highlightCyanRed")), .highlightMagentaGreen = number(object.value("highlightMagentaGreen")),
+            .highlightYellowBlue = number(object.value("highlightYellowBlue")), .preserveLuminosity = boolean(object.value("preserveLuminosity"))};
+}
+
 QJsonObject encoded(const AdjustmentColor &colour)
 {
     return {{"red", colour.red}, {"green", colour.green}, {"blue", colour.blue}};
@@ -184,7 +203,9 @@ LayerAdjustment ManifestJson::adjustment(const QJsonValue &value)
             .curves = curves(object.value("curves")),
             .exposureSettings = optional(object, "exposureSettings", exposure),
             .gradientMapSettings = optional(object, "gradientMapSettings", gradientMap),
-            .grainSettings = optional(object, "grainSettings", grain)};
+            .grainSettings = optional(object, "grainSettings", grain),
+            .blackWhiteSettings = optional(object, "blackWhiteSettings", blackWhite),
+            .colorBalanceSettings = optional(object, "colorBalanceSettings", colorBalance)};
 }
 
 QJsonObject ManifestJson::encoded(const LayerAdjustment &adjustment)
@@ -211,6 +232,21 @@ QJsonObject ManifestJson::encoded(const LayerAdjustment &adjustment)
         const GrainSettings &grain = *adjustment.grainSettings;
         object.insert("grainSettings", QJsonObject{{"amount", grain.amount}, {"size", grain.size}, {"roughness", grain.roughness},
                                                    {"seed", qint64(grain.seed)}});
+    }
+    if (adjustment.blackWhiteSettings) {
+        const BlackWhiteSettings &gray = *adjustment.blackWhiteSettings;
+        object.insert("blackWhiteSettings", QJsonObject{{"reds", gray.reds}, {"yellows", gray.yellows}, {"greens", gray.greens}, {"cyans", gray.cyans},
+                                                        {"blues", gray.blues}, {"magentas", gray.magentas}, {"tint", gray.tint},
+                                                        {"tintHue", gray.tintHue}, {"tintSaturation", gray.tintSaturation}});
+    }
+    if (adjustment.colorBalanceSettings) {
+        const ColorBalanceSettings &balance = *adjustment.colorBalanceSettings;
+        object.insert("colorBalanceSettings",
+                      QJsonObject{{"shadowCyanRed", balance.shadowCyanRed}, {"shadowMagentaGreen", balance.shadowMagentaGreen},
+                                  {"shadowYellowBlue", balance.shadowYellowBlue}, {"midCyanRed", balance.midCyanRed},
+                                  {"midMagentaGreen", balance.midMagentaGreen}, {"midYellowBlue", balance.midYellowBlue},
+                                  {"highlightCyanRed", balance.highlightCyanRed}, {"highlightMagentaGreen", balance.highlightMagentaGreen},
+                                  {"highlightYellowBlue", balance.highlightYellowBlue}, {"preserveLuminosity", balance.preserveLuminosity}});
     }
     return object;
 }

@@ -58,8 +58,10 @@ private slots:
 void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel_data()
 {
     QTest::addColumn<AdjustmentKind>("kind");
+    // Invert has no settings, so no editor: held apart.
     for (const AdjustmentKind kind : allAdjustmentKinds)
-        QTest::newRow(qPrintable(rawValue(kind))) << kind;
+        if (isEditable(kind))
+            QTest::newRow(qPrintable(rawValue(kind))) << kind;
 }
 
 void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
@@ -101,18 +103,25 @@ void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
     }
     case AdjustmentKind::exposure:
     case AdjustmentKind::gradientMap:
-    case AdjustmentKind::grain: {
+    case AdjustmentKind::grain:
+    case AdjustmentKind::blackWhite:
+    case AdjustmentKind::colorBalance: {
         QVERIFY(session.filterEdit().value().kind == filterKind(kind));
         FilterSettings settings = session.filterEdit().value().settings;
         if (kind == AdjustmentKind::exposure)
             settings.exposure.exposure = 1;
         else if (kind == AdjustmentKind::gradientMap)
             settings.gradientMap.reversed = true;
+        else if (kind == AdjustmentKind::blackWhite)
+            settings.blackWhite.reds = 100;
+        else if (kind == AdjustmentKind::colorBalance)
+            settings.colorBalance.midCyanRed = 50;
         else
             settings.grain.amount = 70;
         session.updateFilter(settings, true);
         const LayerAdjustment live = session.activeLayer().value().adjustment.value();
-        QVERIFY(live.exposure() == settings.exposure && live.gradientMap() == settings.gradientMap && live.grain() == settings.grain);
+        QVERIFY(live.exposure() == settings.exposure && live.gradientMap() == settings.gradientMap && live.grain() == settings.grain
+                && live.blackWhite() == settings.blackWhite && live.colorBalance() == settings.colorBalance);
         QVERIFY(awaited([&](std::function<void()> done) { session.commitFilter(std::move(done)); }));
         break;
     }
@@ -127,6 +136,8 @@ void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
         QVERIFY(awaited([&](std::function<void()> done) { session.commitHueSaturation(std::move(done)); }));
         break;
     }
+    case AdjustmentKind::invert:
+        QFAIL("Invert has no editor");
     }
     const LayerAdjustment saved = session.activeLayer().value().adjustment.value();
     QVERIFY(!session.adjustmentEditingID() && saved != created);
@@ -144,10 +155,12 @@ void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
     case AdjustmentKind::curves:
     case AdjustmentKind::exposure:
     case AdjustmentKind::gradientMap:
-    case AdjustmentKind::grain: {
+    case AdjustmentKind::grain:
+    case AdjustmentKind::blackWhite:
+    case AdjustmentKind::colorBalance: {
         const FilterSettings reopened = session.filterEdit().value().settings;
         QVERIFY(reopened.curves == saved.curves && reopened.exposure == saved.exposure() && reopened.gradientMap == saved.gradientMap()
-                && reopened.grain == saved.grain());
+                && reopened.grain == saved.grain() && reopened.blackWhite == saved.blackWhite() && reopened.colorBalance == saved.colorBalance());
         session.updateFilter(FilterSettings(), true);
         session.cancelFilter();
         break;
@@ -157,6 +170,8 @@ void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
         session.updateHueSaturation(HueSaturationSettings(), true);
         session.cancelHueSaturation();
         break;
+    case AdjustmentKind::invert:
+        QFAIL("Invert has no editor");
     }
     QVERIFY(session.activeLayer().value().adjustment.value() == saved);
     QVERIFY(!session.adjustmentEditingID());

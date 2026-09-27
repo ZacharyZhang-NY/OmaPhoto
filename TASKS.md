@@ -340,7 +340,10 @@ The panel of 4.6 shows and edits what the session holds so far. Each item adds i
 - [x] 12.7a Version 1.2.2, part one: Photoshop's remaining blend modes in its groups.
 - 12.7a round 1: FAIL, one finding. A clipping stack's base and an adjustment in one of the eight new modes blend by it in the twin, where Swift's `cgMode` draws them as Normal; AGENTS.md had called Swift's cases dead. Named now as a fix beyond Swift and tested on both paths; three wordings taken. A parallel run showed `GradientCanvasTests` reading the edit a turn early; it waits now.
 - 12.7a round 2: PASS. One note taken: the stack test asserts the exact 136.
-- [ ] 12.7b Version 1.2.2, part two: Black & White, Color Balance and Invert adjustments.
+- [x] 12.7b Version 1.2.2, part two: Black & White, Color Balance and Invert adjustments.
+- 12.7b round 1: FAIL, three findings. A Black & White or Color Balance value past its range aborted the app: the filter's workers now catch `ProjectError`, the sheet shows it and a commit reports it with no step, as Swift; Undo and Redo double a step's ampersand; yellows and cyans are told apart in the kernel test. Headlines semibold, Preserve Luminosity's help asserted.
+- 12.7b round 2: FAIL, one finding: five Color Balance manifest keys sat at zero in every fixture; nine distinct amounts now, each key's value read.
+- 12.7b round 3: FAIL, one finding, the third and last round: the sheet's rows were not held to their fields. Fixed after the round: every Black & White and Color Balance slider is set to a value of its own and read back, Hue to 360; the review's three survivors fail now (`mut-12.7b-r3.log`); the item closes on that.
 - [ ] 12.8a Version 1.2.3, part one: the Camera Raw filter's model and pixel kernels.
 - [ ] 12.8b Version 1.2.3, part two: the Camera Raw panel beside the canvas, its grading wheels turning the way their hue runs (1.2.9's `96edd5f`).
 - [ ] 12.8c Version 1.2.3, part three: Inner Glow, Image Trim, blur and noise adjustment layers, the layer context menu without 1.2.5's dropped Layer Effects entry (`5d7adba`).

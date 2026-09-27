@@ -166,6 +166,8 @@ private:
     bool m_isGroup = false;
     bool m_editableText = false;
     bool m_isAdjustment = false;
+    // Swift's isEditable: Invert's row renames instead.
+    bool m_editableAdjustment = false;
     int m_indent = 0;
     std::optional<QPoint> m_press;
     // Alt at the press makes the drag a copy.
@@ -203,6 +205,7 @@ class NativeLayerList : public QScrollArea {
     Q_OBJECT
 public:
     explicit NativeLayerList(EditorSession &session, QWidget *parent = nullptr);
+    ~NativeLayerList() override;
     // A dragged mask carries its layer's id under this type.
     static const QString maskType;
     // A row drag names its list, as Swift checks tables.

@@ -101,8 +101,10 @@ void FloatingPanelTests::adjustmentPanelSurvivesALayoutPass()
 void FloatingPanelTests::adjustmentEditorsUseMovableNonmodalPanels_data()
 {
     QTest::addColumn<AdjustmentKind>("kind");
+    // Invert has no settings, so no editor, as Swift's.
     for (const AdjustmentKind kind : allAdjustmentKinds)
-        QTest::newRow(qPrintable(rawValue(kind))) << kind;
+        if (isEditable(kind))
+            QTest::newRow(qPrintable(rawValue(kind))) << kind;
 }
 
 void FloatingPanelTests::adjustmentEditorsUseMovableNonmodalPanels()
