@@ -34,10 +34,11 @@ jobs:
           echo "7485c7e7aac6501b27e353dcbe068e45c61ab51fbaf598d13970dfae669d20bf  /tmp/ort.tgz" | sha256sum -c -
           mkdir -p /tmp/ort
           tar -xzf /tmp/ort.tgz -C /tmp/ort --strip-components=1
-          sudo mkdir -p /usr/local/include/onnxruntime /usr/local/lib64 /usr/local/lib/cmake
+          sudo mkdir -p /usr/local/include/onnxruntime /usr/local/lib64 /usr/local/lib/cmake /usr/local/share/doc/onnxruntime
           sudo cp -r /tmp/ort/include/. /usr/local/include/onnxruntime/
           sudo mv /tmp/ort/lib/cmake/onnxruntime /usr/local/lib/cmake/
           sudo cp -a /tmp/ort/lib/. /usr/local/lib64/
+          sudo cp /tmp/ort/LICENSE /tmp/ort/ThirdPartyNotices.txt /usr/local/share/doc/onnxruntime/
           echo /usr/local/lib64 | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
           sudo ldconfig
           rm -rf /tmp/ort /tmp/ort.tgz
