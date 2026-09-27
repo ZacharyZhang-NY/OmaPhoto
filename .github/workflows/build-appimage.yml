@@ -178,6 +178,14 @@ jobs:
           # No D-Bus/AT-SPI daemon in this container - Qt's accessibility bridge would
           # otherwise block trying to reach it instead of failing fast.
           export QT_ACCESSIBILITY=0
+          # The previous run's gdb backtrace showed a QDBusConnection worker thread
+          # already spawned and blocked, with xwininfo showing zero windows ever created -
+          # the app never got as far as the main window. This container has no dbus-daemon
+          # at all, but DISPLAY is set, which is exactly the condition that makes libdbus
+          # attempt its X11-property-based session-bus autolaunch handshake instead of
+          # failing immediately - and that handshake has nothing to actually talk to here.
+          # "disabled:" is libdbus's own sentinel for "no bus, do not try to autolaunch one".
+          export DBUS_SESSION_BUS_ADDRESS=disabled:
           # Xvfb has no real GPU and no DRI driver files are bundled in the AppImage, so
           # Qt's xcb platform plugin probing GLX/EGL for a window surface format (which it
           # does at startup even for a plain Widgets app with no OpenGL widgets) can stall
