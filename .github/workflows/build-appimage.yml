@@ -139,10 +139,17 @@ jobs:
           # The AppImage links against Ubuntu's GLVND libGLX.so.0/libOpenGL.so.0, but
           # Alpine's mesa-gl only ships the classic monolithic libGL.so.1, which already
           # exports the same GLX and GL symbols - point the GLVND sonames at it instead of
-          # trying to bring in a GLVND stack Alpine does not package.
-          GL_LIB=$(find /usr/lib /usr/lib64 -name 'libGL.so.1' 2>/dev/null | head -1)
-          ln -sf "$GL_LIB" "$(dirname "$GL_LIB")/libGLX.so.0"
-          ln -sf "$GL_LIB" "$(dirname "$GL_LIB")/libOpenGL.so.0"
+          # trying to bring in a GLVND stack Alpine does not package. AppRun still failed to
+          # load libGLX.so.0 after this symlink alone: real glibc's ld.so resolves sonames
+          # from its ld.so.cache, which was built by the glibc-bin trigger before these
+          # symlinks existed, so the new names never made it into the cache. Export the
+          # symlink directory as LD_LIBRARY_PATH for the launch step instead, since that is
+          # consulted directly at load time and does not depend on the cache being current.
+          GL_LIB=$(find /usr/lib /usr/lib64 /lib /lib64 -name 'libGL.so.1' 2>/dev/null | head -1)
+          GL_DIR=$(dirname "$GL_LIB")
+          ln -sf "$GL_LIB" "$GL_DIR/libGLX.so.0"
+          ln -sf "$GL_LIB" "$GL_DIR/libOpenGL.so.0"
+          echo "GL_DIR=$GL_DIR" >> "$GITHUB_ENV"
 
       - name: Launch OmaPhoto under Xvfb and screenshot it
         run: |
@@ -155,6 +162,7 @@ jobs:
 
           export DISPLAY=:99
           export QT_QPA_PLATFORM=xcb
+          export LD_LIBRARY_PATH="$GL_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           ./squashfs-root/AppRun &
           APP_PID=$!
           sleep 8
