@@ -133,6 +133,9 @@ jobs:
     runs-on: ubuntu-24.04
     container:
       image: debian:trixie-slim
+      # Docker's default seccomp profile blocks ptrace; needed for the gdb backtrace
+      # this job takes of a stalled AppRun before killing it.
+      options: --cap-add=SYS_PTRACE
     steps:
       # Five attempts on an Alpine (musl) target hit a hard wall: with a real-glibc
       # compat layer forced in for the app's own glibc-linked payload, the process then
@@ -158,7 +161,8 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates
+            fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates \
+            x11-utils gdb
 
       - name: Launch OmaPhoto under Xvfb and screenshot it
         run: |
@@ -181,6 +185,11 @@ jobs:
           # driver files to bundle for a code path the app doesn't actually need.
           export QT_XCB_GL_INTEGRATION=none
           export LIBGL_ALWAYS_SOFTWARE=1
+          # Neither this env var check nor QT_DEBUG_PLUGINS fixes anything by themselves -
+          # they only make the next failure's log more informative than "nothing happened".
+          mkdir -p -m0700 /tmp/runtime-root
+          export XDG_RUNTIME_DIR=/tmp/runtime-root
+          export QT_DEBUG_PLUGINS=1
           ./squashfs-root/AppRun &
           APP_PID=$!
 
@@ -201,9 +210,15 @@ jobs:
 
           # Distinguish "still running but never painted" (a real rendering problem) from
           # "already exited" (a crash or early return) before killing it - both look
-          # identical from the screenshot alone, but need different follow-up.
+          # identical from the screenshot alone, but need different follow-up. If it's
+          # still running, grab a backtrace of every thread before killing it - a fixed
+          # env var is a guess, a backtrace of where it actually is is not.
+          echo "xwininfo window list:" >&2
+          timeout 10 xwininfo -tree -root >&2 2>&1 || true
           if kill -0 "$APP_PID" 2>/dev/null; then
-            echo "AppRun (pid $APP_PID) is still running after the 15s retry window" >&2
+            echo "AppRun (pid $APP_PID) is still running after the 15s retry window - backtracing it:" >&2
+            REAL_PID=$(pgrep -P "$APP_PID" -f omaphoto || echo "$APP_PID")
+            timeout 15 gdb -p "$REAL_PID" --batch -ex "thread apply all bt" >&2 2>&1 || true
           else
             echo "AppRun (pid $APP_PID) has already exited" >&2
           fi
