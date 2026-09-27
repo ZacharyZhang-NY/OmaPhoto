@@ -100,6 +100,8 @@ struct SessionJobs {
         std::optional<QString> failure;
         // The job's settings, which the preview was made with.
         FilterSettings settings;
+        // Camera Raw's scope of the grade itself.
+        std::optional<CameraRawScope> scope = std::nullopt;
     };
     struct FilterMade {
         std::optional<ImportedImage> asset;

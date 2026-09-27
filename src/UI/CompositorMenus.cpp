@@ -215,7 +215,8 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
 
     QMenu *filter = bar.addMenu(QStringLiteral("Fil&ter"));
     for (const FilterKind kind : allFilterKinds) {
-        if (kind != FilterKind::contentAwareFill && !isImageAdjustment(kind))
+        // Camera Raw's entry arrives with its panel (12.8b).
+        if (kind != FilterKind::contentAwareFill && kind != FilterKind::cameraRaw && !isImageAdjustment(kind))
             add(filter, filterName(kind), rawValue(kind) + QStringLiteral("…"), QKeySequence(), [this, kind] { session().beginFilter(kind); });
     }
 
@@ -357,7 +358,7 @@ void CompositorMenus::synchronize()
         action(QString::fromLatin1(name))->setEnabled(s.canModifySelection());
     action(QStringLiteral("levels"))->setEnabled(s.canAdjustColors() && !s.hueSaturation());
     for (const FilterKind kind : allFilterKinds) {
-        if (kind != FilterKind::contentAwareFill)
+        if (kind != FilterKind::contentAwareFill && kind != FilterKind::cameraRaw)
             action(filterName(kind))->setEnabled(s.canAdjustColors() && !s.hueSaturation());
     }
     action(QStringLiteral("hueSaturation"))->setEnabled(s.canAdjustColors());

@@ -114,6 +114,10 @@ void EditorSession::renderFilterPreview()
         m_filterRendering = true;
         m_filterPreview.setFuture(QtConcurrent::run([job]() -> Filtered {
             try {
+                if (job.kind == FilterKind::cameraRaw) {
+                    auto [image, scope] = CameraRawScope::preview(job);
+                    return Filtered{std::move(image), std::nullopt, job.settings, std::move(scope)};
+                }
                 return Filtered{PixelFilter::run(job), std::nullopt, job.settings};
             } catch (const ContentFillError &error) {
                 return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
@@ -139,6 +143,8 @@ void EditorSession::finishFilterPreview()
         FilterEdit &edit = *m_filterEdit;
         edit.preparing = false;
         edit.previewError = result.failure;
+        if (result.scope)
+            edit.rawPanel.scope = result.scope;
         if (edit.preview || isAutomatic(edit.kind)) {
             edit.preparedPreview = result.image;
             edit.preparedSettings = result.settings;
@@ -191,10 +197,15 @@ void EditorSession::commitFilter(std::function<void()> done)
         finish();
         return;
     }
+    // A hidden Camera Raw group stays out next time too.
+    const FilterSettings rendered = edit.renderSettings();
+    if (edit.kind == FilterKind::cameraRaw)
+        m_filterSettings = rendered;
     // Nothing to change closes as Cancel does, with no step.
     if ((edit.kind == FilterKind::lensCorrection && edit.settings.distortion == 0)
         || (edit.kind == FilterKind::exposure && edit.settings.exposure == ExposureSettings())
-        || (edit.kind == FilterKind::grain && edit.settings.grain.amount == 0)) {
+        || (edit.kind == FilterKind::grain && edit.settings.grain.amount == 0)
+        || (edit.kind == FilterKind::cameraRaw && rendered.cameraRaw.isIdentity())) {
         cancelFilter();
         finish();
         return;
@@ -203,7 +214,8 @@ void EditorSession::commitFilter(std::function<void()> done)
     // Swift cancels the running preview: its result and queue drop.
     edit.pending.reset();
     m_filterPreviewFor = QUuid();
-    m_filterSettings = edit.settings;
+    if (edit.kind != FilterKind::cameraRaw)
+        m_filterSettings = edit.settings;
     setIsProjectBusy(true);
     m_committingFilter = Committing{edit.id, std::move(done)};
     // A mask hides the background, which can come back.
@@ -214,7 +226,7 @@ void EditorSession::commitFilter(std::function<void()> done)
     const std::optional<QImage> cached = isAutomatic(edit.kind) && edit.preparedSettings == edit.settings ? edit.preparedPreview : std::nullopt;
     const bool spreads = edit.kind == FilterKind::gaussianBlur || edit.kind == FilterKind::motionBlur;
     // A painted layer flattens in the worker, which catches failures.
-    m_filterCommit.setFuture(QtConcurrent::run([kind = edit.kind, original = edit.original, grownImage = edit.grownImage, settings = edit.settings,
+    m_filterCommit.setFuture(QtConcurrent::run([kind = edit.kind, original = edit.original, grownImage = edit.grownImage, settings = rendered,
                                                 selection = edit.selection, mapping = edit.mapping, seed = edit.seed, cached,
                                                 grown = edit.grownTransform, spreads]() -> FilterMade {
         try {

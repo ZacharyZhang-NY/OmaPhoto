@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/CameraRaw.h"
 #include "Document/Curves.h"
 #include "Document/ImageAdjustments.h"
 #include "Document/LayerTransform.h"
@@ -14,7 +15,10 @@
 struct ImageLayer;
 
 // The Filter and Image menus' filters.
-enum class FilterKind { gaussianBlur, motionBlur, addNoise, lensCorrection, removeBackground, contentAwareFill, curves, exposure, gradientMap, grain, blackWhite, colorBalance };
+enum class FilterKind {
+    gaussianBlur, motionBlur, addNoise, lensCorrection, cameraRaw, removeBackground, contentAwareFill, curves, exposure, gradientMap, grain, blackWhite,
+    colorBalance
+};
 // The menu's title, Swift's rawValue.
 QString rawValue(FilterKind kind);
 // Made without settings: its preview is its result.
@@ -23,7 +27,8 @@ bool isAutomatic(FilterKind kind);
 bool isImageAdjustment(FilterKind kind);
 // Swift's allCases, the menus' order.
 inline constexpr std::array allFilterKinds{FilterKind::gaussianBlur,     FilterKind::motionBlur,       FilterKind::addNoise,
-                                           FilterKind::lensCorrection,   FilterKind::removeBackground, FilterKind::contentAwareFill,
+                                           FilterKind::lensCorrection,   FilterKind::cameraRaw,        FilterKind::removeBackground,
+                                           FilterKind::contentAwareFill,
                                            FilterKind::curves,           FilterKind::exposure,         FilterKind::gradientMap,
                                            FilterKind::grain,            FilterKind::blackWhite,       FilterKind::colorBalance};
 
@@ -52,6 +57,7 @@ struct FilterSettings {
     GrainSettings grain{};
     BlackWhiteSettings blackWhite{};
     ColorBalanceSettings colorBalance{};
+    CameraRawSettings cameraRaw{};
     BackgroundQuality backgroundQuality = BackgroundQuality::basic;
     // How far, in pixels, the mask is pulled onto edges.
     double refineEdges = 12;
@@ -74,6 +80,13 @@ struct FilterJob {
     QTransform mapping;
     // Add Noise's pattern: the same seed, the same grain.
     quint32 seed = 0;
+    // Camera Raw's preview-only views; a commit leaves them off.
+    std::optional<CameraRawClipping> cameraRawClipping = std::nullopt;
+    bool showsShadowClipping = false;
+    bool showsHighlightClipping = false;
+    // The point colour shown alone, or −1 for the grade.
+    int visualizesPointColor = -1;
+    bool showsSharpenMask = false;
 };
 
 // Swift's PixelFilter.
@@ -106,6 +119,8 @@ public:
     // Pads the grid for the blur; it only ever grows.
     void growForBlur();
     std::optional<QImage> previewImage(QUuid id) const;
+    // The settings as rendered: a hidden Camera Raw group drops.
+    FilterSettings renderSettings() const;
     FilterJob previewJob() const;
 
     // Swift's object identity: a preview lands on its own edit.
@@ -135,6 +150,7 @@ public:
     // The settings the prepared preview was made with.
     std::optional<FilterSettings> preparedSettings;
     std::optional<FilterJob> pending;
+    CameraRawPanel rawPanel;
 
 private:
     void grow(const QRectF &extent);

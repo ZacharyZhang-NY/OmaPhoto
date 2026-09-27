@@ -66,7 +66,8 @@ void FilterModelTests::kindsKeepSwiftsNames()
 {
     const std::pair<FilterKind, const char *> kinds[] = {
         {FilterKind::gaussianBlur, "Gaussian Blur"}, {FilterKind::motionBlur, "Motion Blur"}, {FilterKind::addNoise, "Add Noise"},
-        {FilterKind::lensCorrection, "Lens Correction"}, {FilterKind::removeBackground, "Remove Background"},
+        {FilterKind::lensCorrection, "Lens Correction"}, {FilterKind::cameraRaw, "Camera Raw Filter"},
+        {FilterKind::removeBackground, "Remove Background"},
         {FilterKind::contentAwareFill, "Content-Aware Fill"}, {FilterKind::curves, "Curves"}, {FilterKind::exposure, "Exposure"},
         {FilterKind::gradientMap, "Gradient Map"}, {FilterKind::grain, "Grain"}, {FilterKind::blackWhite, "Black & White"},
         {FilterKind::colorBalance, "Color Balance"}};
@@ -77,7 +78,7 @@ void FilterModelTests::kindsKeepSwiftsNames()
         QVERIFY(allFilterKinds[index] == kind);
         QCOMPARE(rawValue(kind), QString(name));
         QCOMPARE(isAutomatic(kind), kind == FilterKind::contentAwareFill || kind == FilterKind::removeBackground);
-        QCOMPARE(isImageAdjustment(kind), index >= 6);
+        QCOMPARE(isImageAdjustment(kind), index >= 7);
     }
     // Remove Background's qualities, Swift's words and order.
     QVERIFY(allBackgroundQualities.size() == 2 && allBackgroundQualities[0] == BackgroundQuality::basic);

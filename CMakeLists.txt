@@ -55,6 +55,11 @@ add_library(compositor_core STATIC
     src/Document/ToolDefaults.cpp
     src/Document/ObjectSelection.cpp
     src/Document/Filters.cpp
+    src/Document/CameraRaw.cpp
+    src/Document/CameraRaw+Session.cpp
+    src/Document/CameraRawColor.cpp
+    src/Document/CameraRawDetailOptics.cpp
+    src/Document/CameraRawGeometryCalibration.cpp
     src/Document/GuidedMatte.cpp
     src/Document/SubjectRemoval.cpp
     src/Document/FloatingSelection.cpp
@@ -191,6 +196,8 @@ target_sources(compositor_core PRIVATE ${OMAPHOTO_KERNELS}/AdjustPixels.c ${OMAP
 set_source_files_properties(${OMAPHOTO_KERNELS}/AdjustPixels.c ${OMAPHOTO_KERNELS}/BrushPixels.c ${OMAPHOTO_KERNELS}/WandPixels.c ${OMAPHOTO_KERNELS}/ContentFill.c
     ${OMAPHOTO_KERNELS}/HealPixels.c ${OMAPHOTO_KERNELS}/LevelsPixels.c ${OMAPHOTO_KERNELS}/NoisePixels.c ${OMAPHOTO_KERNELS}/LensPixels.c
     PROPERTIES COMPILE_OPTIONS -O2)
+# Swift's kernel warns so through 1.3.3, unchanged.
+set_property(SOURCE ${OMAPHOTO_KERNELS}/AdjustPixels.c APPEND PROPERTY COMPILE_OPTIONS -Wno-unused-parameter -Wno-misleading-indentation)
 # The per-pixel loops vectorise only at -O3.
 set_source_files_properties(src/Rendering/BrushCoverage.cpp src/Rendering/DownsampleCache.cpp PROPERTIES COMPILE_OPTIONS -O3)
 target_include_directories(compositor_core PUBLIC src PRIVATE ${OMAPHOTO_KERNELS})

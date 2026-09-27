@@ -182,6 +182,8 @@ FilterSheet::FilterSheet(EditorSession &session, QWidget *parent)
         break;
     case FilterKind::removeBackground: background(); break;
     case FilterKind::blackWhite: blackWhite(); break;
+    // CameraRawControls arrive with the panel (12.8b).
+    case FilterKind::cameraRaw: break;
     case FilterKind::colorBalance: colorBalance(); break;
     case FilterKind::contentAwareFill:
         m_column->addWidget(words(QStringLiteral("Fill the selection using surrounding pixels from this layer."), false, this));

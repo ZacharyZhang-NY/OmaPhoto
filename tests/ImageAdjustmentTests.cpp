@@ -54,6 +54,7 @@ private slots:
     void exposureWorksInLinearLightWithOffsetAndGamma();
     void gradientMapColorsByBrightnessAndReverses();
     void grainIsFixedInDocumentSpaceAndLeavesTransparencyAlone();
+    void grainSizeControlsParticleScaleEvenWithRoughness();
     void imageMenuExposureChangesTheLayerInOneStep();
     void gradientMapColorsUseTheAppColorPicker();
     void settingsSaveAndOlderAdjustmentsStillOpen();
@@ -116,6 +117,22 @@ void ImageAdjustmentTests::grainIsFixedInDocumentSpaceAndLeavesTransparencyAlone
     QVERIFY2(pixels(GrainSettings{0, 1.5, 50, 0}.apply(gray())) == pixels(gray()), "no amount, no change");
     const std::vector<std::array<int, 4>> cleared = pixels(settings.apply(gray(4, 4, 0)));
     QVERIFY2(std::all_of(cleared.begin(), cleared.end(), [](const std::array<int, 4> &pixel) { return pixel[3] == 0; }), "clear pixels stay clear");
+}
+
+// Swift's 1.2.3 test: bigger grain, larger and smoother particles.
+void ImageAdjustmentTests::grainSizeControlsParticleScaleEvenWithRoughness()
+{
+    const QImage source = gray(64, 64);
+    const std::vector<std::array<int, 4>> small = pixels(GrainSettings{70, 1, 70, 17}.apply(source));
+    const std::vector<std::array<int, 4>> large = pixels(GrainSettings{70, 12, 70, 17}.apply(source));
+    const auto neighbouring = [](const std::vector<std::array<int, 4>> &values) {
+        double total = 0, count = 0;
+        for (int y = 0; y < 64; ++y)
+            for (int x = 1; x < 64; ++x, ++count)
+                total += std::abs(values[size_t(y * 64 + x)][0] - values[size_t(y * 64 + x - 1)][0]);
+        return total / count;
+    };
+    QVERIFY(neighbouring(large) < neighbouring(small) * 0.7);
 }
 
 void ImageAdjustmentTests::imageMenuExposureChangesTheLayerInOneStep()

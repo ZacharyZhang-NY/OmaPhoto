@@ -24,6 +24,7 @@ QString rawValue(FilterKind kind)
     case FilterKind::motionBlur: return QStringLiteral("Motion Blur");
     case FilterKind::addNoise: return QStringLiteral("Add Noise");
     case FilterKind::lensCorrection: return QStringLiteral("Lens Correction");
+    case FilterKind::cameraRaw: return QStringLiteral("Camera Raw Filter");
     case FilterKind::removeBackground: return QStringLiteral("Remove Background");
     case FilterKind::contentAwareFill: return QStringLiteral("Content-Aware Fill");
     case FilterKind::curves: return QStringLiteral("Curves");
@@ -67,6 +68,7 @@ FilterSettings FilterSettings::normalized() const
     result.exposure = exposure.normalized();
     result.gradientMap = gradientMap.normalized();
     result.grain = grain.normalized();
+    result.cameraRaw = cameraRaw.normalized();
     return result;
 }
 
@@ -118,6 +120,9 @@ QImage PixelFilter::run(const FilterJob &job)
     case FilterKind::gradientMap: image = settings.gradientMap.apply(job.image); break;
     case FilterKind::blackWhite: image = settings.blackWhite.apply(job.image); break;
     case FilterKind::colorBalance: image = settings.colorBalance.apply(job.image); break;
+    case FilterKind::cameraRaw:
+        image = settings.cameraRaw.apply(job.image, job.cameraRawClipping, job.scale, job.seed, job.visualizesPointColor, job.showsSharpenMask);
+        break;
     // Grain sits in layer pixels; the job's seed patterns it.
     case FilterKind::grain: image = settings.grain.apply(job.image, QPointF(), 1 / job.scale, job.seed); break;
     case FilterKind::removeBackground: image = SubjectRemoval::run(job.image, settings); break;
@@ -243,5 +248,24 @@ std::optional<QImage> FilterEdit::previewImage(QUuid id) const
 
 FilterJob FilterEdit::previewJob() const
 {
-    return FilterJob{kind, previewSource, settings, previewScale, selection, previewMapping, seed};
+    return FilterJob{kind,
+                     previewSource,
+                     renderSettings(),
+                     previewScale,
+                     selection,
+                     previewMapping,
+                     seed,
+                     rawPanel.clipping,
+                     rawPanel.showsShadowClipping,
+                     rawPanel.showsHighlightClipping,
+                     rawPanel.pointColorVisualizeIndex(settings.cameraRaw),
+                     rawPanel.sharpenMask};
+}
+
+FilterSettings FilterEdit::renderSettings() const
+{
+    FilterSettings value = settings;
+    if (kind == FilterKind::cameraRaw)
+        value.cameraRaw = value.cameraRaw.applying(rawPanel.shows);
+    return value;
 }

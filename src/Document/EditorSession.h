@@ -315,6 +315,7 @@ public:
 #include "Document/LayerAdjustment+Session.h"
 #include "Document/AdjustmentEditing+Session.h"
 #include "Document/LayerEffects+Session.h"
+#include "Document/CameraRaw+Session.h"
 #include "Document/Guides+Session.h"
 #include "Document/ObjectSelection+Session.h"
 signals:
