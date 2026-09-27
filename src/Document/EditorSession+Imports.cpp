@@ -1,6 +1,8 @@
 #include "Document/EditorSession.h"
 #include "Document/ProjectWorkspace.h"
+#include "Document/PixelAdjust.h"
 #include "IO/PSD/PSDReader.h"
+#include "IO/RawImporter.h"
 #include "Logging.h"
 #include <QtConcurrent>
 
@@ -105,6 +107,10 @@ void EditorSession::decodeNext()
         }
     }
     const QUrl url = request.urls[m_importIndex];
+    if (url.isLocalFile() && RawImporter::matches(url.toLocalFile())) {
+        decodeRaw(url.toLocalFile(), 100'000'000 - usedPixels);
+        return;
+    }
     if (url.isLocalFile() && PSDReader::matches(url.toLocalFile())) {
         beginPSDReading(QStringLiteral("Open “%1”?").arg(url.fileName()), QStringLiteral("Import"));
         m_photoshopReader.setFuture(QtConcurrent::run([path = url.toLocalFile(), remaining = 100'000'000 - usedPixels]() -> PhotoshopRead {
@@ -131,6 +137,57 @@ void EditorSession::decodeNext()
             return {std::nullopt, url.fileName() + ": " + error.what()};
         }
     }));
+}
+
+void EditorSession::decodeRaw(const QString &path, qint64 remaining)
+{
+    const QString name = QFileInfo(path).fileName();
+    const std::optional<QSize> size = RawImporter::pixelSize(path);
+    const auto refuse = [&](ImageImportError::Kind kind) {
+        m_importFailures << name + ": " + ImageImportError(kind).what();
+        m_importIndex += 1;
+        decodeNext();
+    };
+    if (!size)
+        return refuse(ImageImportError::Kind::unreadable);
+    if (size->width() > 30'000 || size->height() > 30'000 || qint64(size->width()) * size->height() > remaining)
+        return refuse(ImageImportError::Kind::tooLarge);
+    developRaw(path, [this, path, name](std::optional<RawDevelopSettings> settings) {
+        if (!settings) {
+            m_importIndex += 1;
+            decodeNext();
+            return;
+        }
+        // Seconds of work: a worker, so the window keeps drawing.
+        m_decoder.setFuture(QtConcurrent::run([path, name, settings = *settings]() -> Decoded {
+            try {
+                const QImage developed = RawImporter::Queue::shared().develop(path, settings, std::nullopt);
+                return {ImportedImage(developed, PixelAdjust::thumbnail(developed), ProjectTab::nameWithoutSuffix(path)), QString()};
+            } catch (const ImageImportError &error) {
+                return {std::nullopt, name + ": " + error.what()};
+            } catch (const ExportError &error) {
+                return {std::nullopt, name + ": " + error.what()};
+            }
+        }));
+    });
+}
+
+void EditorSession::developRaw(const QString &path, std::function<void(std::optional<RawDevelopSettings>)> answer)
+{
+    m_rawAnswer = std::move(answer);
+    m_rawDevelop = RawDevelopRequest{path, RawImporter::asShot(path).value_or(RawDevelopSettings())};
+    notify();
+}
+
+void EditorSession::finishRawDevelop(std::optional<RawDevelopSettings> settings)
+{
+    m_rawDevelop = std::nullopt;
+    notify();
+    // Frees the preview's decode on a worker, behind any preview.
+    (void)QtConcurrent::run([] { RawImporter::Queue::shared().release(); });
+    // The import resumes from the event loop, as a task.
+    if (const auto answer = std::exchange(m_rawAnswer, {}))
+        QMetaObject::invokeMethod(this, [answer, settings] { answer(settings); }, Qt::QueuedConnection);
 }
 
 void EditorSession::finishDecode()

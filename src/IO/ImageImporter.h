@@ -38,7 +38,8 @@ private:
 
 class ImageImportError : public std::runtime_error {
 public:
-    enum class Kind { unreadable, unsupported, tooLarge };
+    // whiteBalance is Linux's: LibRaw cannot take every white.
+    enum class Kind { unreadable, unsupported, tooLarge, whiteBalance };
     explicit ImageImportError(Kind kind);
     Kind kind;
 };

@@ -21,6 +21,8 @@ QString description(ImageImportError::Kind kind)
         return QStringLiteral("Choose a JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) file.");
     case ImageImportError::Kind::tooLarge:
         return QStringLiteral("This import exceeds the current 100-megapixel document budget or 30,000-pixel side limit.");
+    case ImageImportError::Kind::whiteBalance:
+        return QStringLiteral("This camera can’t record that white balance. Move Temperature or Tint back toward the shot.");
     }
     Q_UNREACHABLE();
 }

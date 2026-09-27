@@ -1,6 +1,6 @@
 # Arch and Omarchy: Qt and GCC as shipped.
 FROM archlinux:latest
-RUN pacman -Syu --noconfirm --needed base-devel cmake ninja pkgconf qt6-base qt6-imageformats libheif libde265 \
+RUN pacman -Syu --noconfirm --needed base-devel cmake ninja pkgconf qt6-base qt6-imageformats libheif libde265 libraw \
         fontconfig ttf-dejavu curl \
     && pacman -Scc --noconfirm
 # The ONNX Runtime the packages carry: Microsoft's own build.

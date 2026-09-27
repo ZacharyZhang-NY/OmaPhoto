@@ -399,6 +399,7 @@ void ContentView::synchronize()
                                                                              : hint(m_session.tool(), iconKind(m_session.tool()), m_session.blurMode(), m_session.shapeKind()));
     showImporter();
     showConversionSheet();
+    showRawDevelopSheet();
     showAlert(m_importAlert, QStringLiteral("Import couldn’t finish"), m_session.importError(), [this] { m_session.setImportError(std::nullopt); });
     showAlert(m_brushAlert, QStringLiteral("Couldn’t paint"), m_session.brushError(), [this] { m_session.setBrushError(std::nullopt); });
     showAlert(m_cropAlert, QStringLiteral("Couldn’t crop"), m_session.cropError(), [this] { m_session.setCropError(std::nullopt); });

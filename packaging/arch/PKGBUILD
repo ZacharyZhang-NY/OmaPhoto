@@ -6,7 +6,7 @@ pkgdesc='Layered image editing for Linux, a port of Compositor'
 arch=('x86_64')
 url='https://github.com/ZacharyZhang-NY/OmaPhoto'
 license=('MIT')
-depends=('qt6-base' 'qt6-imageformats' 'libheif' 'libde265' 'fontconfig' 'hicolor-icon-theme' 'shared-mime-info')
+depends=('qt6-base' 'qt6-imageformats' 'libheif' 'libraw' 'libde265' 'fontconfig' 'hicolor-icon-theme' 'shared-mime-info')
 makedepends=('cmake' 'ninja')
 # ONNX Runtime ships inside: Arch's changes its symbols each release.
 source=('u2net.onnx::https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx'

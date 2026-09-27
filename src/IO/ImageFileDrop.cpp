@@ -1,5 +1,6 @@
 #include "IO/ImageFileDrop.h"
 #include "Document/ProjectWorkspace.h"
+#include "IO/RawImporter.h"
 #include "Logging.h"
 #include <QDir>
 #include <QFile>
@@ -7,13 +8,16 @@
 #include <algorithm>
 
 namespace {
-// Swift's order: PNG, JPEG, HEIC, TIFF, Photoshop, then any picture.
+// Swift's order: PNG, JPEG, HEIC, TIFF, Photoshop, RAW, then any.
 QStringList pictureFormats(const QMimeData &data)
 {
     QStringList formats;
     for (const QString &format : {QStringLiteral("image/png"), QStringLiteral("image/jpeg"), QStringLiteral("image/heic"), QStringLiteral("image/tiff"),
                                    QStringLiteral("image/vnd.adobe.photoshop")})
         if (data.hasFormat(format))
+            formats << format;
+    for (const QString &format : data.formats())
+        if (RawImporter::isRawType(format) && !formats.contains(format))
             formats << format;
     for (const QString &format : data.formats())
         if (format.startsWith(QLatin1String("image/")) && !formats.contains(format))

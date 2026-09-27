@@ -53,6 +53,7 @@ private:
     // Swift's onChange of levels: its panel opens and closes.
     void synchronizePanels();
     void showConversionSheet();
+    void showRawDevelopSheet();
     ToolIconKind iconKind(NavigationTool tool) const;
     void showHeader(NavigationTool tool);
     void showWelcome(bool shown);
@@ -86,6 +87,7 @@ private:
     // The Photoshop sheet and the request it shows.
     QPointer<QDialog> m_conversionSheet;
     std::optional<PSDConversionRequest> m_conversionShown;
+    QPointer<QDialog> m_rawSheet;
     QPointer<QMessageBox> m_importAlert;
     QPointer<QMessageBox> m_brushAlert;
     QPointer<QMessageBox> m_cropAlert;

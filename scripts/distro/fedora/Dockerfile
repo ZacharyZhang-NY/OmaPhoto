@@ -1,7 +1,7 @@
 # Fedora 43, the oldest still supported; HEVC from RPM Fusion.
 FROM fedora:43
 RUN dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-43.noarch.rpm \
-    && dnf install -y gcc-c++ cmake ninja-build pkgconf qt6-qtbase-devel qt6-qtimageformats libheif-devel libheif-freeworld \
+    && dnf install -y gcc-c++ cmake ninja-build pkgconf qt6-qtbase-devel qt6-qtimageformats libheif-devel LibRaw-devel libheif-freeworld \
         fontconfig-devel dejavu-sans-fonts dejavu-serif-fonts dejavu-sans-mono-fonts curl rpm-build file \
     && dnf clean all
 # The ONNX Runtime the packages carry: Microsoft's own build.

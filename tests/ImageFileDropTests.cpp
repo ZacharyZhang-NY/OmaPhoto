@@ -1,5 +1,6 @@
 #include "ContentView.h"
 #include "IO/ImageFileDrop.h"
+#include "DNGFixture.h"
 #include "PSDFixture.h"
 #include "UI/ProjectTabs.h"
 #include "UI/ProjectWorkspaceView.h"
@@ -148,6 +149,22 @@ void ImageFileDropTests::aPictureIsCopiedToAFileFirst()
     QCOMPARE(names(opened), QStringList{"Sky"});
     QCOMPARE(opened.history.undoName(), QString("Import Photoshop File"));
     QCOMPARE(takeCopy(before), QString("Dropped.psd"));
+    // A camera RAW comes after Photoshop, before any other picture.
+    QMimeData raw;
+    raw.setData("image/gif", "any picture last");
+    raw.setData("image/x-adobe-dng", DNGFixture::data({}));
+    QCOMPARE(ImageFileDrop::providers(raw).front()->formats(), QStringList{"image/x-adobe-dng"});
+    raw.setData("image/vnd.adobe.photoshop", "photoshop first");
+    QCOMPARE(ImageFileDrop::providers(raw).front()->formats(), QStringList{"image/vnd.adobe.photoshop"});
+    raw.removeFormat("image/vnd.adobe.photoshop");
+    EditorSession developed;
+    done = false;
+    ImageFileDrop::importProviders(raw, developed, std::nullopt, nullptr, std::nullopt, [&done] { done = true; });
+    QTRY_VERIFY(developed.rawDevelop());
+    developed.finishRawDevelop(developed.rawDevelop()->settings);
+    QTRY_VERIFY(done);
+    QCOMPARE(names(developed), QStringList{"Dropped"});
+    QCOMPARE(takeCopy(before), QString("Dropped.dng"));
 }
 
 void ImageFileDropTests::whatCannotBeReadIsSaid()

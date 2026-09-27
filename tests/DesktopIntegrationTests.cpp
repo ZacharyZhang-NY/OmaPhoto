@@ -70,7 +70,7 @@ void DesktopIntegrationTests::theEntryOpensSwiftsDocumentTypes()
     QCOMPARE(keys.value("Terminal"), QString("false"));
     QVERIFY(keys.value("Categories").split(QLatin1Char(';')).contains("Graphics"));
     // Swift's two document types: its projects, then four pictures.
-    QCOMPARE(keys.value("MimeType"), QString("application/x-compositor-project;image/png;image/jpeg;image/heic;image/tiff;image/vnd.adobe.photoshop;"));
+    QCOMPARE(keys.value("MimeType"), QString("application/x-compositor-project;image/png;image/jpeg;image/heic;image/tiff;image/vnd.adobe.photoshop;image/x-dcraw;"));
 }
 
 void DesktopIntegrationTests::aProjectFolderIsAType()

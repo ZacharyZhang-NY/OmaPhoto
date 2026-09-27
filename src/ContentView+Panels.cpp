@@ -4,6 +4,7 @@
 #include "UI/FilterSheet.h"
 #include "UI/HueSaturationSheet.h"
 #include "UI/LevelsSheet.h"
+#include "UI/RawDevelopSheet.h"
 #include <QFileDialog>
 #include <QVBoxLayout>
 #include <QMessageBox>
@@ -85,7 +86,7 @@ void ContentView::showImporter()
     m_importer = new QFileDialog(this);
     m_importer->setAttribute(Qt::WA_DeleteOnClose);
     m_importer->setFileMode(QFileDialog::ExistingFiles);
-    m_importer->setNameFilter(QStringLiteral("Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd)"));
+    m_importer->setNameFilter(QStringLiteral("Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd %1)").arg(RawImporter::globs().join(' ')));
     connect(m_importer, &QDialog::finished, this, [this, panel = m_importer.data()](int result) {
         // Ours no longer: the flag must not reject it again.
         if (m_importer != panel)
@@ -159,4 +160,31 @@ void ContentView::showConversionSheet()
     m_conversionSheet->setWindowTitle(request->title);
     m_conversionSheet->layout()->addWidget(new PSDConversionSheet(*request, [this](bool confirmed) { m_session.finishConversion(confirmed); }, m_conversionSheet));
     m_conversionSheet->open();
+}
+
+void ContentView::showRawDevelopSheet()
+{
+    const std::optional<RawDevelopRequest> &request = m_session.rawDevelop();
+    if (!request) {
+        // Ours no longer, so the close answers nothing.
+        if (QDialog *shown = std::exchange(m_rawSheet, nullptr))
+            shown->reject();
+        return;
+    }
+    if (m_rawSheet)
+        return;
+    m_rawSheet = new QDialog(this);
+    m_rawSheet->setObjectName(QStringLiteral("rawDevelopSheet"));
+    m_rawSheet->setAttribute(Qt::WA_DeleteOnClose);
+    m_rawSheet->setWindowTitle(QStringLiteral("Develop RAW"));
+    auto *layout = new QVBoxLayout(m_rawSheet);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSizeConstraint(QLayout::SetFixedSize);
+    // Escape and the close button cancel, as Swift's dismissal.
+    connect(m_rawSheet, &QDialog::finished, this, [this, shown = m_rawSheet.data()] {
+        if (m_rawSheet == shown)
+            m_session.finishRawDevelop(std::nullopt);
+    });
+    layout->addWidget(new RawDevelopSheet(*request, [this](std::optional<RawDevelopSettings> settings) { m_session.finishRawDevelop(settings); }, m_rawSheet));
+    m_rawSheet->open();
 }

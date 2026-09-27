@@ -17,6 +17,7 @@
 #include "Document/EditorSession+Model.h"
 #include "IO/ProjectStore.h"
 #include "IO/PSD/PSDDocumentBuilder.h"
+#include "IO/RawImporter.h"
 #include "UI/PSDConversionSheet.h"
 #include "Rendering/CanvasViewport.h"
 #include "Rendering/EffectsPreviewCache.h"
@@ -70,6 +71,9 @@ public:
     void setImportError(std::optional<QString> error);
     bool showsConversionSheet() const { return m_showsConversionSheet; }
     const std::optional<PSDConversionRequest> &conversionRequest() const { return m_conversionRequest; }
+    // The RAW file the develop sheet shows, while it shows.
+    const std::optional<RawDevelopRequest> &rawDevelop() const { return m_rawDevelop; }
+    void finishRawDevelop(std::optional<RawDevelopSettings> settings);
     std::optional<QUuid> renamingLayerID() const { return m_renamingLayerID; }
     void setRenamingLayerID(std::optional<QUuid> id);
 
@@ -242,6 +246,8 @@ public:
     void finishPSDReading(const std::vector<PSDConversion> &conversions, std::function<void(bool)> answer);
     void endPSDReading();
     void finishConversion(bool confirmed);
+    void decodeRaw(const QString &path, qint64 remaining);
+    void developRaw(const QString &path, std::function<void(std::optional<RawDevelopSettings>)> answer);
     void insertPhotoshop(const PSDImport &imported, const QString &named, std::optional<QPointF> centeredAt = std::nullopt);
     void createDocument(int width, int height, bool emptyLayer = false);
     void fit();
@@ -386,6 +392,8 @@ private:
     bool m_showsConversionSheet = false;
     std::optional<PSDConversionRequest> m_conversionRequest;
     std::function<void(bool)> m_conversionAnswer;
+    std::optional<RawDevelopRequest> m_rawDevelop;
+    std::function<void(std::optional<RawDevelopSettings>)> m_rawAnswer;
     // Cancel pressed while the file was still read.
     bool m_conversionCancelled = false;
     std::optional<QString> m_brushError;

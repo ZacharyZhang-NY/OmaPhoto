@@ -14,7 +14,7 @@ It is a Linux port of [Compositor](https://github.com/robbietilton/Compositor) b
 - Layer effects: stroke, drop shadow, color overlay, inner shadow
 - Filters: Gaussian and motion blur, noise, lens correction, Content-Aware Fill and Remove Background (U²-Net on ONNX Runtime, offline)
 - Crop, canvas size, image size; PNG and JPEG export
-- Imports JPEG, PNG, TIFF and HEIC
+- Imports JPEG, PNG, TIFF, HEIC, Photoshop files and camera RAW
 
 ## Install
 
@@ -64,7 +64,7 @@ scripts/dev.sh run     # build, then the app on your Wayland display
 
 `run` gives the container your home folder at its own path, so the app opens and saves your files and reads your Omarchy theme, and the GPU's render nodes (`/dev/dri/renderD*`), which Mesa's EGL wants. Files outside your home folder stay out of reach.
 
-By hand: C++20, Qt 6.4 or later (Widgets, Concurrent, image formats), CMake, Ninja, libheif, fontconfig and ONNX Runtime. `-DOMAPHOTO_MODEL=path/to/u2net.onnx` installs Remove Background's model. `scripts/distro-check.sh arch|fedora|nixos|resolute` builds and tests on those systems (`resolute` is Ubuntu 26.04).
+By hand: C++20, Qt 6.4 or later (Widgets, Concurrent, image formats), CMake, Ninja, libheif, LibRaw, fontconfig and ONNX Runtime. `-DOMAPHOTO_MODEL=path/to/u2net.onnx` installs Remove Background's model. `scripts/distro-check.sh arch|fedora|nixos|resolute` builds and tests on those systems (`resolute` is Ubuntu 26.04).
 
 ## Licence
 
