@@ -137,14 +137,14 @@ jobs:
       # this job takes of a stalled AppRun before killing it.
       options: --cap-add=SYS_PTRACE
     steps:
-      # Five attempts on an Alpine (musl) target hit a hard wall: with a real-glibc
-      # compat layer forced in for the app's own glibc-linked payload, the process then
-      # also had to load Alpine's musl-native xcb/mesa libraries, and hung indefinitely
-      # (no crash, no error) right after touching them - a real-glibc process mixing
-      # musl-compiled shared objects in the same address space is known-fragile (TLS
-      # layout, pthread ABI, malloc differences). AppImage's portability promise is
-      # about glibc distros in the first place, so verify against a minimal *glibc*
-      # target instead of fighting musl - no compat layer needed at all here.
+      # AppImage's actual portability promise is about glibc distros - this is the real
+      # gate (see the `upload` job below). An earlier attempt at doing this on Alpine
+      # (musl) instead hit a hard wall before the AppImage bundled its own libraries:
+      # with a real-glibc compat layer forced in for the payload, the process also had
+      # to load Alpine's musl-native xcb/mesa libraries and hung indefinitely. Now that
+      # everything the app needs is bundled (see the build job), a second, separate
+      # `screenshot-alpine` job below tries Alpine again as a stricter, optional
+      # stretch-goal test - no compat layer needed at all here on Debian either way.
       - name: Download AppImage artifact
         uses: actions/download-artifact@v4
         with:
@@ -274,10 +274,138 @@ jobs:
           path: screenshot.png
           if-no-files-found: ignore
 
+  screenshot-alpine:
+    name: Launch on a minimal musl distro (Alpine) and screenshot
+    needs: build
+    runs-on: ubuntu-24.04
+    container:
+      image: alpine:3.20
+      # Docker's default seccomp profile blocks ptrace; needed for the gdb backtrace
+      # this job takes of a stalled AppRun before killing it.
+      options: --cap-add=SYS_PTRACE
+    steps:
+      # actions/* run via a Node binary the runner injects from the host, which is
+      # glibc-linked; without a compat shim it can't even exec inside a musl container.
+      - name: Install glibc compat for the injected actions runtime
+        run: apk add --no-cache libc6-compat
+
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: appimage-x86_64
+
+      # The AppImage's payload is glibc-linked (built on Ubuntu) and now bundles every
+      # library it needs (X11, xcb, GL/EGL, etc. - see the build job), so unlike the
+      # earlier Alpine attempt, it should no longer touch any of Alpine's own musl-native
+      # system libraries at runtime - the exact thing that caused the earlier indefinite
+      # hang. It still needs a working glibc dynamic linker just to start at all, though:
+      # gcompat (Alpine's official shim) lacks GLIBC_2.38-era symbols this payload needs
+      # (__isoc23_strtol, renameat2, close_range, pthread_cond_clockwait), and
+      # sgerrand/alpine-pkg-glibc stops at glibc 2.35 - dalet-oss/alpine-glibc continues
+      # that same packaging up to date. This is a third-party apk repo and signing key,
+      # not an official Alpine package.
+      - name: Install a real glibc (gcompat is not complete enough for this payload)
+        run: |
+          GLIBC_VER=2.44
+          wget -q -O /etc/apk/keys/alpine-packaging-rsa.pub \
+            https://raw.githubusercontent.com/dalet-oss/alpine-glibc/master/alpine-packaging-rsa.pub
+          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-${GLIBC_VER}.apk"
+          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-bin-${GLIBC_VER}.apk"
+          apk add --no-cache --force-overwrite "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
+          rm -f "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
+
+      # Same rule as the Debian job: this container should need nothing app-specific,
+      # only genuine test infrastructure. If AppRun ever needs an app library added here,
+      # the build job's bundling is incomplete - fix it there, not here.
+      - name: Install test infrastructure (display, screenshot tooling - no app libraries)
+        run: |
+          apk add --no-cache \
+            ttf-dejavu xvfb ffmpeg imagemagick ca-certificates \
+            xwininfo gdb icewm
+
+      - name: Launch OmaPhoto under Xvfb and screenshot it
+        run: |
+          chmod +x OmaPhoto-x86_64.AppImage
+          ./OmaPhoto-x86_64.AppImage --appimage-extract
+
+          Xvfb :99 -screen 0 1280x800x24 &
+          XVFB_PID=$!
+          sleep 2
+
+          export DISPLAY=:99
+          # See the Debian job for why a window manager, DBUS_SESSION_BUS_ADDRESS=disabled:,
+          # and QT_ACCESSIBILITY=0 are all here - same reasoning, same container-vs-desktop gaps.
+          icewm > /dev/null 2>&1 &
+          ICEWM_PID=$!
+          sleep 2
+          export QT_QPA_PLATFORM=xcb
+          export QT_ACCESSIBILITY=0
+          export DBUS_SESSION_BUS_ADDRESS=disabled:
+          export QT_XCB_GL_INTEGRATION=none
+          export LIBGL_ALWAYS_SOFTWARE=1
+          mkdir -p -m0700 /tmp/runtime-root
+          export XDG_RUNTIME_DIR=/tmp/runtime-root
+          export QT_DEBUG_PLUGINS=1
+          ./squashfs-root/AppRun &
+          APP_PID=$!
+
+          # Same retry-until-real-content check as the Debian job, using the correct
+          # ImageMagick property (see that job's comment for the bug this replaced).
+          START=$(date +%s)
+          STDDEV=0
+          while [ "$(( $(date +%s) - START ))" -lt 15 ]; do
+            sleep 2
+            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot-alpine.png -loglevel error
+            IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot-alpine.png 2>&1)
+            IDENTIFY_RC=$?
+            if [ "$IDENTIFY_RC" -ne 0 ]; then
+              echo "identify failed (exit $IDENTIFY_RC): $IDENTIFY_OUT" >&2
+              STDDEV=0
+            else
+              STDDEV="$IDENTIFY_OUT"
+            fi
+            echo "frame stddev: $STDDEV" >&2
+            if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+              break
+            fi
+          done
+
+          echo "xwininfo window list:" >&2
+          timeout 10 xwininfo -tree -root >&2 2>&1 || true
+          if kill -0 "$APP_PID" 2>/dev/null; then
+            echo "AppRun (pid $APP_PID) is still running after the 15s retry window - backtracing it:" >&2
+            timeout 15 gdb -p "$APP_PID" --batch -ex "thread apply all bt" >&2 2>&1 || true
+          else
+            echo "AppRun (pid $APP_PID) has already exited" >&2
+          fi
+
+          kill "$APP_PID" 2>/dev/null || true
+          kill "$ICEWM_PID" 2>/dev/null || true
+          kill "$XVFB_PID" 2>/dev/null || true
+
+          test -s screenshot-alpine.png
+          if ! awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+            echo "screenshot-alpine.png still looks blank/flat after 15s (pixel stddev=$STDDEV) - the app did not render" >&2
+            exit 1
+          fi
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot-alpine
+          path: screenshot-alpine.png
+          if-no-files-found: ignore
+
   upload:
     name: Create release
-    needs: [build, screenshot-debian]
-    if: github.event_name == 'push'
+    needs: [build, screenshot-debian, screenshot-alpine]
+    # Debian is the real gate (AppImage's actual portability promise); Alpine is a
+    # stricter, more fragile stretch goal - its screenshot gets included when it
+    # succeeds, but a release still ships without it if it fails.
+    if: |
+      always() && github.event_name == 'push' &&
+      needs.build.result == 'success' && needs.screenshot-debian.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -293,15 +421,30 @@ jobs:
           VERSION=$(grep -oP 'project\(omaphoto VERSION \K[0-9.]+' CMakeLists.txt)
           wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
           chmod +x pyuploadtool-x86_64.AppImage
+          FILES="screenshot/screenshot.png"
+          [ -f screenshot-alpine/screenshot-alpine.png ] && FILES="$FILES screenshot-alpine/screenshot-alpine.png"
           GITHUB_RELEASE_NAME="$VERSION" GITHUB_CONTINUOUS_RELEASE_TYPE=stable \
-            ./pyuploadtool-x86_64.AppImage **/OmaPhoto*.AppImage* screenshot/screenshot.png
+            ./pyuploadtool-x86_64.AppImage **/OmaPhoto*.AppImage* $FILES
 
-      - name: Add the screenshot to the release notes
+      - name: Add the screenshot(s) to the release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=$(gh release list --repo "${{ github.repository }}" --json tagName --jq '.[0].tagName')
-          NOTES=$(gh release view "$TAG" --repo "${{ github.repository }}" --json body --jq .body)
-          printf '%s\n\n## Running on a stock minimal Debian\n\n![OmaPhoto running on a stock minimal Debian](https://github.com/%s/releases/download/%s/screenshot.png)\n' \
-            "$NOTES" "${{ github.repository }}" "$TAG" > notes.md
+          gh release view "$TAG" --repo "${{ github.repository }}" --json body --jq .body > notes.md
+          {
+            echo ""
+            echo ""
+            echo "## Running on a stock minimal Debian"
+            echo ""
+            echo "![OmaPhoto running on a stock minimal Debian](https://github.com/${{ github.repository }}/releases/download/$TAG/screenshot.png)"
+          } >> notes.md
+          if [ -f screenshot-alpine/screenshot-alpine.png ]; then
+            {
+              echo ""
+              echo "## Running on a stock minimal Alpine"
+              echo ""
+              echo "![OmaPhoto running on a stock minimal Alpine](https://github.com/${{ github.repository }}/releases/download/$TAG/screenshot-alpine.png)"
+            } >> notes.md
+          fi
           gh release edit "$TAG" --repo "${{ github.repository }}" --notes-file notes.md
