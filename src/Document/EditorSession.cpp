@@ -13,6 +13,7 @@ EditorSession::EditorSession(QObject *parent) : QObject(parent), m_busyTimer(thi
         notify();
     });
     connect(&m_decoder, &QFutureWatcher<Decoded>::finished, this, &EditorSession::finishDecode);
+    connect(&m_photoshopReader, &QFutureWatcher<PhotoshopRead>::finished, this, &EditorSession::finishPhotoshopRead);
     connect(&m_baker, &QFutureWatcher<Baked>::finished, this, &EditorSession::finishBake);
     connect(&m_inverter, &QFutureWatcher<Inverted>::finished, this, &EditorSession::finishInvert);
     connect(&m_wand, &QFutureWatcher<Wanded>::finished, this, &EditorSession::finishWand);

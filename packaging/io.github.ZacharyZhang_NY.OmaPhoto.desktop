@@ -7,5 +7,5 @@ Exec=omaphoto %F
 Icon=io.github.ZacharyZhang_NY.OmaPhoto
 Terminal=false
 Categories=Graphics;2DGraphics;RasterGraphics;
-MimeType=application/x-compositor-project;image/png;image/jpeg;image/heic;image/tiff;
+MimeType=application/x-compositor-project;image/png;image/jpeg;image/heic;image/tiff;image/vnd.adobe.photoshop;
 StartupWMClass=OmaPhoto

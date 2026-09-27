@@ -1,4 +1,6 @@
 #include "IO/ImageImporter.h"
+#include "IO/PSD/PSDDocumentBuilder.h"
+#include "IO/PSD/PSDReader.h"
 #include "Logging.h"
 #include "Rendering/RasterSnapshot.h"
 #include <QColorSpace>
@@ -16,7 +18,7 @@ QString description(ImageImportError::Kind kind)
     case ImageImportError::Kind::unreadable:
         return QStringLiteral("The image could not be read. It may be damaged or unavailable.");
     case ImageImportError::Kind::unsupported:
-        return QStringLiteral("Choose a JPEG, PNG, HEIC, or TIFF image.");
+        return QStringLiteral("Choose a JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) file.");
     case ImageImportError::Kind::tooLarge:
         return QStringLiteral("This import exceeds the current 100-megapixel document budget or 30,000-pixel side limit.");
     }
@@ -240,4 +242,14 @@ ImportedImage ImageImporter::decode(const QString &path, qint64 remainingPixels)
     const QString name = QFileInfo(path).completeBaseName();
     qCInfo(lcIO).noquote() << "imported" << path << image.width() << "x" << image.height();
     return ImportedImage(image, thumbnail, name.isEmpty() ? QFileInfo(path).fileName() : name);
+}
+
+PSDDocument ImageImporter::loadPhotoshop(const QString &path, qint64 remainingPixels)
+{
+    return PSDReader::read(path, remainingPixels);
+}
+
+std::map<QUuid, ImportedImage> ImageImporter::photoshopAssets(const PSDDocument &document)
+{
+    return PSDDocumentBuilder::assets(document);
 }

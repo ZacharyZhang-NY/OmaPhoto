@@ -1,5 +1,6 @@
 #include "ContentView.h"
 #include "IO/ImageFileDrop.h"
+#include "PSDFixture.h"
 #include "UI/ProjectTabs.h"
 #include "UI/ProjectWorkspaceView.h"
 #include <QDragEnterEvent>
@@ -46,6 +47,28 @@ QMimeData *files(const QStringList &paths, const QList<QUrl> &others = {})
         urls << QUrl::fromLocalFile(path);
     data->setUrls(urls + others);
     return data;
+}
+
+// Each dropped picture's copy, in a temporary folder.
+QStringList droppedCopies()
+{
+    QStringList found;
+    for (const QString &folder : QDir::temp().entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+        for (const QString &file : QDir(QDir::temp().filePath(folder)).entryList({"Dropped.*"}, QDir::Files))
+            found << QDir::temp().filePath(folder + "/" + file);
+    return found;
+}
+
+// The copy one drop made, taken away again.
+QString takeCopy(const QStringList &before)
+{
+    QStringList made = droppedCopies();
+    for (const QString &old : before)
+        made.removeAll(old);
+    if (made.size() != 1)
+        throw std::runtime_error("a drop made no single copy");
+    QDir(QFileInfo(made.front()).path()).removeRecursively();
+    return QFileInfo(made.front()).fileName();
 }
 
 QStringList names(const EditorSession &session)
@@ -96,20 +119,40 @@ void ImageFileDropTests::aPictureIsCopiedToAFileFirst()
     data.setData("image/png", png);
     EditorSession session;
     bool done = false;
+    const QStringList before = droppedCopies();
     ImageFileDrop::importProviders(data, session, QPointF(2, 2), nullptr, std::nullopt, [&done] { done = true; });
     QTRY_VERIFY(done);
     QVERIFY(!session.importError());
-    const QStringList listed = names(session);
-    QCOMPARE(listed.size(), 1);
-    QVERIFY(listed.value(0).startsWith("Dropped-"));
+    // The copy keeps the layer's name, in its own folder.
+    QCOMPARE(names(session), QStringList{"Dropped"});
     QCOMPARE(session.document().value().size(), QSize(3, 5));
-    QVERIFY(QFileInfo::exists(QDir::temp().filePath(listed.value(0) + ".png")));
-    QFile::remove(QDir::temp().filePath(listed.value(0) + ".png"));
+    QCOMPARE(takeCopy(before), QString("Dropped.png"));
+    // A Photoshop picture comes after TIFF and opens.
+    PSDRecord sky;
+    sky.id = QUuid::createUuid();
+    sky.name = "Sky";
+    sky.image = PSDFixture::colorImage(4, 2, 0, 0, 1);
+    sky.bounds = QRectF(0, 0, 4, 2);
+    QMimeData photoshop;
+    photoshop.setData("image/vnd.adobe.photoshop", PSDFixture::data(PSDDocument{4, 2, 72, {sky}}, *sky.image));
+    photoshop.setData("application/x-other", "ignored");
+    QCOMPARE(ImageFileDrop::providers(photoshop).front()->formats(), QStringList{"image/vnd.adobe.photoshop"});
+    photoshop.setData("image/tiff", "tiff first");
+    QCOMPARE(ImageFileDrop::providers(photoshop).front()->formats(), QStringList{"image/tiff"});
+    photoshop.removeFormat("image/tiff");
+    EditorSession opened;
+    done = false;
+    ImageFileDrop::importProviders(photoshop, opened, std::nullopt, nullptr, std::nullopt, [&done] { done = true; });
+    QTRY_VERIFY(done);
+    QVERIFY(!opened.importError());
+    QCOMPARE(names(opened), QStringList{"Sky"});
+    QCOMPARE(opened.history.undoName(), QString("Import Photoshop File"));
+    QCOMPARE(takeCopy(before), QString("Dropped.psd"));
 }
 
 void ImageFileDropTests::whatCannotBeReadIsSaid()
 {
-    const QString said = "Some dropped items couldn’t be read. Drag JPEG, PNG, HEIC, or TIFF files from the file manager.";
+    const QString said = "Some dropped items couldn’t be read. Drag JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) files from the file manager.";
     EditorSession session;
     bool done = false;
     std::unique_ptr<QMimeData> link(files({}, {QUrl("https://example.com/page")}));
@@ -270,8 +313,15 @@ void ImageFileDropTests::aPictureThatCannotBeKeptIsUnreadable()
     QVERIFY(png.size() > 4096);
     QMimeData data;
     data.setData("image/png", png);
-    const auto dropped = [] { return QDir::temp().entryList({"Dropped-*"}, QDir::Files).size(); };
-    const qsizetype before = dropped();
+    // No copy stays behind, and no folder named for one.
+    const auto dropped = [] {
+        QStringList kept = droppedCopies();
+        for (const QString &folder : QDir::temp().entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+            if (!QUuid::fromString(folder).isNull())
+                kept << folder;
+        return kept;
+    };
+    const QStringList before = dropped();
     EditorSession session;
     bool done = false;
     signal(SIGXFSZ, SIG_IGN);
@@ -283,7 +333,7 @@ void ImageFileDropTests::aPictureThatCannotBeKeptIsUnreadable()
     ImageFileDrop::importProviders(data, session, std::nullopt, nullptr, std::nullopt, [&done] { done = true; });
     QCOMPARE(setrlimit(RLIMIT_FSIZE, &room), 0);
     QTRY_VERIFY(done);
-    QCOMPARE(session.importError(), std::optional<QString>("Some dropped items couldn’t be read. Drag JPEG, PNG, HEIC, or TIFF files from the file manager."));
+    QCOMPARE(session.importError(), std::optional<QString>("Some dropped items couldn’t be read. Drag JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) files from the file manager."));
     QVERIFY(!session.document());
     QCOMPARE(dropped(), before);
 }
@@ -304,13 +354,12 @@ void ImageFileDropTests::aPictureReachesATabWhole()
     EditorSession &session = workspace.current().session;
     session.createDocument(8, 8);
     bool done = false;
+    const QStringList before = droppedCopies();
     workspace.receiveProviders(data, workspace.current().id, std::nullopt, [&done] { done = true; });
     QTRY_VERIFY(done);
     QVERIFY(!session.importError());
-    const QStringList listed = names(session);
-    QCOMPARE(listed.size(), 1);
-    QVERIFY(listed.value(0).startsWith("Dropped-"));
-    QFile::remove(QDir::temp().filePath(listed.value(0) + ".png"));
+    QCOMPARE(names(session), QStringList{"Dropped"});
+    QCOMPARE(takeCopy(before), QString("Dropped.png"));
 }
 
 namespace {
@@ -344,11 +393,12 @@ void ImageFileDropTests::aLazyDragGivesOnlyThePictureChosen()
     EditorSession &session = workspace.current().session;
     session.createDocument(8, 8);
     bool done = false;
+    const QStringList before = droppedCopies();
     workspace.receiveProviders(drag, workspace.current().id, std::nullopt, [&done] { done = true; });
     QTRY_VERIFY(done);
     QVERIFY(!session.importError());
-    QCOMPARE(names(session).size(), 1);
-    QFile::remove(QDir::temp().filePath(names(session).value(0) + ".png"));
+    QCOMPARE(names(session), QStringList{"Dropped"});
+    QCOMPARE(takeCopy(before), QString("Dropped.png"));
     drag.asked.removeDuplicates();
     drag.asked.sort();
     QCOMPARE(drag.asked, (QStringList{"image/png", "text/uri-list"}));

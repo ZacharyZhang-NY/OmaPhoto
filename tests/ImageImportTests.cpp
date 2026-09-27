@@ -459,7 +459,7 @@ void ImageImportTests::thumbnailsAreSmoothed()
 void ImageImportTests::errorsCarrySwiftsDescriptions()
 {
     QCOMPARE(QString(ImageImportError(ImageImportError::Kind::unreadable).what()), QString("The image could not be read. It may be damaged or unavailable."));
-    QCOMPARE(QString(ImageImportError(ImageImportError::Kind::unsupported).what()), QString("Choose a JPEG, PNG, HEIC, or TIFF image."));
+    QCOMPARE(QString(ImageImportError(ImageImportError::Kind::unsupported).what()), QString("Choose a JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) file."));
     QCOMPARE(QString(ImageImportError(ImageImportError::Kind::tooLarge).what()),
              QString("This import exceeds the current 100-megapixel document budget or 30,000-pixel side limit."));
     QCOMPARE(ImageImportError(ImageImportError::Kind::tooLarge).kind, ImageImportError::Kind::tooLarge);

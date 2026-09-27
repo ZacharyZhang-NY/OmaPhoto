@@ -1,11 +1,14 @@
 #pragma once
 #include <QImage>
 #include <QString>
+#include <QUuid>
 #include <compare>
+#include <map>
 #include <memory>
 #include <stdexcept>
 
 class RasterSnapshot;
+struct PSDDocument;
 
 // Which pixels an asset holds, as CGImage identity did.
 struct ImageIdentity {
@@ -45,4 +48,6 @@ namespace ImageImporter {
 void liftAllocationLimit();
 // JPEG, PNG, TIFF or HEIC: upright, sRGB, premultiplied.
 ImportedImage decode(const QString &path, qint64 remainingPixels = 100'000'000);
+PSDDocument loadPhotoshop(const QString &path, qint64 remainingPixels = 100'000'000);
+std::map<QUuid, ImportedImage> photoshopAssets(const PSDDocument &document);
 }

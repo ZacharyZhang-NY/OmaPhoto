@@ -4,6 +4,7 @@
 #include "Rendering/EditorCanvas.h"
 #include "UI/FloatingPanel.h"
 #include "UI/ToolIcons.h"
+#include <QDialog>
 #include <QGridLayout>
 #include <QLabel>
 #include <QPointer>
@@ -51,6 +52,7 @@ private:
     void synchronize();
     // Swift's onChange of levels: its panel opens and closes.
     void synchronizePanels();
+    void showConversionSheet();
     ToolIconKind iconKind(NavigationTool tool) const;
     void showHeader(NavigationTool tool);
     void showWelcome(bool shown);
@@ -81,6 +83,9 @@ private:
     QLabel *const m_activity;
     QProgressBar *const m_spinner;
     QPointer<QFileDialog> m_importer;
+    // The Photoshop sheet and the request it shows.
+    QPointer<QDialog> m_conversionSheet;
+    std::optional<PSDConversionRequest> m_conversionShown;
     QPointer<QMessageBox> m_importAlert;
     QPointer<QMessageBox> m_brushAlert;
     QPointer<QMessageBox> m_cropAlert;

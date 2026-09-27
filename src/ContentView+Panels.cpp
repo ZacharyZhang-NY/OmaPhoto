@@ -5,6 +5,7 @@
 #include "UI/HueSaturationSheet.h"
 #include "UI/LevelsSheet.h"
 #include <QFileDialog>
+#include <QVBoxLayout>
 #include <QMessageBox>
 
 void ContentView::synchronizePanels()
@@ -84,7 +85,7 @@ void ContentView::showImporter()
     m_importer = new QFileDialog(this);
     m_importer->setAttribute(Qt::WA_DeleteOnClose);
     m_importer->setFileMode(QFileDialog::ExistingFiles);
-    m_importer->setNameFilter(QStringLiteral("Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff)"));
+    m_importer->setNameFilter(QStringLiteral("Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd)"));
     connect(m_importer, &QDialog::finished, this, [this, panel = m_importer.data()](int result) {
         // Ours no longer: the flag must not reject it again.
         if (m_importer != panel)
@@ -123,4 +124,39 @@ void ContentView::showAlert(QPointer<QMessageBox> &alert, const QString &title, 
         dismiss();
     });
     alert->open();
+}
+
+void ContentView::showConversionSheet()
+{
+    const std::optional<PSDConversionRequest> &request = m_session.conversionRequest();
+    if (!m_session.showsConversionSheet() || !request) {
+        // Ours no longer, so the close answers nothing.
+        if (QDialog *shown = std::exchange(m_conversionSheet, nullptr))
+            shown->reject();
+        return;
+    }
+    if (m_conversionSheet && m_conversionShown == *request)
+        return;
+    m_conversionShown = *request;
+    if (!m_conversionSheet) {
+        m_conversionSheet = new QDialog(this);
+        m_conversionSheet->setObjectName(QStringLiteral("conversionSheet"));
+        m_conversionSheet->setAttribute(Qt::WA_DeleteOnClose);
+        auto *layout = new QVBoxLayout(m_conversionSheet);
+        layout->setContentsMargins(0, 0, 0, 0);
+        // Escape and the close button cancel, as Swift's dismissal.
+        connect(m_conversionSheet, &QDialog::finished, this, [this, shown = m_conversionSheet.data()] {
+            if (m_conversionSheet != shown)
+                return;
+            m_session.finishConversion(false);
+        });
+    }
+    // Reading gives way to the list: new content.
+    for (PSDConversionSheet *old : m_conversionSheet->findChildren<PSDConversionSheet *>(Qt::FindDirectChildrenOnly)) {
+        old->hide();
+        old->deleteLater();
+    }
+    m_conversionSheet->setWindowTitle(request->title);
+    m_conversionSheet->layout()->addWidget(new PSDConversionSheet(*request, [this](bool confirmed) { m_session.finishConversion(confirmed); }, m_conversionSheet));
+    m_conversionSheet->open();
 }

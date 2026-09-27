@@ -5,6 +5,7 @@
 #include "Document/Selection.h"
 #include "IO/ImageImporter.h"
 #include "IO/ProjectStore.h"
+#include "IO/PSD/PSDTypes.h"
 #include <QImage>
 #include <QPainterPath>
 #include <QSet>
@@ -28,6 +29,12 @@ struct SessionJobs {
     };
     struct Decoded {
         std::optional<ImportedImage> asset;
+        QString failure;
+    };
+    // A Photoshop file read with its assets, or why not.
+    struct PhotoshopRead {
+        std::optional<PSDDocument> document;
+        std::map<QUuid, ImportedImage> assets;
         QString failure;
     };
     struct Baked {

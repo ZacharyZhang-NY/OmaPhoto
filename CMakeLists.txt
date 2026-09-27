@@ -115,6 +115,7 @@ add_library(compositor_core STATIC
     src/UI/KeyboardShortcuts.cpp
     src/UI/KeyboardShortcuts+Sheet.cpp
     src/UI/NewCanvasSheet.cpp
+    src/UI/PSDConversionSheet.cpp
     src/UI/OmarchyTheme.cpp
     src/UI/ProjectTabs.cpp
     src/UI/ProjectWorkspaceView.cpp
@@ -128,6 +129,12 @@ add_library(compositor_core STATIC
     src/IO/ProjectController+Resize.cpp
     src/IO/ProjectController+Export.cpp
     src/IO/ImageFileDrop.cpp
+    src/IO/PSD/PSDChannelCoder.cpp
+    src/IO/PSD/PSDDocumentBuilder.cpp
+    src/IO/PSD/PSDReader.cpp
+    src/IO/PSD/PSDReader+Adjustments.cpp
+    src/IO/PSD/PSDTypes.cpp
+    src/IO/PSD/PSDVector.cpp
     src/IO/ProjectStore.cpp
     src/IO/ProjectStore+Adjustment.cpp
     src/IO/ProjectStore+Effects.cpp
@@ -443,6 +450,11 @@ compositor_test(SubjectRemovalFailureTests)
 compositor_test(RemoveBackgroundTests)
 compositor_test(SelectSubjectTests)
 compositor_test(ObjectSelectionTests)
+compositor_test(PSDRoundTripTests)
+compositor_test(PSDVectorTests)
+compositor_test(PSDReaderTests)
+compositor_test(PSDReaderLayerTests)
+compositor_test(PSDImportTests)
 compositor_test(LayerEffectsRendererTests)
 compositor_test(LayerFlipTests)
 compositor_test(LayerMergeTests)

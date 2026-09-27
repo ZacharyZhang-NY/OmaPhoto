@@ -300,7 +300,10 @@ void ContentViewTests::theImporterPicksFilesAndClearsItsFlag()
     desk.note = [&] {
         session.selectTool(NavigationTool::hand);
         const QList<QFileDialog *> panels = view.findChildren<QFileDialog *>();
-        return QString("%1 %2").arg(panels.size()).arg(panels.value(0) && panels.value(0)->fileMode() == QFileDialog::ExistingFiles ? "many" : "one");
+        return QString("%1 %2 %3")
+            .arg(panels.size())
+            .arg(panels.value(0) && panels.value(0)->fileMode() == QFileDialog::ExistingFiles ? "many" : "one")
+            .arg(panels.value(0) ? panels.value(0)->nameFilters().join(';') : QString());
     };
     session.setShowsImporter(true);
     QTRY_COMPARE(desk.seen.size(), 1);
@@ -319,7 +322,8 @@ void ContentViewTests::theImporterPicksFilesAndClearsItsFlag()
     QTest::qWait(50);
     QCOMPARE(int(session.document().value().layers.size()), 2);
     desk.typeBeforeCancel.clear();
-    QCOMPARE(desk.seen.mid(0, 2), (QStringList{"panel|Open|open|file|||1 many", "panel|Open|open|file|||1 many"}));
+    const QString panel = "panel|Open|open|file|||1 many Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd)";
+    QCOMPARE(desk.seen.mid(0, 2), (QStringList{panel, panel}));
     QCOMPARE(desk.seen.size(), 3);
     // The flag cleared from elsewhere takes the panel down.
     desk.replies.clear();

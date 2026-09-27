@@ -7,11 +7,12 @@
 #include <algorithm>
 
 namespace {
-// Swift's order: PNG, JPEG, HEIC, TIFF, then any picture.
+// Swift's order: PNG, JPEG, HEIC, TIFF, Photoshop, then any picture.
 QStringList pictureFormats(const QMimeData &data)
 {
     QStringList formats;
-    for (const QString &format : {QStringLiteral("image/png"), QStringLiteral("image/jpeg"), QStringLiteral("image/heic"), QStringLiteral("image/tiff")})
+    for (const QString &format : {QStringLiteral("image/png"), QStringLiteral("image/jpeg"), QStringLiteral("image/heic"), QStringLiteral("image/tiff"),
+                                   QStringLiteral("image/vnd.adobe.photoshop")})
         if (data.hasFormat(format))
             formats << format;
     for (const QString &format : data.formats())
@@ -27,14 +28,20 @@ std::optional<QUrl> temporaryFile(const QMimeData &data)
     if (formats.isEmpty())
         return std::nullopt;
     const QString suffix = QMimeDatabase().mimeTypeForName(formats.first()).preferredSuffix();
-    const QString name = QStringLiteral("Dropped-%1.%2").arg(QUuid::createUuid().toString(QUuid::WithoutBraces).toUpper(), suffix.isEmpty() ? QStringLiteral("png") : suffix);
-    QFile file(QDir::temp().filePath(name));
+    // Its own folder keeps the name the layers show.
+    const QString folder = QDir::temp().filePath(QUuid::createUuid().toString(QUuid::WithoutBraces).toUpper());
+    if (!QDir().mkpath(folder)) {
+        qCWarning(lcIO).noquote() << "could not make a folder for a dropped picture:" << folder;
+        return std::nullopt;
+    }
+    QFile file(QDir(folder).filePath(QStringLiteral("Dropped.") + (suffix.isEmpty() ? QStringLiteral("png") : suffix)));
     const QByteArray bytes = data.data(formats.first());
     if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.flush()) {
         qCWarning(lcIO) << "could not keep a dropped picture:" << file.errorString();
         // A failed flush fails `remove()` too: close, then unlink.
         file.close();
         QFile::remove(file.fileName());
+        QDir().rmdir(folder);
         return std::nullopt;
     }
     return QUrl::fromLocalFile(file.fileName());
@@ -91,7 +98,7 @@ void ImageFileDrop::importProviders(const QMimeData &data, EditorSession &sessio
     }
     const auto finished = [&session, unreadable, done] {
         if (unreadable) {
-            const QString message = QStringLiteral("Some dropped items couldn’t be read. Drag JPEG, PNG, HEIC, or TIFF files from the file manager.");
+            const QString message = QStringLiteral("Some dropped items couldn’t be read. Drag JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) files from the file manager.");
             session.setImportError(session.importError() ? *session.importError() + QStringLiteral("\n\n") + message : message);
         }
         if (done)

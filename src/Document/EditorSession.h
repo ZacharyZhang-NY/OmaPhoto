@@ -16,6 +16,8 @@
 #include "Document/EditorSession+Jobs.h"
 #include "Document/EditorSession+Model.h"
 #include "IO/ProjectStore.h"
+#include "IO/PSD/PSDDocumentBuilder.h"
+#include "UI/PSDConversionSheet.h"
 #include "Rendering/CanvasViewport.h"
 #include "Rendering/EffectsPreviewCache.h"
 #include <QFutureWatcher>
@@ -66,6 +68,8 @@ public:
     void setIsImporting(bool importing);
     std::optional<QString> importError() const { return m_importError; }
     void setImportError(std::optional<QString> error);
+    bool showsConversionSheet() const { return m_showsConversionSheet; }
+    const std::optional<PSDConversionRequest> &conversionRequest() const { return m_conversionRequest; }
     std::optional<QUuid> renamingLayerID() const { return m_renamingLayerID; }
     void setRenamingLayerID(std::optional<QUuid> id);
 
@@ -233,6 +237,12 @@ public:
     // Files decode off the UI thread; `done` follows this request.
     void importImages(const QList<QUrl> &urls, std::optional<QPointF> point = std::nullopt, std::function<void()> done = {});
     void insert(const ImportedImage &asset, std::optional<QPointF> centeredAt = std::nullopt);
+    // The sheet shows while a Photoshop file is read.
+    void beginPSDReading(const QString &title, const QString &confirmTitle);
+    void finishPSDReading(const std::vector<PSDConversion> &conversions, std::function<void(bool)> answer);
+    void endPSDReading();
+    void finishConversion(bool confirmed);
+    void insertPhotoshop(const PSDImport &imported, const QString &named, std::optional<QPointF> centeredAt = std::nullopt);
     void createDocument(int width, int height, bool emptyLayer = false);
     void fit();
     void zoom(double value, std::optional<QPointF> anchor = std::nullopt);
@@ -312,6 +322,7 @@ private:
     void drainImports();
     void decodeNext();
     void finishDecode();
+    void finishPhotoshopRead();
     void endDuplicateTransform();
     // Clone Stamp is family 1, the Smear 2, others 0.
     static int tipFamily(NavigationTool tool);
@@ -371,6 +382,12 @@ private:
     std::optional<QPointF> m_importPoint;
     QStringList m_importFailures;
     QFutureWatcher<Decoded> m_decoder;
+    QFutureWatcher<PhotoshopRead> m_photoshopReader;
+    bool m_showsConversionSheet = false;
+    std::optional<PSDConversionRequest> m_conversionRequest;
+    std::function<void(bool)> m_conversionAnswer;
+    // Cancel pressed while the file was still read.
+    bool m_conversionCancelled = false;
     std::optional<QString> m_brushError;
     // The layers a bake under way will delete.
     std::vector<QUuid> m_bakingIDs;

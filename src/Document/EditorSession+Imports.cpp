@@ -1,4 +1,6 @@
 #include "Document/EditorSession.h"
+#include "Document/ProjectWorkspace.h"
+#include "IO/PSD/PSDReader.h"
 #include "Logging.h"
 #include <QtConcurrent>
 
@@ -73,7 +75,9 @@ void EditorSession::drainImports()
             setImportError(std::exchange(m_importFailures, {}).join("\n\n"));
         return;
     }
-    beginEdit(QStringLiteral("Import Images"));
+    const QList<QUrl> &urls = m_pendingImports.front().urls;
+    const bool photoshop = std::all_of(urls.begin(), urls.end(), [](const QUrl &url) { return url.isLocalFile() && PSDReader::matches(url.toLocalFile()); });
+    beginEdit(photoshop ? QStringLiteral("Import Photoshop File") : QStringLiteral("Import Images"));
     // Without a canvas the first image makes it.
     m_importPoint = m_document ? m_pendingImports.front().point : std::nullopt;
     m_importIndex = 0;
@@ -101,6 +105,23 @@ void EditorSession::decodeNext()
         }
     }
     const QUrl url = request.urls[m_importIndex];
+    if (url.isLocalFile() && PSDReader::matches(url.toLocalFile())) {
+        beginPSDReading(QStringLiteral("Open “%1”?").arg(url.fileName()), QStringLiteral("Import"));
+        m_photoshopReader.setFuture(QtConcurrent::run([path = url.toLocalFile(), remaining = 100'000'000 - usedPixels]() -> PhotoshopRead {
+            try {
+                PSDDocument document = ImageImporter::loadPhotoshop(path, remaining);
+                std::map<QUuid, ImportedImage> assets = ImageImporter::photoshopAssets(document);
+                return {std::move(document), std::move(assets), QString()};
+            } catch (const ImageImportError &error) {
+                return {std::nullopt, {}, QString::fromUtf8(error.what())};
+            } catch (const PSDError &error) {
+                return {std::nullopt, {}, QString::fromUtf8(error.what())};
+            } catch (const ExportError &error) {
+                return {std::nullopt, {}, QString::fromUtf8(error.what())};
+            }
+        }));
+        return;
+    }
     m_decoder.setFuture(QtConcurrent::run([url, remaining = 100'000'000 - usedPixels]() -> Decoded {
         try {
             if (!url.isLocalFile())
@@ -121,4 +142,142 @@ void EditorSession::finishDecode()
         m_importFailures << decoded.failure;
     m_importIndex += 1;
     decodeNext();
+}
+
+void EditorSession::finishPhotoshopRead()
+{
+    const PhotoshopRead read = m_photoshopReader.result();
+    const QUrl url = m_pendingImports.front().urls[m_importIndex];
+    const auto next = [this] {
+        m_importIndex += 1;
+        decodeNext();
+    };
+    // Every image has its asset: making layers cannot fail.
+    const std::optional<PSDImport> imported = read.document ? std::optional(PSDDocumentBuilder::makeImport(*read.document, read.assets)) : std::nullopt;
+    if (!imported) {
+        endPSDReading();
+        m_importFailures << url.fileName() + ": " + read.failure;
+        next();
+        return;
+    }
+    const std::vector<PSDConversion> conversions = imported->conversions;
+    finishPSDReading(conversions, [this, imported = std::move(*imported), url, next](bool confirmed) {
+        if (confirmed) {
+            try {
+                insertPhotoshop(imported, ProjectTab::nameWithoutSuffix(url.toLocalFile()), m_importPoint);
+            } catch (const std::runtime_error &error) {
+                m_importFailures << url.fileName() + ": " + QString::fromUtf8(error.what());
+            }
+        }
+        next();
+    });
+}
+
+void EditorSession::beginPSDReading(const QString &title, const QString &confirmTitle)
+{
+    m_conversionCancelled = false;
+    m_conversionRequest = PSDConversionRequest{title, confirmTitle, {}, true};
+    m_showsConversionSheet = true;
+    notify();
+}
+
+void EditorSession::finishPSDReading(const std::vector<PSDConversion> &conversions, std::function<void(bool)> answer)
+{
+    if (m_conversionCancelled || conversions.empty()) {
+        const bool confirmed = !m_conversionCancelled;
+        endPSDReading();
+        answer(confirmed);
+        return;
+    }
+    // The sheet waits for Cancel or the confirm button.
+    m_conversionAnswer = std::move(answer);
+    m_conversionRequest->conversions = conversions;
+    m_conversionRequest->isReading = false;
+    notify();
+}
+
+void EditorSession::endPSDReading()
+{
+    if (m_conversionAnswer)
+        return;
+    m_showsConversionSheet = false;
+    m_conversionRequest = std::nullopt;
+    notify();
+}
+
+void EditorSession::finishConversion(bool confirmed)
+{
+    if (!confirmed && m_conversionRequest && m_conversionRequest->isReading)
+        m_conversionCancelled = true;
+    m_showsConversionSheet = false;
+    m_conversionRequest = std::nullopt;
+    notify();
+    // The import resumes from the event loop, as a task.
+    if (const std::function<void(bool)> answer = std::exchange(m_conversionAnswer, {}))
+        QMetaObject::invokeMethod(this, [answer, confirmed] { answer(confirmed); }, Qt::QueuedConnection);
+}
+
+void EditorSession::insertPhotoshop(const PSDImport &imported, const QString &named, std::optional<QPointF> centeredAt)
+{
+    std::vector<ImageLayer> incoming = imported.layers;
+    const size_t existing = m_document ? m_document->layers.size() : 0;
+    if (existing + incoming.size() + (m_document ? 1 : 0) > 10'000)
+        throw ImageImportError(ImageImportError::Kind::tooLarge);
+    std::vector<ImageLayer> layers = m_document ? m_document->layers : std::vector<ImageLayer>();
+    std::optional<ImageLayer> group;
+    if (m_document) {
+        // An open canvas takes the file as one folder.
+        group = ImageLayer(named, m_document->size());
+        group->isGroup = true;
+        const std::optional<ImageLayer> active = activeLayer();
+        group->parentID = active && active->isGroup ? m_activeLayerID : active ? active->parentID : std::nullopt;
+        std::optional<QRectF> box;
+        for (const ImageLayer &layer : incoming)
+            if (!layer.isGroup)
+                box = box ? box->united(QRectF(layer.origin(), layer.size())) : QRectF(layer.origin(), layer.size());
+        if (centeredAt && box) {
+            const QPointF shift = *centeredAt - box->center();
+            for (ImageLayer &layer : incoming)
+                layer.transform.origin += shift;
+        }
+        for (ImageLayer &layer : incoming)
+            if (!layer.parentID)
+                layer.parentID = group->id;
+        layers.push_back(*group);
+    }
+    layers.insert(layers.end(), incoming.begin(), incoming.end());
+    // Folders nested past Swift's limit refuse the file.
+    std::vector<ProjectLayerRecord> records;
+    for (const ImageLayer &layer : layers)
+        records.push_back(layer.hierarchyRecord());
+    try {
+        LayerHierarchy::validate(records);
+    } catch (const ProjectError &) {
+        qCWarning(lcIO) << "a Photoshop file nests its folders too deep";
+        throw PSDError(PSDError::Kind::truncated);
+    }
+    beginEdit(QStringLiteral("Import Photoshop File"));
+    if (!group) {
+        CanvasDocument document(imported.width, imported.height);
+        document.layers = std::move(layers);
+        document.resolution = imported.resolution;
+        m_document = std::move(document);
+        viewport.fit(m_document->size());
+        // The topmost root layer, else the topmost layer.
+        std::optional<QUuid> active = incoming.empty() ? std::nullopt : std::optional(incoming.back().id);
+        for (size_t index = incoming.size(); index-- > 0;) {
+            if (!incoming[index].parentID) {
+                active = incoming[index].id;
+                break;
+            }
+        }
+        setActiveLayerID(active);
+    } else {
+        m_document->layers = std::move(layers);
+        if (group->parentID)
+            m_collapsedGroupIDs.remove(*group->parentID);
+        setActiveLayerID(group->id);
+    }
+    endEdit();
+    qCInfo(lcIO) << "imported a Photoshop file of" << incoming.size() << "layers";
 }
