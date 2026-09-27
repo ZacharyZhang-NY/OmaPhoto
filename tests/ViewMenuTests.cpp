@@ -6,6 +6,7 @@ class ViewMenuTests : public QObject {
 private slots:
     void viewEntriesZoomTheFrontSession();
     void thePixelGridEntryTogglesTheSession();
+    void guideEntriesFollowTheSession();
 };
 
 void ViewMenuTests::viewEntriesZoomTheFrontSession()
@@ -52,6 +53,44 @@ void ViewMenuTests::thePixelGridEntryTogglesTheSession()
     QVERIFY(bar.session().snappingEnabled() && snap.isChecked());
     bar.session().setSnappingEnabled(false);
     QVERIFY(!snap.isChecked());
+}
+
+void ViewMenuTests::guideEntriesFollowTheSession()
+{
+    Bar bar;
+    const std::vector<std::tuple<const char *, QString, bool (EditorSession::*)() const, bool>> toggles{
+        {"showGrid", "Grid", &EditorSession::showsGrid, false},
+        {"showGuides", "Guides", &EditorSession::showsGuides, true},
+        {"showRulers", "Rulers", &EditorSession::showsRulers, false},
+        {"snapEnabled", "Snap", &EditorSession::snapEnabled, true},
+        {"snapToGuides", "Guides", &EditorSession::snapToGuides, true},
+        {"snapToGrid", "Grid", &EditorSession::snapToGrid, false},
+        {"snapToLayers", "Layers", &EditorSession::snapToLayers, true},
+        {"snapToDocumentBounds", "Document Bounds", &EditorSession::snapToDocumentBounds, true},
+        {"lockGuides", "Lock Guides", &EditorSession::locksGuides, false}};
+    // Without a document every entry rests.
+    for (const auto &[name, text, read, start] : toggles) {
+        QAction &entry = bar.action(name);
+        QVERIFY2(entry.isCheckable() && !entry.isEnabled() && entry.isChecked() == start && entry.text() == text, name);
+    }
+    QVERIFY(!bar.action("clearGuides").isEnabled());
+    bar.session().createDocument(20, 20);
+    for (const auto &[name, text, read, start] : toggles) {
+        QAction &entry = bar.action(name);
+        QVERIFY2(entry.isEnabled(), name);
+        entry.trigger();
+        QVERIFY2((bar.session().*read)() != start && entry.isChecked() != start, name);
+        entry.trigger();
+        QVERIFY2((bar.session().*read)() == start && entry.isChecked() == start, name);
+    }
+    // The submenus Swift names, and Clear Guides with guides.
+    QCOMPARE(qobject_cast<QMenu *>(bar.action("showGrid").parent())->title(), QString("Show"));
+    QCOMPARE(qobject_cast<QMenu *>(bar.action("snapToGrid").parent())->title(), QString("Snap To"));
+    bar.session().addGuide({QUuid::createUuid(), CanvasGuide::Axis::vertical, 5});
+    QVERIFY(bar.action("clearGuides").isEnabled());
+    bar.action("clearGuides").trigger();
+    QVERIFY(bar.session().document().value().guides.empty());
+    QVERIFY(!bar.action("clearGuides").isEnabled());
 }
 
 QTEST_MAIN(ViewMenuTests)

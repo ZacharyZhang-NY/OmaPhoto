@@ -23,29 +23,29 @@ void TransformSnapTests::targetsAreTheCanvasAndTheOtherVisibleLayersEdgesAndMidd
     EditorSession session;
     QCOMPARE(session.transformSnapTargets({}), SnapGuides{});
     session.createDocument(100, 80);
-    QCOMPARE(session.transformSnapTargets({}), (SnapGuides{{0, 50, 100}, {0, 40, 80}}));
+    QCOMPARE(session.transformSnapTargets({}), (SnapGuides{{0, 100, 50}, {0, 80, 40}}));
     const QUuid a = insertImage(session, 20, 10, {20, 15});
     const QUuid b = insertImage(session, 10, 10, {70, 60});
-    QCOMPARE(session.transformSnapTargets({}), (SnapGuides{{0, 50, 100, 10, 20, 30, 65, 70, 75}, {0, 40, 80, 10, 15, 20, 55, 60, 65}}));
+    QCOMPARE(session.transformSnapTargets({}), (SnapGuides{{0, 100, 50, 10, 20, 30, 65, 70, 75}, {0, 80, 40, 10, 15, 20, 55, 60, 65}}));
     // The layers being moved are no targets; hidden ones neither.
-    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 50, 100, 65, 70, 75}, {0, 40, 80, 55, 60, 65}}));
+    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 100, 50, 65, 70, 75}, {0, 80, 40, 55, 60, 65}}));
     session.toggleLayerVisibility(b);
-    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 50, 100}, {0, 40, 80}}));
+    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 100, 50}, {0, 80, 40}}));
     session.toggleLayerVisibility(b);
     // A turned layer offers the box around its corners, rounded.
     rewrite(session, [&](ProjectSnapshot &snapshot) { record(snapshot, b).transform = {.origin = {60, 50}, .size = {20, 10}, .rotation = 90}; });
-    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 50, 100, 65, 70, 75}, {0, 40, 80, 45, 55, 65}}));
+    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 100, 50, 65, 70, 75}, {0, 80, 40, 45, 55, 65}}));
     rewrite(session, [&](ProjectSnapshot &snapshot) { record(snapshot, b).transform = {.origin = {60, 50}, .size = {20, 10}, .rotation = 30}; });
-    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 50, 100, 59, 70, 81}, {0, 40, 80, 46, 55, 64}}));
+    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 100, 50, 59, 70, 81}, {0, 80, 40, 46, 55, 64}}));
     // A pending edit's placement counts, as the canvas shows it.
     session.selectLayer(b);
     session.beginTransform();
     session.previewTransform({.origin = {50, 50}, .size = {10, 10}});
-    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 50, 100, 50, 55, 60}, {0, 40, 80, 50, 55, 60}}));
+    QCOMPARE(session.transformSnapTargets({a}), (SnapGuides{{0, 100, 50, 50, 55, 60}, {0, 80, 40, 50, 55, 60}}));
     session.cancelTransform();
     // A blank layer has no pixels to line up with.
     session.addBlankLayer();
-    QCOMPARE(session.transformSnapTargets({a, b}), (SnapGuides{{0, 50, 100}, {0, 40, 80}}));
+    QCOMPARE(session.transformSnapTargets({a, b}), (SnapGuides{{0, 100, 50}, {0, 80, 40}}));
 }
 
 void TransformSnapTests::snappedMoveNudgesWithinToleranceAndKeepsTheGuides()

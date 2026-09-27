@@ -38,6 +38,26 @@ QString description(ProjectError::Kind kind)
 
 constexpr qint64 manifestBytes = 4 * 1024 * 1024, assetBytes = 512 * 1024 * 1024;
 
+// Guides came with version 8: a thousand, each once, bounded.
+void validateGuides(const ProjectManifest &manifest)
+{
+    const std::vector<CanvasGuide> guides = manifest.guides.value_or(std::vector<CanvasGuide>());
+    if (manifest.version < 8) {
+        if (!guides.empty())
+            throw ProjectError(ProjectError::Kind::invalid);
+        return;
+    }
+    if (guides.size() > 1'000)
+        throw ProjectError(ProjectError::Kind::tooLarge);
+    QSet<QUuid> ids;
+    for (const CanvasGuide &guide : guides) {
+        // The range refuses NaN and infinity as well.
+        if (ids.contains(guide.id) || !(std::abs(guide.position) <= 1'000'000))
+            throw ProjectError(ProjectError::Kind::invalid);
+        ids.insert(guide.id);
+    }
+}
+
 void validate(const ProjectManifest &manifest)
 {
     if (manifest.format != QLatin1String("com.compositor.project"))
@@ -88,6 +108,7 @@ void validate(const ProjectManifest &manifest)
     }
     if (manifest.activeLayerID && !ids.contains(*manifest.activeLayerID))
         throw ProjectError(ProjectError::Kind::invalid);
+    validateGuides(manifest);
 }
 
 // Images share 100 million pixels; masks share another.

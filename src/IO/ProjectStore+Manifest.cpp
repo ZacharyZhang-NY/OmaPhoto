@@ -115,6 +115,26 @@ LayerTextStyle textStyle(const QJsonValue &value)
             .boxSize = optional(object, "boxSize", size)};
 }
 
+CanvasGuide guide(const QJsonValue &value)
+{
+    const QJsonObject object = value.toObject();
+    const std::optional<CanvasGuide::Axis> axis = guideAxis(string(object.value("axis")));
+    // A value that is no object has no axis: refused.
+    if (!axis)
+        refuse();
+    return {uuid(object.value("id")), *axis, number(object.value("position"))};
+}
+
+std::vector<CanvasGuide> guides(const QJsonValue &value)
+{
+    if (!value.isArray())
+        refuse();
+    std::vector<CanvasGuide> result;
+    for (const QJsonValue &each : value.toArray())
+        result.push_back(guide(each));
+    return result;
+}
+
 ProjectLayerRecord layer(const QJsonValue &value)
 {
     const QJsonObject object = value.toObject();
@@ -211,6 +231,12 @@ QByteArray ProjectManifest::encoded() const
         object.insert("resolution", *resolution);
     if (activeLayerID)
         object.insert("activeLayerID", uuidString(*activeLayerID));
+    if (guides) {
+        QJsonArray lines;
+        for (const CanvasGuide &guide : *guides)
+            lines.append(QJsonObject{{"id", uuidString(guide.id)}, {"axis", rawValue(guide.axis)}, {"position", guide.position}});
+        object.insert("guides", lines);
+    }
     // Swift indents by two; four would outgrow 4 MiB sooner.
     QByteArray json;
     for (const QByteArray &line : QJsonDocument(object).toJson(QJsonDocument::Indented).split('\n')) {
@@ -232,7 +258,8 @@ ProjectManifest ProjectManifest::decoded(const QByteArray &data)
     return {.format = string(object.value("format")), .version = integer(object.value("version")),
             .colorSpace = string(object.value("colorSpace")), .resolution = optional(object, "resolution", number),
             .documentID = uuid(object.value("documentID")), .width = integer(object.value("width")),
-            .height = integer(object.value("height")), .activeLayerID = optional(object, "activeLayerID", uuid), .layers = records};
+            .height = integer(object.value("height")), .activeLayerID = optional(object, "activeLayerID", uuid), .layers = records,
+            .guides = optional(object, "guides", ::guides)};
 }
 
 std::pair<QString, qint64> ProjectManifest::header(const QByteArray &data)

@@ -48,6 +48,7 @@ add_library(compositor_core STATIC
     src/Document/ProjectWorkspace.cpp
     src/Document/SelectionClipboard.cpp
     src/Document/Crop.cpp
+    src/Document/Guides.cpp
     src/Document/Filters.cpp
     src/Document/GuidedMatte.cpp
     src/Document/SubjectRemoval.cpp
@@ -460,6 +461,7 @@ compositor_test(FilterSheetTests)
 compositor_test(FilterControlsTests)
 compositor_test(FloatingSelectionTests)
 compositor_test(CropTests)
+compositor_test(GuideTests)
 compositor_test(CropSessionTests)
 compositor_test(CropCanvasTests)
 compositor_test(CropControlsTests)

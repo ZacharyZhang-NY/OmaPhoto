@@ -33,7 +33,7 @@ ProjectSnapshot resized(const ProjectSnapshot &snapshot, const ImageSizeOptions 
         throw ProjectError(ProjectError::Kind::tooLarge);
     const ProjectManifest &old = snapshot.manifest;
     ProjectManifest manifest{.resolution = options.resolution, .documentID = old.documentID, .width = options.width,
-                             .height = options.height, .activeLayerID = old.activeLayerID, .layers = {}};
+                             .height = options.height, .activeLayerID = old.activeLayerID, .layers = {}, .guides = old.guides};
     if (old.width == options.width && old.height == options.height) {
         manifest.layers = old.layers;
         return {.manifest = manifest, .images = snapshot.images, .masks = snapshot.masks};
@@ -41,6 +41,11 @@ ProjectSnapshot resized(const ProjectSnapshot &snapshot, const ImageSizeOptions 
     if (options.width * options.height > 100'000'000)
         throw ProjectError(ProjectError::Kind::tooLarge);
     const double sx = double(options.width) / double(old.width), sy = double(options.height) / double(old.height);
+    // Guides scale with the pixels.
+    if (manifest.guides) {
+        for (CanvasGuide &guide : *manifest.guides)
+            guide = guide.scaled(sx, sy);
+    }
     std::map<QUuid, ImportedImage> images, masks;
     qint64 usedPixels = 0, usedMaskPixels = 0;
     for (const ProjectLayerRecord &layer : old.layers) {

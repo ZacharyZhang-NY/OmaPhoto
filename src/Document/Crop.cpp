@@ -133,8 +133,7 @@ QRectF CropSnap::apply(QRectF rect, const CropDrag &drag, QPointF point, std::op
     return result;
 }
 
-namespace {
-QRectF boxAround(const LayerTransform &transform)
+QRectF TransformSnap::box(const LayerTransform &transform)
 {
     const Corners corners = DistortWarp::corners(transform);
     QPointF low = corners[0], high = corners[0];
@@ -144,25 +143,11 @@ QRectF boxAround(const LayerTransform &transform)
     }
     return QRectF(low, high);
 }
-}
 
-// The canvas's edges and middle, and every other visible layer's.
+// View > Snap To's targets, centres included.
 SnapGuides EditorSession::transformSnapTargets(const QSet<QUuid> &moving) const
 {
-    SnapGuides targets;
-    if (!m_document)
-        return targets;
-    const QSizeF size = m_document->size();
-    targets.xs = {0, size.width() / 2, size.width()};
-    targets.ys = {0, size.height() / 2, size.height()};
-    for (const ImageLayer &layer : m_document->renderLayers()) {
-        if (!layer.asset || moving.contains(layer.id))
-            continue;
-        const QRectF box = boxAround(displayedTransform(layer));
-        targets.xs.insert(targets.xs.end(), {std::round(box.left()), std::round(box.center().x()), std::round(box.right())});
-        targets.ys.insert(targets.ys.end(), {std::round(box.top()), std::round(box.center().y()), std::round(box.bottom())});
-    }
-    return targets;
+    return alignmentSnapTargets(moving, true);
 }
 
 // `draft` nudged onto a nearby edge or middle, within `tolerance`.
@@ -173,7 +158,7 @@ LayerTransform EditorSession::snappedMove(const LayerTransform &draft, const QSe
         return draft;
     }
     const SnapGuides targets = transformSnapTargets(moving);
-    const TransformSnap::Offset snap = TransformSnap::offset(boxAround(draft), targets.xs, targets.ys, tolerance);
+    const TransformSnap::Offset snap = TransformSnap::offset(TransformSnap::box(draft), targets.xs, targets.ys, tolerance);
     snapGuides = {snap.x ? std::vector<double>{*snap.x} : std::vector<double>{}, snap.y ? std::vector<double>{*snap.y} : std::vector<double>{}};
     if (snap.offset.isNull())
         return draft;
@@ -182,23 +167,10 @@ LayerTransform EditorSession::snappedMove(const LayerTransform &draft, const QSe
     return snapped;
 }
 
-// The canvas's edges and every visible layer's upright bounds.
+// View > Snap To's targets, without the centres.
 SnapGuides EditorSession::cropSnapTargets() const
 {
-    SnapGuides targets;
-    if (!m_document)
-        return targets;
-    const QSizeF size = m_document->size();
-    targets.xs = {0, size.width()};
-    targets.ys = {0, size.height()};
-    for (const ImageLayer &layer : m_document->renderLayers()) {
-        if (!layer.asset)
-            continue;
-        const QRectF box = boxAround(displayedTransform(layer));
-        targets.xs.insert(targets.xs.end(), {std::round(box.left()), std::round(box.right())});
-        targets.ys.insert(targets.ys.end(), {std::round(box.top()), std::round(box.bottom())});
-    }
-    return targets;
+    return alignmentSnapTargets({}, false);
 }
 
 std::optional<QRectF> EditorSession::visibleCropRect() const

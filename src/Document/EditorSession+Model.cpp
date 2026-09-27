@@ -45,7 +45,7 @@ CanvasDocument::CanvasDocument(int width, int height)
 
 CanvasDocument::CanvasDocument(const ProjectSnapshot &snapshot)
     : id(snapshot.manifest.documentID), width(int(snapshot.manifest.width)), height(int(snapshot.manifest.height)),
-      resolution(snapshot.manifest.resolution.value_or(72))
+      resolution(snapshot.manifest.resolution.value_or(72)), guides(snapshot.manifest.guides.value_or(std::vector<CanvasGuide>()))
 {
     for (const ProjectLayerRecord &record : snapshot.manifest.layers) {
         const auto image = snapshot.images.find(record.id);

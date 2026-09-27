@@ -1,6 +1,7 @@
 #pragma once
 #include "Document/LayerAdjustment.h"
 #include "Document/LayerAppearance.h"
+#include "Document/Guides.h"
 #include "Document/LayerGroups.h"
 #include "Document/LayerMask.h"
 #include "Document/LayerTransform.h"
@@ -63,6 +64,8 @@ struct CanvasDocument {
     int height;
     double resolution = 72;
     std::vector<ImageLayer> layers; // Bottom to top.
+    // Saved with the project; undo covers them.
+    std::vector<CanvasGuide> guides;
     // Part of the document so undo covers it; never saved.
     std::optional<DocumentSelection> selection;
 

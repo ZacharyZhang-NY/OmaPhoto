@@ -108,4 +108,6 @@ struct Offset {
 
 Offset offset(const QRectF &box, const std::vector<double> &xs, const std::vector<double> &ys,
               double tolerance);
+// The upright box round a transform's corners; in Crop.cpp.
+QRectF box(const LayerTransform &transform);
 }

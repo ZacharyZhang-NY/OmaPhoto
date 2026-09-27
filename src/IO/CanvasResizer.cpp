@@ -20,7 +20,12 @@ ProjectSnapshot resized(const ProjectSnapshot &snapshot, const CanvasSizeOptions
     if (options.width == old.width && options.height == old.height && offset == QPointF(0, 0))
         return snapshot;
     ProjectManifest manifest{.resolution = old.resolution, .documentID = old.documentID, .width = options.width,
-                             .height = options.height, .activeLayerID = old.activeLayerID, .layers = {}};
+                             .height = options.height, .activeLayerID = old.activeLayerID, .layers = {}, .guides = old.guides};
+    // Guides move with the pixels.
+    if (manifest.guides) {
+        for (CanvasGuide &guide : *manifest.guides)
+            guide = guide.offset(offset.x(), offset.y());
+    }
     for (const ProjectLayerRecord &layer : old.layers) {
         LayerTransform transform = layer.transform;
         transform.origin += offset;

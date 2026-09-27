@@ -297,6 +297,7 @@ public:
 #include "Document/LayerAdjustment+Session.h"
 #include "Document/AdjustmentEditing+Session.h"
 #include "Document/LayerEffects+Session.h"
+#include "Document/Guides+Session.h"
 signals:
     void changed();
 
@@ -340,6 +341,17 @@ private:
     std::optional<QString> m_projectPath;
     bool m_showsPixelGrid = true;
     bool m_snappingEnabled = true;
+    // The layout grid starts off; guides show; rulers hide.
+    bool m_showsGrid = false;
+    bool m_showsGuides = true;
+    bool m_showsRulers = false;
+    bool m_snapEnabled = true;
+    bool m_snapToGuides = true;
+    bool m_snapToGrid = false;
+    bool m_snapToLayers = true;
+    bool m_snapToDocumentBounds = true;
+    bool m_locksGuides = false;
+    std::optional<GuideDrag> m_guideDrag;
     bool m_showsSampleRing = true;
     std::optional<QRectF> m_cropRect;
     QString m_cropRatioChoice = QStringLiteral("Free");

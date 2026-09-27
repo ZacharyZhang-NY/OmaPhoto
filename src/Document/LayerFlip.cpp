@@ -67,5 +67,7 @@ void EditorSession::flipCanvas(bool horizontally)
         const QTransform mirror = horizontally ? QTransform(-1, 0, 0, 1, size.width(), 0) : QTransform(1, 0, 0, -1, 0, size.height());
         m_document->selection->path = mirror.map(m_document->selection->path);
     }
+    for (CanvasGuide &guide : m_document->guides)
+        guide = guide.mirrored(horizontally, axis);
     endEdit();
 }

@@ -15,6 +15,9 @@ std::optional<ProjectSnapshot> EditorSession::projectSnapshot() const
             snapshot.masks.insert({layer.id, layer.mask->asset});
         snapshot.manifest.layers.push_back(layer.hierarchyRecord());
     }
+    // No guides leave the key out, as Swift writes nil.
+    if (!m_document->guides.empty())
+        snapshot.manifest.guides = m_document->guides;
     return snapshot;
 }
 
@@ -23,6 +26,7 @@ void EditorSession::installProject(const ProjectSnapshot &snapshot, const QStrin
     m_collapsedGroupIDs.clear();
     m_isMaskSelected = false;
     m_cropRect.reset();
+    m_guideDrag = std::nullopt;
     m_transformEdit = std::nullopt;
     m_document = CanvasDocument(snapshot);
     // Install loads shapes and text; Swift's resize rebuild does not.
@@ -53,6 +57,7 @@ void EditorSession::clearProject()
     m_isMaskSelected = false;
     m_cropRect.reset();
     m_transformEdit = std::nullopt;
+    m_guideDrag = std::nullopt;
     m_document = std::nullopt;
     setActiveLayerID(std::nullopt);
     m_renamingLayerID = std::nullopt;

@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/Guides.h"
 #include "Document/LayerAdjustment.h"
 #include "Document/LayerAppearance.h"
 #include "Document/LayerEffects.h"
@@ -60,6 +61,8 @@ struct ProjectManifest {
     qint64 height;
     std::optional<QUuid> activeLayerID;
     std::vector<ProjectLayerRecord> layers;
+    // Alignment guides; versions 1 to 7 carry none.
+    std::optional<std::vector<CanvasGuide>> guides = std::nullopt;
 
     // Pretty JSON with sorted keys; absent optionals are left out.
     QByteArray encoded() const;

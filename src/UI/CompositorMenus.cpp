@@ -129,6 +129,32 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     add(view, QStringLiteral("transformControls"), QStringLiteral("Show Transform Controls"), QKeySequence(Qt::CTRL | Qt::Key_H),
         [this] { session().setShowsTransformControls(!session().showsTransformControls()); })
         ->setCheckable(true);
+    // Swift 1.1.7's guides, grid, rulers and Snap To.
+    view->addSeparator();
+    const auto toggle = [this](QMenu *menu, const QString &name, const QString &text, const QKeySequence &key, bool (EditorSession::*read)() const,
+                               void (EditorSession::*write)(bool)) {
+        add(menu, name, text, key, [this, read, write] { (session().*write)(!(session().*read)()); })->setCheckable(true);
+    };
+    QMenu *show = view->addMenu(QStringLiteral("Show"));
+    toggle(show, QStringLiteral("showGrid"), QStringLiteral("Grid"), QKeySequence(Qt::CTRL | Qt::Key_Apostrophe), &EditorSession::showsGrid,
+           &EditorSession::setShowsGrid);
+    toggle(show, QStringLiteral("showGuides"), QStringLiteral("Guides"), QKeySequence(Qt::CTRL | Qt::Key_Semicolon), &EditorSession::showsGuides,
+           &EditorSession::setShowsGuides);
+    toggle(view, QStringLiteral("showRulers"), QStringLiteral("Rulers"), QKeySequence(Qt::CTRL | Qt::Key_R), &EditorSession::showsRulers,
+           &EditorSession::setShowsRulers);
+    view->addSeparator();
+    toggle(view, QStringLiteral("snapEnabled"), QStringLiteral("Snap"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Semicolon),
+           &EditorSession::snapEnabled, &EditorSession::setSnapEnabled);
+    QMenu *snapTo = view->addMenu(QStringLiteral("Snap To"));
+    toggle(snapTo, QStringLiteral("snapToGuides"), QStringLiteral("Guides"), QKeySequence(), &EditorSession::snapToGuides, &EditorSession::setSnapToGuides);
+    toggle(snapTo, QStringLiteral("snapToGrid"), QStringLiteral("Grid"), QKeySequence(), &EditorSession::snapToGrid, &EditorSession::setSnapToGrid);
+    toggle(snapTo, QStringLiteral("snapToLayers"), QStringLiteral("Layers"), QKeySequence(), &EditorSession::snapToLayers, &EditorSession::setSnapToLayers);
+    toggle(snapTo, QStringLiteral("snapToDocumentBounds"), QStringLiteral("Document Bounds"), QKeySequence(), &EditorSession::snapToDocumentBounds,
+           &EditorSession::setSnapToDocumentBounds);
+    view->addSeparator();
+    toggle(view, QStringLiteral("lockGuides"), QStringLiteral("Lock Guides"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Semicolon),
+           &EditorSession::locksGuides, &EditorSession::setLocksGuides);
+    add(view, QStringLiteral("clearGuides"), QStringLiteral("Clear Guides"), QKeySequence(), [this] { session().clearGuides(); });
 
     QMenu *select = bar.addMenu(QStringLiteral("&Select"));
     // Text fields keep their own Select All.
@@ -294,6 +320,15 @@ void CompositorMenus::synchronize()
         action(QString::fromLatin1(name))->setEnabled(drawn);
     action(QStringLiteral("pixelGrid"))->setChecked(s.showsPixelGrid());
     action(QStringLiteral("snap"))->setChecked(s.snappingEnabled());
+    const bool opened = s.document().has_value();
+    for (const auto &[name, value] : std::initializer_list<std::pair<const char *, bool>>{
+             {"showGrid", s.showsGrid()}, {"showGuides", s.showsGuides()}, {"showRulers", s.showsRulers()}, {"snapEnabled", s.snapEnabled()},
+             {"snapToGuides", s.snapToGuides()}, {"snapToGrid", s.snapToGrid()}, {"snapToLayers", s.snapToLayers()},
+             {"snapToDocumentBounds", s.snapToDocumentBounds()}, {"lockGuides", s.locksGuides()}}) {
+        action(QString::fromLatin1(name))->setChecked(value);
+        action(QString::fromLatin1(name))->setEnabled(opened);
+    }
+    action(QStringLiteral("clearGuides"))->setEnabled(s.canClearGuides());
     action(QStringLiteral("transformControls"))->setChecked(s.showsTransformControls());
     action(QStringLiteral("transformControls"))->setEnabled(s.tool() == NavigationTool::move && s.document().has_value());
     const bool selected = s.selection().has_value();

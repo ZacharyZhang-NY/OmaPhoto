@@ -135,7 +135,8 @@ const std::vector<ShortcutDefinition> &ShortcutDefinition::all()
             entry("Canvas Size", "c", 3, true), entry("Image Size", "i", 3, true), entry("Transform Layer / Selection", "t", 1, true),
             entry("Duplicate / Layer via Copy", "j", 1, true), entry("Toggle Clipping Mask", "g", 3, true),
             entry("Group Layers", "g", 1, true), entry("New Blank Layer", "n", 9, true), entry("Move Layer Up", "]", 1, true),
-            entry("Move Layer Down", "[", 1, true), entry("Merge Layers", "e", 1, true)};
+            entry("Move Layer Down", "[", 1, true), entry("Merge Layers", "e", 1, true), entry("Show Grid", "'", 1, true),
+            entry("Show Guides", ";", 1, true), entry("Show Rulers", "r", 1, true), entry("Snap", ";", 9, true), entry("Lock Guides", ";", 3, true)};
         const std::vector<std::pair<const char *, QString>> tools{
             {"Select tool", "a"}, {"Move / Transform tool", "v"}, {"Hand tool", "h"}, {"Zoom tool", "z"}, {"Brush tool", "b"},
             {"Eraser", "e"}, {"Spot Healing", "j"}, {"Clone Stamp", "s"}, {"Type tool", "t"}, {"Gradient tool", "g"},

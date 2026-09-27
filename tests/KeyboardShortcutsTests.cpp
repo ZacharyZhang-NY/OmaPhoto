@@ -92,8 +92,8 @@ void KeyboardShortcutsTests::chordsReadKeysAsSwiftDoes()
 void KeyboardShortcutsTests::theListIsSwiftsWithoutHide()
 {
     const std::vector<ShortcutDefinition> &all = ShortcutDefinition::all();
-    // Swift's 107, less Hide Compositor.
-    QCOMPARE(int(all.size()), 106);
+    // Swift's 112 since 1.1.7, less Hide Compositor.
+    QCOMPARE(int(all.size()), 111);
     QSet<QString> ids;
     for (const ShortcutDefinition &definition : all)
         ids.insert(definition.id());
@@ -168,6 +168,16 @@ void KeyboardShortcutsTests::menusAndSheetsTakeTheirRemappedKeys()
     QCOMPARE(settings.native(ShortcutChord("y", 1)), ShortcutChord("y", 1));
     // A menu's chord is no sheet's.
     QCOMPARE(settings.native(ShortcutChord("z", 1)), ShortcutChord("z", 1));
+    // 1.1.7's View entries remap by their own keys.
+    const std::vector<std::pair<QString, QKeySequence>> view{{"Show Grid", QKeySequence(Qt::CTRL | Qt::Key_Apostrophe)},
+                                                             {"Show Guides", QKeySequence(Qt::CTRL | Qt::Key_Semicolon)},
+                                                             {"Show Rulers", QKeySequence(Qt::CTRL | Qt::Key_R)},
+                                                             {"Snap", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Semicolon)},
+                                                             {"Lock Guides", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Semicolon)}};
+    for (const auto &[title, original] : view) {
+        QVERIFY(settings.save({{named(title).id(), ShortcutChord("k", 7)}}));
+        QVERIFY2(settings.menu(original) == QKeySequence(Qt::CTRL | Qt::ALT | Qt::META | Qt::Key_K), qPrintable(title));
+    }
 }
 
 void KeyboardShortcutsTests::theCanvasTranslatesRemappedKeys()
