@@ -178,6 +178,9 @@ QCursor CanvasView::transformCursor(QPointF point, Qt::KeyboardModifiers modifie
     const std::optional<TransformOverlayGeometry> geometry = m_overlay.geometry();
     const std::optional<TransformDrag::Mode> hit = geometry ? geometry->hit(point) : std::nullopt;
     if (!hit) {
+        // Guides lie under the handles, over a layer's drag.
+        if (const std::optional<CanvasGuide> guide = m_session.hitGuide(point))
+            return QCursor(guide->axis == CanvasGuide::Axis::vertical ? Qt::SizeHorCursor : Qt::SizeVerCursor);
         if (!pressMovesLayer(point, modifiers))
             return QCursor(Qt::ArrowCursor);
         return duplicate ? duplicateCursor(ratio) : moveCursor(ratio);

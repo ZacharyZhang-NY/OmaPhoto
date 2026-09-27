@@ -161,6 +161,11 @@ bool CanvasView::synchronizeDisplay()
     } else if (m_displayedTool != m_session.tool() || m_displayedBlocked != blocked || m_displayedSelectionCursor != cursorState) {
         updateCursor();
     }
+    // The grid and guides redraw the view, as Swift's observation.
+    if (const GuidesShown lines{m_session.showsGrid(), m_session.showsGuides(), m_session.displayedGuides()}; m_displayedGuideLines != lines) {
+        update();
+        m_displayedGuideLines = lines;
+    }
     // A shape draft redraws the view, as Swift's observation does.
     if (const std::optional<ShapeShown> shape = shownShape(); m_displayedShape != shape) {
         update();

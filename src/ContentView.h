@@ -69,6 +69,8 @@ private:
     LayersPanel *const m_layersPanel;
     // An accent ring while a drop may land.
     QWidget *const m_dropRing;
+    // Swift 1.1.7's rulers: the corner, then the two strips.
+    std::vector<QWidget *> m_rulers;
     ProjectWorkspace *m_workspace = nullptr;
     // A document that appears hands the canvas the keys.
     bool m_hadDocument = false;

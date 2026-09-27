@@ -1,5 +1,7 @@
 // Swift's Guides extension, and the View menu's guide state.
 public:
+    // Cyan, Photoshop's default guide colour.
+    static inline const QColor guideColor = QColor::fromRgbF(0, 1, 1, 0.9f);
     static constexpr double guideHitDistance = 5;
     bool showsGrid() const { return m_showsGrid; }
     void setShowsGrid(bool shows);

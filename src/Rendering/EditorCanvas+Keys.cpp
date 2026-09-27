@@ -111,6 +111,11 @@ void CanvasView::pressKey(QKeyEvent *event, int physical)
             m_session.cancelGradient();
     } else if (cropKey(*event)) {
         return;
+    } else if (event->key() == Qt::Key_Escape && m_session.guideDrag()) {
+        m_session.cancelGuideDrag();
+        m_guideDragging = false;
+        m_dragCursor.reset();
+        updateCursor();
     } else if ((event->key() == Qt::Key_Escape || enter) && m_session.transformEdit()) {
         // The keys end a drag with its edit, cursor included.
         m_transformDrag.reset();

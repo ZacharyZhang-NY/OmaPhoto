@@ -51,6 +51,8 @@ public:
 
 private:
     QTransform documentToView() const;
+    void drawLayoutGrid(QPainter &context) const;
+    void drawGuides(QPainter &context) const;
     void drawTransformHandles(QPainter &context, const QPalette &palette) const;
     void drawGradientLine(QPainter &context, QPointF start, QPointF end) const;
     void drawCrop(QPainter &context) const;

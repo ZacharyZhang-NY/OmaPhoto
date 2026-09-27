@@ -79,6 +79,7 @@ add_library(compositor_core STATIC
     src/UI/BlendModePicker.cpp
     src/UI/BrushControls.cpp
     src/UI/CropControls.cpp
+    src/UI/CanvasRulers.cpp
     src/UI/CanvasSizeSheet.cpp
     src/UI/ImageSizeSheet.cpp
     src/UI/JPEGExportSheet.cpp
@@ -138,6 +139,7 @@ add_library(compositor_core STATIC
     src/Rendering/EditorCanvas+Crop.cpp
     src/Rendering/EditorCanvas+Effects.cpp
     src/Rendering/EditorCanvas+Grid.cpp
+    src/Rendering/EditorCanvas+Guides.cpp
     src/Rendering/EditorCanvas+Keys.cpp
     src/Rendering/EditorCanvas+Gradient.cpp
     src/Rendering/EditorCanvas+Cursors.cpp
@@ -462,6 +464,7 @@ compositor_test(FilterControlsTests)
 compositor_test(FloatingSelectionTests)
 compositor_test(CropTests)
 compositor_test(GuideTests)
+compositor_test(GuideCanvasTests)
 compositor_test(CropSessionTests)
 compositor_test(CropCanvasTests)
 compositor_test(CropControlsTests)

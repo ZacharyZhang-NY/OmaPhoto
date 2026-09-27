@@ -58,6 +58,9 @@ public:
     const SampleRingOverlay &sampleRing() const { return m_sampleRing; }
     // The text typed on the canvas, while one is open.
     InlineTextEditor *inlineTextEditor() const { return m_inlineTextEditor.get(); }
+    // Released on the rulers, just outside the canvas.
+    bool isOverRuler(QPointF point) const;
+    std::optional<double> documentPosition(CanvasGuide::Axis axis, QPointF point) const;
 
 protected:
     bool event(QEvent *event) override;
@@ -234,6 +237,10 @@ private:
     void dragCrop(QPointF point, Qt::KeyboardModifiers modifiers);
     void endCropDrag();
     bool cropKey(const QKeyEvent &key);
+    // The Move tool's guide drags (EditorCanvas+Guides.cpp).
+    bool beginGuideDrag(QPointF point);
+    bool guideMove(QPointF point, Qt::MouseButtons buttons);
+    void endGuideDrag(QPointF point);
     // Swift's targeted drag: right raises; Ctrl drags the hue.
     bool targetingMove(QPointF point, Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers);
     void targetingRelease();
@@ -348,4 +355,13 @@ private:
     std::optional<CropSnap> m_cropSnap;
     // The crop frame as last shown, in view points.
     std::optional<QRectF> m_displayedCrop;
+    bool m_guideDragging = false;
+    // The grid and guides as drawn: a change redraws.
+    struct GuidesShown {
+        bool grid;
+        bool guides;
+        std::vector<CanvasGuide> lines;
+        friend bool operator==(const GuidesShown &, const GuidesShown &) = default;
+    };
+    std::optional<GuidesShown> m_displayedGuideLines;
 };

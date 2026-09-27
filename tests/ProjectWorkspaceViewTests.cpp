@@ -85,7 +85,7 @@ void ProjectWorkspaceViewTests::testCreateCanvasAndNavigation()
     action(window, "fitCanvas").trigger();
     QVERIFY(workspace.current().session.viewport.followsFit());
     QCoreApplication::processEvents();
-    QVERIFY(window.grab().save(QStringLiteral("EditorFoundation.png")));
+    QVERIFY(window.grab().save(QCoreApplication::applicationDirPath() + QStringLiteral("/EditorFoundation.png")));
     // New canvas opens a tab unasked; the canvas stays behind.
     action(window, "newCanvasToolbar").trigger();
     QCOMPARE(int(workspace.tabs().size()), 2);

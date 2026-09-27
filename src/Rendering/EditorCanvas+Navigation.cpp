@@ -29,7 +29,8 @@ bool CanvasView::event(QEvent *event)
     if (event->type() == QEvent::NativeGesture) {
         const auto *gesture = static_cast<QNativeGestureEvent *>(event);
         // A pinch, as Swift's magnify; not mid-drag or mid-stroke.
-        if (gesture->gestureType() == Qt::ZoomNativeGesture && !m_transformDrag && !m_cropDrag && !m_session.brushStroke() && !m_session.warpStroke()) {
+        if (gesture->gestureType() == Qt::ZoomNativeGesture && !m_transformDrag && !m_cropDrag && !m_guideDragging && !m_session.brushStroke()
+            && !m_session.warpStroke()) {
             m_session.zoom(m_session.viewport.zoom() * (1 + gesture->value()), gesture->position());
             event->accept();
             return true;
@@ -97,7 +98,7 @@ void CanvasView::consumeFocusRequest(int request)
 
 void CanvasView::wheelEvent(QWheelEvent *event)
 {
-    if (!m_session.document() || m_transformDrag || m_cropDrag || m_session.brushStroke() || m_session.warpStroke())
+    if (!m_session.document() || m_transformDrag || m_cropDrag || m_guideDragging || m_session.brushStroke() || m_session.warpStroke())
         return;
     // Trackpads report pixels; a wheel reports notches, lines each.
     const bool precise = !event->pixelDelta().isNull();
@@ -146,7 +147,8 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
         m_lastDragPoint = point;
         updateCursor();
     } else if (m_session.tool() == NavigationTool::move) {
-        beginTransformDrag(point, event->modifiers());
+        if (!beginGuideDrag(point))
+            beginTransformDrag(point, event->modifiers());
     } else if (isSelectionTool(m_session.tool())) {
         lassoMouseDown(point, event->modifiers());
         updateCursor();
@@ -211,7 +213,7 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
     if (m_inlineTextEditor && !held)
         m_inlineTextEditor->release();
     if (pickingMove(point, event->buttons()) || targetingMove(point, event->buttons(), event->modifiers())
-        || cropMove(point, event->buttons(), event->modifiers()))
+        || cropMove(point, event->buttons(), event->modifiers()) || guideMove(point, event->buttons()))
         return;
     if (m_transformDrag) {
         dragTransform(point, event->modifiers());
@@ -280,6 +282,7 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
     m_session.snapGuides = {};
+    endGuideDrag(event->position());
     pickingRelease();
     targetingRelease();
     brushMouseUp(event->position());
@@ -323,6 +326,8 @@ void CanvasView::focusOutEvent(QFocusEvent *event)
     updateBrushCursor();
     cancelTransformDrag();
     endCropDrag();
+    // A lost release: the guide stays where it was dragged.
+    endGuideDrag(QPointF(0, 0));
     m_gradientDrag.reset();
     m_session.cancelShape();
     endSelectionGestures();

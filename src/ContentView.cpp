@@ -1,4 +1,5 @@
 #include "ContentView.h"
+#include "UI/CanvasRulers.h"
 #include "UI/ColorPaletteControls.h"
 #include "Logging.h"
 #include "Document/ProjectWorkspace.h"
@@ -245,7 +246,18 @@ ContentView::ContentView(EditorSession &session, ProjectController *projects, QW
     middle->setSpacing(0);
     middle->addWidget(rail);
     middle->addWidget(divider(QFrame::VLine, this));
-    middle->addWidget(canvas, 1);
+    // The rulers frame the canvas above and left, Swift's stacks.
+    auto *framed = new QWidget(this);
+    auto *rulers = new QGridLayout(framed);
+    rulers->setContentsMargins(0, 0, 0, 0);
+    rulers->setSpacing(0);
+    m_rulers = {new CanvasRulerCorner(framed), new CanvasRulerView(session, CanvasGuide::Axis::horizontal, *m_canvas, framed),
+                new CanvasRulerView(session, CanvasGuide::Axis::vertical, *m_canvas, framed)};
+    rulers->addWidget(m_rulers[0], 0, 0);
+    rulers->addWidget(m_rulers[1], 0, 1);
+    rulers->addWidget(m_rulers[2], 1, 0);
+    rulers->addWidget(canvas, 1, 1);
+    middle->addWidget(framed, 1);
     m_layersPanel->setFixedWidth(int(layersPanelWidth()));
     middle->addWidget(new PanelResizeEdge(*m_layersPanel, this));
     middle->addWidget(m_layersPanel);
@@ -372,6 +384,8 @@ void ContentView::synchronize()
     }
     const std::optional<CanvasDocument> &document = m_session.document();
     showWelcome(!document);
+    for (QWidget *ruler : m_rulers)
+        ruler->setVisible(m_session.showsRulers() && document);
     m_zoom->setVisible(document.has_value());
     m_dimensions->setVisible(document.has_value());
     if (document) {

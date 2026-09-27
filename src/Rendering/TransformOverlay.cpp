@@ -181,6 +181,8 @@ std::optional<std::pair<QPointF, QPointF>> TransformOverlay::gradientLine() cons
 
 void TransformOverlay::draw(QPainter &context, const QPalette &palette) const
 {
+    drawLayoutGrid(context);
+    drawGuides(context);
     if (m_session.tool() == NavigationTool::crop)
         drawCrop(context);
     else if (const std::optional<std::pair<QPointF, QPointF>> line = gradientLine())
@@ -356,6 +358,70 @@ void TransformOverlay::drawTransformHandles(QPainter &context, const QPalette &p
         context.drawRect(QRectF(point.x() - 3.5, point.y() - 3.5, 7, 7));
     if (geometry->showsRotation)
         context.drawEllipse(QRectF(geometry->rotationHandle.x() - 4, geometry->rotationHandle.y() - 4, 8, 8));
+    context.restore();
+}
+
+// The layout grid: solid majors, dotted subdivisions when roomy.
+void TransformOverlay::drawLayoutGrid(QPainter &context) const
+{
+    const std::optional<CanvasDocument> &document = m_session.document();
+    if (!m_session.showsGrid() || !document)
+        return;
+    const QSizeF size = document->size();
+    const QTransform map = documentToView();
+    const double hairline = 1 / std::max(m_session.viewport.backingScale, 1.0);
+    const auto lines = [&](bool majors) {
+        QPainterPath path;
+        for (const double x : LayoutGrid::lines(size.width())) {
+            if (LayoutGrid::isMajor(x) == majors) {
+                path.moveTo(map.map(QPointF(x, 0)));
+                path.lineTo(map.map(QPointF(x, size.height())));
+            }
+        }
+        for (const double y : LayoutGrid::lines(size.height())) {
+            if (LayoutGrid::isMajor(y) == majors) {
+                path.moveTo(map.map(QPointF(0, y)));
+                path.lineTo(map.map(QPointF(size.width(), y)));
+            }
+        }
+        return path;
+    };
+    context.save();
+    context.setRenderHint(QPainter::Antialiasing, true);
+    context.setBrush(Qt::NoBrush);
+    if (LayoutGrid::step * m_session.viewport.pointsPerPixel() >= 4) {
+        QPen dotted(QColor::fromRgbF(0.55, 0.55, 0.55, 0.28), hairline, Qt::CustomDashLine, Qt::FlatCap);
+        // One point on, two off: Qt counts in pen widths.
+        dotted.setDashPattern({1 / hairline, 2 / hairline});
+        context.setPen(dotted);
+        context.drawPath(lines(false));
+    }
+    context.setPen(QPen(QColor::fromRgbF(0.7, 0.7, 0.7, 0.45), hairline, Qt::SolidLine, Qt::FlatCap));
+    context.drawPath(lines(true));
+    context.restore();
+}
+
+// Guides span the whole view, past the document too.
+void TransformOverlay::drawGuides(QPainter &context) const
+{
+    const std::optional<CanvasDocument> &document = m_session.document();
+    if (!m_session.showsGuides() || !document)
+        return;
+    const std::vector<CanvasGuide> guides = m_session.displayedGuides();
+    if (guides.empty())
+        return;
+    const CanvasViewport &viewport = m_session.viewport;
+    const QSizeF view = viewport.viewSize;
+    context.save();
+    context.setRenderHint(QPainter::Antialiasing, true);
+    context.setPen(QPen(EditorSession::guideColor, 1 / std::max(viewport.backingScale, 1.0), Qt::SolidLine, Qt::FlatCap));
+    for (const CanvasGuide &guide : guides) {
+        const QPointF at = viewport.viewPoint(QPointF(guide.position, guide.position), document->size());
+        if (guide.axis == CanvasGuide::Axis::vertical)
+            context.drawLine(QPointF(at.x(), 0), QPointF(at.x(), view.height()));
+        else
+            context.drawLine(QPointF(0, at.y()), QPointF(view.width(), at.y()));
+    }
     context.restore();
 }
 

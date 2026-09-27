@@ -86,7 +86,7 @@ void ContentViewTests::testCreateCanvasAndNavigation()
     QCOMPARE(find<QLabel>(view, "zoomStatus").text(), QString("125%"));
     // Layouts settle in the event loop; then the picture holds.
     QCoreApplication::processEvents();
-    QVERIFY(view.grab().save(QStringLiteral("EditorFoundation.png")));
+    QVERIFY(view.grab().save(QCoreApplication::applicationDirPath() + QStringLiteral("/EditorFoundation.png")));
     // A project that is cleared brings a fresh welcome back.
     auto *copied = new QMimeData;
     QImage small(400, 300, QImage::Format_RGBA8888);
@@ -354,7 +354,8 @@ void ContentViewTests::theCanvasSitsUnderTheWelcomeAndTakesTheKeysWithADocument(
     QVERIFY(canvas.isVisible());
     // The rail and the Layers panel take theirs; 480 stays.
     QVERIFY(canvas.width() >= 480 && canvas.height() >= 300);
-    QCOMPARE(canvas.parentWidget()->x() + canvas.parentWidget()->width(), view.layersPanel().x() - 8);
+    // Hidden rulers leave the canvas touching the resize grip.
+    QCOMPARE(canvas.mapTo(&view, QPoint(canvas.width(), 0)).x(), view.layersPanel().x() - 8);
     QCOMPARE(canvas.geometry(), canvas.parentWidget()->rect());
     QTRY_VERIFY(find<QLineEdit>(view, "widthInput").hasFocus());
     session.createNewProject(300, 200);
