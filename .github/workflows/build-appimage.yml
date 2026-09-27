@@ -124,7 +124,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             libx11-6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libsm6 libice6 \
-            libgl1 fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates
+            libgl1 libegl1 fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates
 
       - name: Launch OmaPhoto under Xvfb and screenshot it
         run: |
