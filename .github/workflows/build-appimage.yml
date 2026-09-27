@@ -25,7 +25,10 @@ jobs:
             g++ cmake ninja-build qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev qt6-wayland \
             fonts-dejavu-core qt6-image-formats-plugins libheif-dev libheif-plugin-libde265 \
             libfontconfig-dev ca-certificates curl dpkg-dev file fakeroot \
-            patchelf desktop-file-utils
+            patchelf desktop-file-utils \
+            libx11-6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libsm6 libice6 \
+            libgl1 libegl1 libopengl0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-cursor0
 
       - name: Install ONNX Runtime
         run: |
@@ -73,12 +76,37 @@ jobs:
           ./linuxdeploy-plugin-qt-x86_64.AppImage --appimage-extract
           mv squashfs-root squashfs-root-linuxdeploy-qt
           export PATH="${PWD}/squashfs-root-linuxdeploy-qt/usr/bin:${PATH}"
+
+          # This AppImage is meant to be self-standing: any library the app needs must be
+          # bundled inside it, not assumed present on the target. linuxdeploy's own
+          # auto-discovery deliberately excludes "always assume this is on the host" system
+          # libraries (X11, GLX/EGL, xcb) on the theory that any Linux desktop already has
+          # them - which held for AppRun launched from Ubuntu-based CI, but not for a stock
+          # minimal container. Explicitly bundle each one via --library so the AppImage
+          # carries its own copy instead of depending on the target providing it; resolve
+          # each soname's real path with ldconfig rather than hardcoding a directory, since
+          # that varies (lib vs lib/x86_64-linux-gnu).
+          RUNTIME_LIBS="libX11.so.6 libxcb.so.1 libxkbcommon.so.0 libxkbcommon-x11.so.0 \
+            libSM.so.6 libICE.so.6 libGL.so.1 libEGL.so.1 libOpenGL.so.0 \
+            libxcb-icccm.so.4 libxcb-image.so.0 libxcb-keysyms.so.1 \
+            libxcb-render-util.so.0 libxcb-cursor.so.0"
+          LIBRARY_ARGS=""
+          for lib in $RUNTIME_LIBS; do
+            path=$(ldconfig -p | awk -v l="$lib" '$1==l {print $NF; exit}')
+            if [ -z "$path" ]; then
+              echo "::error::$lib not found via ldconfig - add its package to 'Install build dependencies'" >&2
+              exit 1
+            fi
+            LIBRARY_ARGS="$LIBRARY_ARGS --library=$path"
+          done
+
           ./squashfs-root-linuxdeploy/usr/bin/linuxdeploy \
             --appdir AppDir \
             --executable AppDir/usr/bin/omaphoto \
             --desktop-file AppDir/usr/share/applications/io.github.ZacharyZhang_NY.OmaPhoto.desktop \
             --icon-file packaging/icons/app-icon-256.png \
-            --plugin qt
+            --plugin qt \
+            $LIBRARY_ARGS
 
       - name: Download appimagetool
         run: |
@@ -119,12 +147,18 @@ jobs:
         with:
           name: appimage-x86_64
 
-      - name: Install the minimal packages to run the AppImage and take a screenshot
+      # This is meant to be a stock minimal system with nothing app-specific
+      # preinstalled - that's the whole point of the test. Every library the app itself
+      # needs (X11, xcb, GL/EGL, etc.) is bundled into the AppImage in the build job
+      # instead; only genuine test infrastructure (a display, a screenshot tool, a font
+      # to render, TLS roots for the earlier download) belongs here. If this job ever
+      # needs an app library added back to make AppRun start, that means the build job's
+      # bundling is incomplete - fix it there, not here.
+      - name: Install test infrastructure (display, screenshot tooling - no app libraries)
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            libx11-6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libsm6 libice6 \
-            libgl1 libegl1 fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates
+            fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates
 
       - name: Launch OmaPhoto under Xvfb and screenshot it
         run: |
