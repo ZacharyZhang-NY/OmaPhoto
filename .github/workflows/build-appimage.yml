@@ -133,7 +133,12 @@ jobs:
           apk add --no-cache --force-overwrite "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
           rm -f "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
 
+          # Qt's xcb platform plugin itself (not just the app) needs the small xcb-util
+          # helper libraries (icccm/wm, image, keysyms, render-util, cursor) - without them
+          # dlopen() of libqxcb.so fails and Qt reports "plugin was found" but could not be
+          # initialized.
           apk add --no-cache libx11 libxcb libxkbcommon libxkbcommon-x11 \
+            xcb-util xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-cursor \
             mesa-gl mesa-dri-gallium ttf-dejavu xvfb ffmpeg
 
           # The AppImage links against Ubuntu's GLVND libGLX.so.0/libOpenGL.so.0, but
@@ -163,6 +168,9 @@ jobs:
           export DISPLAY=:99
           export QT_QPA_PLATFORM=xcb
           export LD_LIBRARY_PATH="$GL_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          # Prints why a QPA plugin candidate was rejected, in case xcb still won't load -
+          # otherwise Qt only reports that it "was found" but not why dlopen() failed.
+          export QT_DEBUG_PLUGINS=1
           ./squashfs-root/AppRun &
           APP_PID=$!
           sleep 8
