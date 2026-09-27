@@ -215,12 +215,27 @@ jobs:
           # anything, passing `test -s` on a screenshot that is really just a blank/solid
           # frame. Instead poll for up to 15s, re-grabbing every ~2s, and stop as soon as a
           # frame's pixel stddev shows it is not flat - i.e. something was actually drawn.
+          #
+          # `%[fx:image.stdDev]` is not a real ImageMagick property (the correct one is
+          # `%[fx:standard_deviation]`), and the old check swallowed identify's stderr and
+          # silently fell back to "0" on any error - meaning every prior "still blank"
+          # verdict from this job may have been this check failing, not the app. Use the
+          # real property name and print (not swallow) identify's own error if it has one,
+          # so a tool failure is visible instead of indistinguishable from a real blank frame.
           START=$(date +%s)
           STDDEV=0
           while [ "$(( $(date +%s) - START ))" -lt 15 ]; do
             sleep 2
             ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png -loglevel error
-            STDDEV=$(identify -format "%[fx:image.stdDev]" screenshot.png 2>/dev/null || echo 0)
+            IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot.png 2>&1)
+            IDENTIFY_RC=$?
+            if [ "$IDENTIFY_RC" -ne 0 ]; then
+              echo "identify failed (exit $IDENTIFY_RC): $IDENTIFY_OUT" >&2
+              STDDEV=0
+            else
+              STDDEV="$IDENTIFY_OUT"
+            fi
+            echo "frame stddev: $STDDEV" >&2
             if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
               break
             fi
@@ -252,10 +267,12 @@ jobs:
           fi
 
       - name: Upload screenshot
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshot
           path: screenshot.png
+          if-no-files-found: ignore
 
   upload:
     name: Create release
