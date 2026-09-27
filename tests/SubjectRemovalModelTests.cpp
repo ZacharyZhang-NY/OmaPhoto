@@ -1,4 +1,6 @@
 #include "Document/BrushStroke.h"
+#include "Document/EditorSession.h"
+#include "Document/ObjectSelection.h"
 #include "Document/SubjectRemoval.h"
 #include <QPainter>
 #include <QTemporaryDir>
@@ -48,6 +50,23 @@ void SubjectRemovalModelTests::aModelThatFailsIsNamedAndTheNextUseLoadsAgain()
     said = failure(image);
     QVERIFY2(said.startsWith(QStringLiteral("Remove Background could not use its model: omaphoto/u2net.onnx is in no data folder (")), qPrintable(said));
     QVERIFY2(said.contains(empty.path()), qPrintable(said));
+    // Object mode passes the model's failure on unchanged.
+    try {
+        ObjectSelection::select(image, QPointF(100, 75), 0, true);
+        QFAIL("the object selection ran without a model");
+    } catch (const SubjectRemovalError &error) {
+        QVERIFY(error.kind == SubjectRemovalError::Kind::model);
+    }
+    // The session reports it and keeps the selection.
+    EditorSession session;
+    session.createDocument(200, 150);
+    session.insert(ImportedImage(image, image, QStringLiteral("Disc")));
+    session.selectAll();
+    bool done = false;
+    session.selectObject(QPointF(100, 75), SelectionMode::replace, [&done] { done = true; });
+    QVERIFY(QTest::qWaitFor([&done] { return done; }, 20000));
+    QVERIFY(session.brushError().value().startsWith(QStringLiteral("Remove Background could not use its model: ")));
+    QCOMPARE(session.selection().value().path.boundingRect(), QRectF(0, 0, 200, 150));
     // Back in its folder, the next use loads it.
     if (folders.isEmpty())
         qunsetenv("XDG_DATA_DIRS");

@@ -17,15 +17,15 @@ SelectionAmountField::SelectionAmountField(EditorSession &session, int low, int 
     setFont(ToolHeaderStyle::controlFont());
     setFixedWidth(40);
     setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    // Digits only; the bounds clamp, as Swift's binding does.
-    setValidator(new QRegularExpressionValidator(QRegularExpression(QStringLiteral("[0-9]*")), this));
-    // Typing applies at once; an overflow reads as the top.
+    // Digits, signed below zero; the bounds clamp, as Swift's binding.
+    setValidator(new QRegularExpressionValidator(QRegularExpression(low < 0 ? QStringLiteral("-?[0-9]*") : QStringLiteral("[0-9]*")), this));
+    // Typing applies at once; an overflow reads as its end.
     connect(this, &QLineEdit::textEdited, this, [this](const QString &text) {
-        if (text.isEmpty())
+        if (text.isEmpty() || text == QLatin1String("-"))
             return;
         bool fits = false;
         const qlonglong typed = text.toLongLong(&fits);
-        m_change(double(fits ? std::clamp<qlonglong>(typed, m_low, m_high) : m_high));
+        m_change(double(fits ? std::clamp<qlonglong>(typed, m_low, m_high) : text.startsWith(QLatin1Char('-')) ? m_low : m_high));
     });
 }
 
@@ -95,7 +95,23 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
       m_allLayers(choice(m_sources, QStringLiteral("wandAllLayers"), QStringLiteral("All Layers"),
                          QStringLiteral("Read colors from the active layer only, or from every visible layer as shown"),
                          [this] { changeWand([](WandSettings &wand) { wand.sampleAllLayers = true; }); })),
-      m_contiguous(new QCheckBox(QStringLiteral("Contiguous"), this)),
+      m_contiguous(new QCheckBox(QStringLiteral("Contiguous"), this)), m_wandModes(new QButtonGroup(this)),
+      m_wandMode(choice(m_wandModes, QStringLiteral("magicWandMode"), rawValue(WandMode::wand), QStringLiteral("Press Tab to switch between Wand and Object"),
+                        [this] { m_session.setWandMode(WandMode::wand); })),
+      m_objectMode(choice(m_wandModes, QStringLiteral("magicObjectMode"), rawValue(WandMode::object), QStringLiteral("Press Tab to switch between Wand and Object"),
+                          [this] { m_session.setWandMode(WandMode::object); })),
+      m_objectSources(new QButtonGroup(this)),
+      m_objectThisLayer(choice(m_objectSources, QStringLiteral("objectThisLayer"), QStringLiteral("This Layer"),
+                               QStringLiteral("Analyze the active layer only, or every visible layer as shown"),
+                               [this] { changeObject([](ObjectSelectionSettings &object) { object.sampleAllLayers = false; }); })),
+      m_objectAllLayers(choice(m_objectSources, QStringLiteral("objectAllLayers"), QStringLiteral("All Layers"),
+                               QStringLiteral("Analyze the active layer only, or every visible layer as shown"),
+                               [this] { changeObject([](ObjectSelectionSettings &object) { object.sampleAllLayers = true; }); })),
+      m_edgeLabel(new QLabel(QStringLiteral("Edge"), this)),
+      m_edge(new SelectionAmountField(session, -10, 10, [this] { return double(m_session.objectSelectionSettings().edgeOffset); },
+                                      [this](double edge) { changeObject([edge](ObjectSelectionSettings &object) { object.edgeOffset = int(std::lround(edge)); }); },
+                                      this)),
+      m_edgeUnit(new QLabel(QStringLiteral("px"), this)),
       m_antialias(new QCheckBox(QStringLiteral("Anti-alias"), this)), m_expand(new QPushButton(QStringLiteral("Expand"), this)),
       m_expandAmount(new SelectionAmountField(session, 1, 500, [this] { return double(m_session.selectionExpandAmount()); },
                                               [this](double amount) { m_session.setSelectionExpandAmount(int(std::lround(amount))); }, this)),
@@ -119,12 +135,16 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
     connect(m_sampleSize, &QComboBox::activated, this, [this](int index) {
         changeWand([index](WandSettings &wand) { wand.sampleSize = WandSampleSize(index); });
     });
+    m_edge->setObjectName(QStringLiteral("objectEdge"));
+    for (QWidget *edge : std::initializer_list<QWidget *>{m_edgeLabel, m_edge, m_edgeUnit})
+        edge->setToolTip(QStringLiteral("Positive values tighten the detected mask inward; negative values expand it outward"));
+    m_edgeLabel->setObjectName(QStringLiteral("objectEdgeLabel"));
+    m_edgeLabel->setFont(ToolHeaderStyle::controlFont());
     m_contiguous->setObjectName(QStringLiteral("wandContiguous"));
     m_contiguous->setToolTip(QStringLiteral("Select only similar pixels connected to the one you click; off selects them everywhere"));
     connect(m_contiguous, &QCheckBox::toggled, this, [this](bool on) { changeWand([on](WandSettings &wand) { wand.contiguous = on; }); });
     // Rectangles snap to whole pixels, so smoothing applies elsewhere.
     m_antialias->setObjectName(QStringLiteral("selectionAntialiased"));
-    m_antialias->setToolTip(QStringLiteral("Smooth selection edges; turn off for hard pixel edges"));
     connect(m_antialias, &QCheckBox::toggled, this, [this](bool on) { m_session.setSelectionAntialiased(on); });
     auto *divider = new QFrame(this);
     divider->setFrameShape(QFrame::VLine);
@@ -150,8 +170,9 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
     m_deselect->setObjectName(QStringLiteral("deselect"));
     connect(m_deselect, &QPushButton::clicked, this, [this] { m_session.deselect(); });
     // Swift's `unitSuffix`: a unit sits by each field.
-    for (QWidget *widget : std::initializer_list<QWidget *>{m_rectangle, m_ellipse, m_freehand, m_polygonal, m_replace, m_add, m_subtract, m_toleranceLabel,
-                                                             m_tolerance, m_sampleSize, m_thisLayer, m_allLayers, m_contiguous, m_antialias,
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_rectangle, m_ellipse, m_wandMode, m_objectMode, m_freehand, m_polygonal, m_replace, m_add,
+                                                             m_subtract, m_toleranceLabel, m_tolerance, m_sampleSize, m_thisLayer, m_allLayers, m_contiguous,
+                                                             m_objectThisLayer, m_objectAllLayers, m_edgeLabel, m_edge, m_edgeUnit, m_antialias,
                                                              divider, m_expand, m_expandAmount, new QLabel(QStringLiteral("px"), this), m_contract, m_contractAmount,
                                                              new QLabel(QStringLiteral("px"), this), m_feather, m_featherAmount,
                                                              new QLabel(QStringLiteral("px"), this)})
@@ -168,6 +189,14 @@ void LassoControls::changeWand(const std::function<void(WandSettings &)> &change
     WandSettings wand = m_session.wandSettings();
     change(wand);
     m_session.setWandSettings(wand);
+}
+
+// One field of Object mode's settings changes; the rest stay.
+void LassoControls::changeObject(const std::function<void(ObjectSelectionSettings &)> &change)
+{
+    ObjectSelectionSettings object = m_session.objectSelectionSettings();
+    change(object);
+    m_session.setObjectSelectionSettings(object);
 }
 
 // A segment of Swift's segmented picker: one checkable button.
@@ -188,7 +217,18 @@ QToolButton *LassoControls::choice(QButtonGroup *group, const QString &name, con
 void LassoControls::synchronize()
 {
     const NavigationTool tool = m_session.tool();
-    title->setText(tool == NavigationTool::marquee ? QStringLiteral("Marquee") : tool == NavigationTool::wand ? QStringLiteral("Magic Wand") : QStringLiteral("Lasso"));
+    title->setText(tool == NavigationTool::marquee ? QStringLiteral("Marquee") : tool == NavigationTool::wand ? QStringLiteral("Magic") : QStringLiteral("Lasso"));
+    const bool wand = tool == NavigationTool::wand;
+    const bool object = wand && m_session.wandMode() == WandMode::object;
+    for (QToolButton *button : {m_wandMode, m_objectMode})
+        button->setVisible(wand);
+    m_wandMode->setChecked(!object);
+    m_objectMode->setChecked(object);
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_objectThisLayer, m_objectAllLayers, m_edgeLabel, m_edge, m_edgeUnit})
+        widget->setVisible(object);
+    m_objectThisLayer->setChecked(!m_session.objectSelectionSettings().sampleAllLayers);
+    m_objectAllLayers->setChecked(m_session.objectSelectionSettings().sampleAllLayers);
+    m_edge->sync(m_session.objectSelectionSettings().edgeOffset);
     for (QToolButton *button : {m_rectangle, m_ellipse})
         button->setVisible(tool == NavigationTool::marquee);
     for (QToolButton *button : {m_freehand, m_polygonal})
@@ -202,16 +242,18 @@ void LassoControls::synchronize()
     m_replace->setChecked(mode == SelectionMode::replace);
     m_add->setChecked(mode == SelectionMode::add);
     m_subtract->setChecked(mode == SelectionMode::subtract);
-    const WandSettings &wand = m_session.wandSettings();
+    const WandSettings &colours = m_session.wandSettings();
     for (QWidget *widget : std::initializer_list<QWidget *>{m_toleranceLabel, m_tolerance, m_sampleSize, m_thisLayer, m_allLayers, m_contiguous})
-        widget->setVisible(tool == NavigationTool::wand);
-    m_tolerance->sync(wand.tolerance);
-    m_sampleSize->setCurrentIndex(int(wand.sampleSize));
-    m_thisLayer->setChecked(!wand.sampleAllLayers);
-    m_allLayers->setChecked(wand.sampleAllLayers);
-    if (m_contiguous->isChecked() != wand.contiguous)
-        m_contiguous->setChecked(wand.contiguous);
+        widget->setVisible(wand && !object);
+    m_tolerance->sync(colours.tolerance);
+    m_sampleSize->setCurrentIndex(int(colours.sampleSize));
+    m_thisLayer->setChecked(!colours.sampleAllLayers);
+    m_allLayers->setChecked(colours.sampleAllLayers);
+    if (m_contiguous->isChecked() != colours.contiguous)
+        m_contiguous->setChecked(colours.contiguous);
     m_antialias->setVisible(tool == NavigationTool::lasso || tool == NavigationTool::wand || (tool == NavigationTool::marquee && m_session.marqueeKind() == LassoKind::ellipse));
+    m_antialias->setToolTip(object ? QStringLiteral("Smooth the detected object outline; turn off for the raw pixel mask")
+                                   : QStringLiteral("Smooth selection edges; turn off for hard pixel edges"));
     if (m_antialias->isChecked() != m_session.selectionAntialiased())
         m_antialias->setChecked(m_session.selectionAntialiased());
     const bool modifies = m_session.canModifySelection();

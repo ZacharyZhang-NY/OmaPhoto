@@ -97,13 +97,13 @@ void EditorSession::setWandSettings(const WandSettings &settings)
 }
 
 // What the wand reads: composite, or the active layer's pixels.
-std::optional<QImage> EditorSession::wandSample(const CanvasDocument &document) const
+std::optional<QImage> EditorSession::selectionSample(const CanvasDocument &document, bool sampleAllLayers) const
 {
     try {
         QImage context = BrushRaster::context(document.width, document.height, false);
         QPainter painter(&context);
         // A painted asset flattens here; the catch covers it too.
-        if (m_wandSettings.sampleAllLayers) {
+        if (sampleAllLayers) {
             drawLiveComposite(document, painter);
         } else if (const std::optional<ImageLayer> layer = activeLayer(); layer && !layer->isGroup && layer->asset) {
             const LayerTransform transform = displayedTransform(*layer);
@@ -112,7 +112,7 @@ std::optional<QImage> EditorSession::wandSample(const CanvasDocument &document) 
         painter.end();
         return context;
     } catch (const ExportError &error) {
-        qCWarning(lcApp) << "the wand cannot sample the canvas:" << error.what();
+        qCWarning(lcApp) << "a selection tool cannot sample the canvas:" << error.what();
         return std::nullopt;
     }
 }
@@ -131,13 +131,13 @@ void EditorSession::magicWand(QPointF point, SelectionMode mode, std::function<v
         finish();
         return;
     }
-    const std::optional<QImage> sample = wandSample(*document);
+    const std::optional<QImage> sample = selectionSample(*document, m_wandSettings.sampleAllLayers);
     if (!sample) {
         finish();
         return;
     }
     setIsProjectBusy(true);
-    m_wanding = Wanding{mode, document->id, std::move(done)};
+    m_wanding = Wanding{mode, document->id, std::move(done), QStringLiteral("Magic Wand")};
     m_wand.setFuture(QtConcurrent::run([sample = *sample, point, settings = m_wandSettings]() -> Wanded {
         try {
             return Wanded{MagicWand::select(sample, point, settings), std::nullopt};
@@ -155,7 +155,7 @@ void EditorSession::finishWand()
     const Wanding pending = std::exchange(m_wanding, std::nullopt).value();
     setIsProjectBusy(false);
     if (result.failure) {
-        qCWarning(lcApp).noquote() << "the wand could not select:" << *result.failure;
+        qCWarning(lcApp).noquote() << pending.name << "could not select:" << *result.failure;
         setBrushError(result.failure);
     } else if (m_document && m_document->id == pending.documentID) {
         if (!result.path) {
@@ -164,9 +164,9 @@ void EditorSession::finishWand()
                 deselect();
         } else if (pending.mode == SelectionMode::replace) {
             // A traced outline lies on the canvas: no costly clip.
-            setSelection(DocumentSelection{*result.path, m_selectionAntialiased}, QStringLiteral("Magic Wand"));
+            setSelection(DocumentSelection{*result.path, m_selectionAntialiased}, pending.name);
         } else {
-            applySelection(*result.path, pending.mode, QStringLiteral("Magic Wand"));
+            applySelection(*result.path, pending.mode, pending.name);
         }
     }
     if (pending.done)

@@ -16,6 +16,7 @@ public:
     void cancelLasso();
     void pressMarqueeKey();
     void pressLassoKey();
+    void pressWandKey();
     void toggleMarqueeKind();
     void toggleLassoKind();
     // Closes the outline and combines it with the selection.

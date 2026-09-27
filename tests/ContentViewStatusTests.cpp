@@ -141,7 +141,7 @@ void ContentViewStatusTests::everyToolHasItsHint()
         {NavigationTool::move, "Drag to move · Handles to resize · Circle to rotate · 1–0 layer opacity · Space to pan"},
         {NavigationTool::marquee, "Drag a rectangle · Shift add · Alt subtract · Shift again mid-drag square · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect"},
         {NavigationTool::lasso, "Drag to select · Drag inside to move · Shift add · Alt subtract · Delete clears · Alt+Backspace/Ctrl+Backspace fill · Ctrl+D deselect"},
-        {NavigationTool::wand, "Click to select similar colors · Shift add · Alt subtract · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect"},
+        {NavigationTool::wand, "Click to select similar colors · Tab for Object · Shift add · Alt subtract · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect"},
         {NavigationTool::crop, "Drag to crop · Enter apply · Escape cancel · Space to pan"},
         {NavigationTool::brush, "Drag to paint · [ ] size · Shift-[ ] hardness · 1–0 opacity · Escape cancel · Space to pan"},
         {NavigationTool::spotHealing, "Drag over blemishes to heal · [ ] size · Shift-[ ] hardness · Escape cancel · Space to pan"},
@@ -159,6 +159,7 @@ void ContentViewStatusTests::everyToolHasItsHint()
     QCOMPARE(ContentView::hint(NavigationTool::move, ToolIconKind::eraser), ContentView::hint(NavigationTool::move));
     QCOMPARE(ContentView::hint(NavigationTool::lasso, ToolIconKind::ellipse), ContentView::hint(NavigationTool::lasso));
     QCOMPARE(ContentView::hint(NavigationTool::marquee, ToolIconKind::polygonal), ContentView::hint(NavigationTool::marquee));
+    QCOMPARE(ContentView::hint(NavigationTool::lasso, ToolIconKind::object), ContentView::hint(NavigationTool::lasso));
     EditorSession session;
     session.createDocument(8, 8);
     ContentView view(session);
@@ -166,6 +167,11 @@ void ContentViewStatusTests::everyToolHasItsHint()
         session.selectTool(tool);
         QCOMPARE(find<QLabel>(view, "activityStatus").text(), QString::fromUtf8(words));
     }
+    // Magic's words follow its mode.
+    session.selectTool(NavigationTool::wand);
+    session.setWandMode(WandMode::object);
+    QCOMPARE(find<QLabel>(view, "activityStatus").text(),
+             QString("Click an object to select its outline · Tab for Wand · Shift add · Alt subtract · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect"));
     // The Shape's Shift follows its kind.
     session.selectTool(NavigationTool::shape);
     session.setShapeKind(ShapeKind::ellipse);

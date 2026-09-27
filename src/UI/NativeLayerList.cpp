@@ -187,7 +187,7 @@ void NativeLayerList::pressKey(QKeyEvent *event)
     static const std::map<int, NavigationTool> tools{
         {Qt::Key_A, NavigationTool::idle}, {Qt::Key_V, NavigationTool::move}, {Qt::Key_H, NavigationTool::hand},
         {Qt::Key_Z, NavigationTool::zoom}, {Qt::Key_G, NavigationTool::gradient}, {Qt::Key_L, NavigationTool::lasso}, {Qt::Key_M, NavigationTool::marquee},
-        {Qt::Key_W, NavigationTool::wand}, {Qt::Key_J, NavigationTool::spotHealing}, {Qt::Key_S, NavigationTool::cloneStamp},
+        {Qt::Key_J, NavigationTool::spotHealing}, {Qt::Key_S, NavigationTool::cloneStamp},
         {Qt::Key_U, NavigationTool::shape}, {Qt::Key_R, NavigationTool::blur}, {Qt::Key_I, NavigationTool::eyedropper},
         {Qt::Key_C, NavigationTool::crop}, {Qt::Key_T, NavigationTool::type}};
     if (plain && (key == Qt::Key_Backspace || key == Qt::Key_Delete)) {
@@ -209,6 +209,10 @@ void NativeLayerList::pressKey(QKeyEvent *event)
             m_session.swapPaletteColors();
         else
             m_session.resetPaletteColors();
+    } else if (plain && key == Qt::Key_W) {
+        // A held W picks the Magic tool once, as Swift's.
+        if (!event->isAutoRepeat())
+            m_session.pressWandKey();
     } else if (plain && tools.contains(key)) {
         m_session.selectTool(tools.at(key));
     } else if (plain && event->text().size() == 1 && event->text().front().isDigit() && m_session.usesOpacityKeys()) {

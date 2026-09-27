@@ -96,7 +96,7 @@ QString label(NavigationTool tool)
     case NavigationTool::move: return QStringLiteral("Move / Transform (V)");
     case NavigationTool::marquee: return QStringLiteral("Marquee (M)");
     case NavigationTool::lasso: return QStringLiteral("Lasso (L)");
-    case NavigationTool::wand: return QStringLiteral("Magic Wand (W)");
+    case NavigationTool::wand: return QStringLiteral("Magic (W) · Tab switches Wand and Object");
     case NavigationTool::crop: return QStringLiteral("Crop (C)");
     case NavigationTool::brush: return QStringLiteral("Brush (B) · Eraser (E)");
     case NavigationTool::spotHealing: return QStringLiteral("Spot Healing Brush (J)");

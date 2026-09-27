@@ -165,6 +165,8 @@ void EditorSession::cycleToolMode()
         return;
     if (m_tool == NavigationTool::marquee)
         toggleMarqueeKind();
+    else if (m_tool == NavigationTool::wand)
+        setWandMode(allWandModes[(size_t(m_wandMode) + 1) % allWandModes.size()]);
     else if (m_tool == NavigationTool::lasso)
         toggleLassoKind();
     else if (m_tool == NavigationTool::shape)

@@ -67,9 +67,9 @@ void ToolIconTests::everyToolHasItsOwnIcon()
         icons << icon;
     }
     QCOMPARE(icons.size(), 15);
-    // The Marquee's, the Lasso's and the brush's kinds are icons.
+    // Marquee, Lasso, brush and Magic kinds are icons.
     for (const auto &[tool, kind] : {std::pair(NavigationTool::marquee, ToolIconKind::ellipse), std::pair(NavigationTool::lasso, ToolIconKind::polygonal),
-                                     std::pair(NavigationTool::brush, ToolIconKind::eraser)}) {
+                                     std::pair(NavigationTool::brush, ToolIconKind::eraser), std::pair(NavigationTool::wand, ToolIconKind::object)}) {
         const QImage icon = drawn(tool, Qt::white, 36, {0, 0}, kind);
         QVERIFY(inked(icon) > 60 && !icons.contains(icon));
         icons << icon;
@@ -77,6 +77,7 @@ void ToolIconTests::everyToolHasItsOwnIcon()
     // A kind another tool lacks leaves its icon alone.
     QCOMPARE(drawn(NavigationTool::brush, Qt::white, 36, {0, 0}, ToolIconKind::ellipse), drawn(NavigationTool::brush, Qt::white));
     QCOMPARE(drawn(NavigationTool::move, Qt::white, 36, {0, 0}, ToolIconKind::eraser), drawn(NavigationTool::move, Qt::white));
+    QCOMPARE(drawn(NavigationTool::lasso, Qt::white, 36, {0, 0}, ToolIconKind::object), drawn(NavigationTool::lasso, Qt::white));
 }
 
 void ToolIconTests::anIconTakesTheColourItIsGivenAndNoOther()
@@ -312,22 +313,22 @@ void ToolIconTests::anIconKeepsToTheCallersClip()
 void ToolIconTests::theDrawingsMatchTheirReference()
 {
     // Every stroke is pinned by the picture in the fixtures.
-    QImage sheet(18 * 44 + 8, 2 * 52, QImage::Format_ARGB32_Premultiplied);
+    QImage sheet(19 * 44 + 8, 2 * 52, QImage::Format_ARGB32_Premultiplied);
     sheet.fill(QColor(36, 36, 36));
     QPainter painter(&sheet);
     for (int index = 0; index < 15; ++index) {
         ToolIcons::paint(painter, tools[index], QPointF(8 + index * 44, 8), 36, QColor(235, 235, 235));
         ToolIcons::paint(painter, tools[index], QPointF(17 + index * 44, 66), 18, QColor(235, 235, 235));
     }
-    // Three more: the ellipse Marquee, polygonal Lasso, the eraser.
+    // Four more: ellipse Marquee, polygonal Lasso, eraser, Object mode.
     for (const auto &[index, tool, kind] : {std::tuple(15, NavigationTool::marquee, ToolIconKind::ellipse), std::tuple(16, NavigationTool::lasso, ToolIconKind::polygonal),
-                                            std::tuple(17, NavigationTool::brush, ToolIconKind::eraser)}) {
+                                            std::tuple(17, NavigationTool::brush, ToolIconKind::eraser), std::tuple(18, NavigationTool::wand, ToolIconKind::object)}) {
         ToolIcons::paint(painter, tool, QPointF(8 + index * 44, 8), 36, QColor(235, 235, 235), kind);
         ToolIcons::paint(painter, tool, QPointF(17 + index * 44, 66), 18, QColor(235, 235, 235), kind);
     }
     painter.end();
     // After a wanted change, look at this file; commit it.
-    QVERIFY(sheet.save(QStringLiteral("ToolIcons.png")));
+    QVERIFY(sheet.save(QCoreApplication::applicationDirPath() + QStringLiteral("/ToolIcons.png")));
     const QImage reference = QImage(QFINDTESTDATA("fixtures/ToolIcons.png")).convertToFormat(QImage::Format_ARGB32_Premultiplied);
     QCOMPARE(reference.size(), sheet.size());
     // Type's letters take the system's sans; the sheet's is DejaVu.

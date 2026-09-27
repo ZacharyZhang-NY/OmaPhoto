@@ -79,6 +79,8 @@ inline QStringList described(const EditorSession &session)
                   .arg(int(session.selectionAntialiased())).arg(session.selectionExpandAmount()).arg(session.selectionContractAmount());
     result << QStringLiteral("wand %1 %2 %3 %4").arg(session.wandSettings().tolerance).arg(int(session.wandSettings().sampleSize))
                   .arg(int(session.wandSettings().contiguous)).arg(int(session.wandSettings().sampleAllLayers));
+    result << QStringLiteral("magic %1 object %2 %3").arg(int(session.wandMode())).arg(int(session.objectSelectionSettings().sampleAllLayers))
+                  .arg(session.objectSelectionSettings().edgeOffset);
     if (session.lassoDraft().has_value()) {
         const LassoDraft &draft = session.lassoDraft().value();
         result << QStringLiteral("lasso %1 %2 points %3 cursor %4").arg(int(draft.kind)).arg(int(draft.mode)).arg(draft.points.size())

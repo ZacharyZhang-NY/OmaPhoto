@@ -45,6 +45,7 @@ public:
 private:
     QToolButton *choice(QButtonGroup *group, const QString &name, const QString &text, const QString &tip, const std::function<void()> &pick);
     void changeWand(const std::function<void(WandSettings &)> &change);
+    void changeObject(const std::function<void(ObjectSelectionSettings &)> &change);
     void synchronize();
 
     EditorSession &m_session;
@@ -66,6 +67,16 @@ private:
     QToolButton *const m_thisLayer;
     QToolButton *const m_allLayers;
     QCheckBox *const m_contiguous;
+    // The Magic tool's modes, and Object mode's own settings.
+    QButtonGroup *const m_wandModes;
+    QToolButton *const m_wandMode;
+    QToolButton *const m_objectMode;
+    QButtonGroup *const m_objectSources;
+    QToolButton *const m_objectThisLayer;
+    QToolButton *const m_objectAllLayers;
+    QLabel *const m_edgeLabel;
+    SelectionAmountField *const m_edge;
+    QLabel *const m_edgeUnit;
     QCheckBox *const m_antialias;
     QPushButton *const m_expand;
     SelectionAmountField *const m_expandAmount;

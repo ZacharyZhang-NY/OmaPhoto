@@ -20,6 +20,8 @@ ToolIconKind ContentView::iconKind(NavigationTool tool) const
         return ToolIconKind::polygonal;
     if (tool == NavigationTool::brush && m_session.brushMode() == BrushToolMode::erase)
         return ToolIconKind::eraser;
+    if (tool == NavigationTool::wand && m_session.wandMode() == WandMode::object)
+        return ToolIconKind::object;
     return ToolIconKind::plain;
 }
 
@@ -29,6 +31,8 @@ QString ContentView::hint(NavigationTool tool, ToolIconKind kind, BlurToolMode s
         return QStringLiteral("Drag an ellipse · Shift add · Alt subtract · Shift again mid-drag circle · Drag inside to move · Delete clears · Ctrl+D deselect");
     if (tool == NavigationTool::lasso && kind == ToolIconKind::polygonal)
         return QStringLiteral("Click corners · Click start, double-click or Enter to close · Delete removes corner · Escape cancel");
+    if (tool == NavigationTool::wand && kind == ToolIconKind::object)
+        return QStringLiteral("Click an object to select its outline · Tab for Wand · Shift add · Alt subtract · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect");
     if (tool == NavigationTool::brush && kind == ToolIconKind::eraser)
         return QStringLiteral("Drag to erase · [ ] size · Shift-[ ] hardness · 1–0 opacity · Escape cancel · Space to pan");
     if (tool == NavigationTool::blur)
@@ -42,7 +46,7 @@ QString ContentView::hint(NavigationTool tool, ToolIconKind kind, BlurToolMode s
     // Swift's last branch: the Eyedropper shows Zoom's words too.
     static const std::map<NavigationTool, const char *> hints = {
         {NavigationTool::marquee, "Drag a rectangle · Shift add · Alt subtract · Shift again mid-drag square · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect"},
-        {NavigationTool::wand, "Click to select similar colors · Shift add · Alt subtract · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect"},
+        {NavigationTool::wand, "Click to select similar colors · Tab for Object · Shift add · Alt subtract · Drag inside to move · Ctrl-drag moves pixels · Delete clears · Ctrl+D deselect"},
         {NavigationTool::lasso, "Drag to select · Drag inside to move · Shift add · Alt subtract · Delete clears · Alt+Backspace/Ctrl+Backspace fill · Ctrl+D deselect"},
         {NavigationTool::brush, "Drag to paint · [ ] size · Shift-[ ] hardness · 1–0 opacity · Escape cancel · Space to pan"},
         {NavigationTool::cloneStamp, "Alt-click to set the source · Drag to clone · [ ] size · Shift-[ ] hardness · 1–0 opacity · Space to pan"},

@@ -140,7 +140,7 @@ const std::vector<ShortcutDefinition> &ShortcutDefinition::all()
         const std::vector<std::pair<const char *, QString>> tools{
             {"Select tool", "a"}, {"Move / Transform tool", "v"}, {"Hand tool", "h"}, {"Zoom tool", "z"}, {"Brush tool", "b"},
             {"Eraser", "e"}, {"Spot Healing", "j"}, {"Clone Stamp", "s"}, {"Type tool", "t"}, {"Gradient tool", "g"},
-            {"Shape tool", "u"}, {"Eyedropper tool", "i"}, {"Marquee / cycle shape", "m"}, {"Magic Wand", "w"},
+            {"Shape tool", "u"}, {"Eyedropper tool", "i"}, {"Marquee / cycle shape", "m"}, {"Magic", "w"},
             {"Lasso / cycle mode", "l"}, {"Blur / Smudge / Liquify", "r"}, {"Crop tool", "c"}, {"Swap foreground/background", "x"},
             {"Reset colors", "d"}, {"Cycle tool mode", "\t"}, {"Temporary Hand tool (hold)", " "},
             {"Delete selection / layer / effect / lasso point", backspace}, {"Apply current canvas operation", "\r"},

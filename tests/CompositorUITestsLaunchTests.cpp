@@ -20,7 +20,7 @@ void CompositorUITestsLaunchTests::testLaunch()
     // The welcome is up: Swift's launch test waits for it.
     QVERIFY(window.findChild<QWidget *>("createCanvas")->isVisible());
     QCoreApplication::processEvents();
-    QVERIFY(window.grab().save(QStringLiteral("LaunchScreen.png")));
+    QVERIFY(window.grab().save(QCoreApplication::applicationDirPath() + QStringLiteral("/LaunchScreen.png")));
 }
 
 void CompositorUITestsLaunchTests::testWindowKeepsItsMinimumSize()

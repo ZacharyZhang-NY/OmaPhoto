@@ -8,6 +8,7 @@
 #include "Document/LevelsAutomatic.h"
 #include "Document/FloatingSelection.h"
 #include "Document/MagicWand.h"
+#include "Document/ObjectSelection.h"
 #include "Document/SelectionClipboard.h"
 #include "Document/SelectionEdits.h"
 #include "Document/SmudgeLiquify.h"
@@ -298,6 +299,7 @@ public:
 #include "Document/AdjustmentEditing+Session.h"
 #include "Document/LayerEffects+Session.h"
 #include "Document/Guides+Session.h"
+#include "Document/ObjectSelection+Session.h"
 signals:
     void changed();
 
@@ -376,6 +378,8 @@ private:
     std::optional<Inverting> m_inverting;
     QFutureWatcher<Inverted> m_inverter;
     WandSettings m_wandSettings;
+    WandMode m_wandMode = WandMode::wand;
+    ObjectSelectionSettings m_objectSelectionSettings;
     std::optional<Wanding> m_wanding;
     QFutureWatcher<Wanded> m_wand;
     std::optional<Subjecting> m_subjecting;

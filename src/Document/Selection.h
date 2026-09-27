@@ -4,6 +4,7 @@
 #include <QPointF>
 #include <QRectF>
 #include <QString>
+#include <array>
 #include <optional>
 #include <vector>
 
@@ -30,6 +31,11 @@ struct DocumentSelection {
     SelectionClip clip(QSizeF canvas) const;
     friend bool operator==(const DocumentSelection &, const DocumentSelection &) = default;
 };
+
+// The Magic tool's modes: similar colours, or the object clicked.
+enum class WandMode { wand, object };
+inline constexpr std::array allWandModes{WandMode::wand, WandMode::object};
+QString rawValue(WandMode mode);
 
 // The Marquee's outlines are rectangle and ellipse.
 enum class LassoKind { freehand, polygonal, rectangle, ellipse };

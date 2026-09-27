@@ -23,9 +23,11 @@ QCursor CanvasView::lassoCursor(Qt::KeyboardModifiers modifiers, std::optional<Q
     if ((command || mode == SelectionMode::replace) && document && location
         && m_session.canMoveSelection(m_session.viewport.documentPoint(*location, document->size())))
         return command ? pixelDragCursor(modifiers.testFlag(Qt::AltModifier), ratio) : moveSelectionCursor(ratio);
-    if (m_session.tool() == NavigationTool::wand)
+    const bool wand = m_session.tool() == NavigationTool::wand;
+    if (wand && m_session.wandMode() == WandMode::wand)
         return wandCursor(mode, ratio);
-    const SelectionIcon icon = m_session.tool() == NavigationTool::marquee
+    const SelectionIcon icon = wand ? SelectionIcon::objectSelection
+        : m_session.tool() == NavigationTool::marquee
         ? (m_session.marqueeKind() == LassoKind::ellipse ? SelectionIcon::ellipseMarquee : SelectionIcon::rectangleMarquee)
         : (m_session.lassoKind() == LassoKind::polygonal ? SelectionIcon::polygonalLasso : SelectionIcon::freehandLasso);
     return selectionCursor(icon, mode, ratio);
@@ -54,6 +56,11 @@ void CanvasView::lassoMouseDown(QPointF point, Qt::KeyboardModifiers modifiers)
         if (mode == SelectionMode::replace && m_session.canMoveSelection(pixel) && m_session.beginSelectionMove()) {
             m_selectionDragStart = pixel;
             updateCursor();
+            return;
+        }
+        // Object mode runs before the colour wand, as Swift's.
+        if (m_session.tool() == NavigationTool::wand && m_session.wandMode() == WandMode::object) {
+            m_session.selectObject(pixel, mode);
             return;
         }
         if (m_session.tool() == NavigationTool::wand) {
@@ -130,7 +137,9 @@ void CanvasView::releaseSelectionTool()
         const bool moved = m_session.selectionMoveOrigin() != m_session.selection();
         m_session.endSelectionMove();
         // The wand's click inside selects afresh; another's deselects.
-        if (!moved && m_session.tool() == NavigationTool::wand)
+        if (!moved && m_session.tool() == NavigationTool::wand && m_session.wandMode() == WandMode::object)
+            m_session.selectObject(start, SelectionMode::replace);
+        else if (!moved && m_session.tool() == NavigationTool::wand)
             m_session.magicWand(start, SelectionMode::replace);
         else if (!moved)
             m_session.deselect();
@@ -169,12 +178,14 @@ bool CanvasView::selectionKey(const QKeyEvent &key)
                                  key.key() == Qt::Key_Up ? -step : key.key() == Qt::Key_Down ? step : 0);
         return true;
     }
-    // M and L choose their tools; a repeat does nothing.
-    if (plain && (key.key() == Qt::Key_M || key.key() == Qt::Key_L)) {
+    // M, W and L choose tools; a repeat does nothing.
+    if (plain && (key.key() == Qt::Key_M || key.key() == Qt::Key_W || key.key() == Qt::Key_L)) {
         if (key.isAutoRepeat())
             return true;
         if (key.key() == Qt::Key_M)
             m_session.pressMarqueeKey();
+        else if (key.key() == Qt::Key_W)
+            m_session.pressWandKey();
         else
             m_session.pressLassoKey();
         updateCursor();

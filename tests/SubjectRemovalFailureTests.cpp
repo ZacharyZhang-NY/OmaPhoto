@@ -1,4 +1,5 @@
 #include "AddressSpaceLimit.h"
+#include "Document/ObjectSelection.h"
 #include "Document/BrushStroke.h"
 #include "Document/SubjectRemoval.h"
 #include "IO/ImageExporter.h"
@@ -14,6 +15,7 @@ private slots:
     void initTestCase() { mallopt(M_MMAP_THRESHOLD, 64 * 1024); }
     void aPreviewThatFindsNoMemoryIsARenderError();
     void aModelRunThatFindsNoMemoryIsARenderError();
+    void anObjectSelectionThatFindsNoMemoryIsARenderError();
 };
 
 namespace {
@@ -49,6 +51,23 @@ void SubjectRemovalFailureTests::aModelRunThatFindsNoMemoryIsARenderError()
     malloc_trim(0);
     const AddressSpaceLimit limit(512ll * 1024);
     QVERIFY_THROWS_EXCEPTION(ExportError, SubjectRemoval::run(fresh, FilterSettings()));
+}
+
+void SubjectRemovalFailureTests::anObjectSelectionThatFindsNoMemoryIsARenderError()
+{
+    const QImage large = disc(6000, 4000);
+    // The model's mask is kept, so only the selection allocates.
+    QVERIFY(ObjectSelection::select(large, QPointF(3000, 2000), 0, false).has_value());
+    malloc_trim(0);
+    {
+        // The model's grid finds no room.
+        const AddressSpaceLimit limit(16ll * 1024);
+        QVERIFY_THROWS_EXCEPTION(ExportError, ObjectSelection::select(large, QPointF(3000, 2000), 0, false));
+    }
+    malloc_trim(0);
+    // The grid fits; the image-sized masks do not.
+    const AddressSpaceLimit limit(8ll * 1024 * 1024);
+    QVERIFY_THROWS_EXCEPTION(ExportError, ObjectSelection::select(large, QPointF(3000, 2000), 0, false));
 }
 
 QTEST_GUILESS_MAIN(SubjectRemovalFailureTests)

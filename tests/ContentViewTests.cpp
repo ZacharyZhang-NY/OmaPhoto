@@ -32,7 +32,7 @@ const std::pair<NavigationTool, const char *> labelled[] = {
     {NavigationTool::move, "Move / Transform (V)"},
     {NavigationTool::marquee, "Marquee (M)"},
     {NavigationTool::lasso, "Lasso (L)"},
-    {NavigationTool::wand, "Magic Wand (W)"},
+    {NavigationTool::wand, "Magic (W) · Tab switches Wand and Object"},
     {NavigationTool::crop, "Crop (C)"},
     {NavigationTool::brush, "Brush (B) · Eraser (E)"},
     {NavigationTool::spotHealing, "Spot Healing Brush (J)"},
@@ -167,6 +167,13 @@ void ContentViewTests::theRailHoldsEveryToolInSwiftsOrder()
     QVERIFY(brush->grab().toImage() != painting);
     session.setBrushMode(BrushToolMode::paint);
     QCOMPARE(brush->grab().toImage(), painting);
+    // Magic's shows the object icon in Object mode.
+    QToolButton *const magic = buttons[3];
+    const QImage colours = magic->grab().toImage();
+    session.setWandMode(WandMode::object);
+    QVERIFY(magic->grab().toImage() != colours);
+    session.setWandMode(WandMode::wand);
+    QCOMPARE(magic->grab().toImage(), colours);
 }
 
 void ContentViewTests::theBarFollowsTheTool()
@@ -236,7 +243,7 @@ void ContentViewTests::theBarFollowsTheTool()
     QCOMPARE(bar().title->text(), QString("Lasso"));
     session.selectTool(NavigationTool::wand);
     QVERIFY(bar().property("kept").toBool());
-    QCOMPARE(bar().title->text(), QString("Magic Wand"));
+    QCOMPARE(bar().title->text(), QString("Magic"));
     QCOMPARE(bar().height(), 42);
     QCOMPARE(bar().height(), 42);
 }

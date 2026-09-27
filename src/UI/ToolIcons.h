@@ -5,7 +5,7 @@
 #include <QRectF>
 
 // The Marquee's and the Lasso's icons follow their kinds.
-enum class ToolIconKind { plain, ellipse, polygonal, eraser };
+enum class ToolIconKind { plain, ellipse, polygonal, eraser, object };
 
 // The tool rail's icons, drawn: SF Symbols have no twin.
 namespace ToolIcons {

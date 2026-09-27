@@ -26,8 +26,6 @@ std::optional<NavigationTool> toolForKey(int key)
         return NavigationTool::shape;
     case Qt::Key_I:
         return NavigationTool::eyedropper;
-    case Qt::Key_W:
-        return NavigationTool::wand;
     case Qt::Key_A:
         return NavigationTool::idle;
     case Qt::Key_R:

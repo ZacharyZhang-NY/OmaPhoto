@@ -222,6 +222,11 @@ QImage SubjectRemoval::subjectMask(const QImage &image, const std::optional<QIma
     return combined;
 }
 
+QImage SubjectRemoval::foreground(const QImage &image)
+{
+    return vision(image);
+}
+
 QImage SubjectRemoval::run(const QImage &image, const FilterSettings &settings)
 {
     // The preview refines a copy 1400 long at most: quick.

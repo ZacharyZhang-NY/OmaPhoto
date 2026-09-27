@@ -211,7 +211,7 @@ void ToolIcons::paint(QPainter &painter, NavigationTool tool, QPointF origin, do
     case NavigationTool::move: move(painter); break;
     case NavigationTool::marquee: marquee(painter, kind); break;
     case NavigationTool::lasso: lasso(painter, kind); break;
-    case NavigationTool::wand: wand(painter); break;
+    case NavigationTool::wand: kind == ToolIconKind::object ? SelectionIcons::paint(painter, SelectionIcon::objectSelection) : wand(painter); break;
     case NavigationTool::crop: crop(painter); break;
     case NavigationTool::brush: kind == ToolIconKind::eraser ? eraser(painter) : brush(painter); break;
     case NavigationTool::spotHealing: spotHealing(painter); break;

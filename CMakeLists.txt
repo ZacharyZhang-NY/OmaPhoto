@@ -49,6 +49,7 @@ add_library(compositor_core STATIC
     src/Document/SelectionClipboard.cpp
     src/Document/Crop.cpp
     src/Document/Guides.cpp
+    src/Document/ObjectSelection.cpp
     src/Document/Filters.cpp
     src/Document/GuidedMatte.cpp
     src/Document/SubjectRemoval.cpp
@@ -72,6 +73,7 @@ add_library(compositor_core STATIC
     src/Document/MaskTracing.cpp
     src/Document/PixelInvert.cpp
     src/Document/Selection.cpp
+    src/Document/Selection+Modify.cpp
     src/Document/SelectionEdits.cpp
     src/Document/ShapeTool.cpp
     src/Document/TypeTool.cpp
@@ -440,6 +442,7 @@ compositor_test(SubjectRemovalModelTests)
 compositor_test(SubjectRemovalFailureTests)
 compositor_test(RemoveBackgroundTests)
 compositor_test(SelectSubjectTests)
+compositor_test(ObjectSelectionTests)
 compositor_test(LayerEffectsRendererTests)
 compositor_test(LayerFlipTests)
 compositor_test(LayerMergeTests)

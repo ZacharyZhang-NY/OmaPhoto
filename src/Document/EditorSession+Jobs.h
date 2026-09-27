@@ -46,11 +46,12 @@ struct SessionJobs {
         std::optional<QImage> image;
         std::optional<QString> failure;
     };
-    // What a wand click waits for and applies.
+    // The Magic tool's job, either mode, and its step's name.
     struct Wanding {
         SelectionMode mode;
         QUuid documentID;
         std::function<void()> done;
+        QString name;
     };
     struct Wanded {
         std::optional<QPainterPath> path;

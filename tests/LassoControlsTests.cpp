@@ -33,6 +33,7 @@ private slots:
     void expandContractAndTheirAmountsNeedASelection();
     void deselectTheEmptyWordsAndAntialiasFollowTheSession();
     void theWandsControlsWriteItsSettings();
+    void magicsModesAndObjectControlsWriteTheirSettings();
 };
 
 void LassoControlsTests::theBarShowsTheToolsKindsAndSwitchesThem()
@@ -63,7 +64,7 @@ void LassoControlsTests::theBarShowsTheToolsKindsAndSwitchesThem()
     QVERIFY(bar.button("marqueeEllipse").isChecked() && !bar.button("marqueeRectangle").isChecked());
     QVERIFY(find<QCheckBox>(bar.controls, "selectionAntialiased").isVisible());
     session.selectTool(NavigationTool::wand);
-    QCOMPARE(bar.controls.title->text(), QString("Magic Wand"));
+    QCOMPARE(bar.controls.title->text(), QString("Magic"));
     QVERIFY(!bar.button("marqueeRectangle").isVisible() && !bar.button("lassoFreehand").isVisible());
     QVERIFY(find<QCheckBox>(bar.controls, "selectionAntialiased").isVisible());
     QCOMPARE(bar.controls.height(), 42);
@@ -254,6 +255,10 @@ void LassoControlsTests::theWandsControlsWriteItsSettings()
     QTest::keyClicks(&tolerance, "0");
     QTest::keyClick(&tolerance, Qt::Key_Down);
     QCOMPARE(session.wandSettings().tolerance, 0);
+    // A field that stays above zero takes no sign.
+    tolerance.selectAll();
+    QTest::keyClicks(&tolerance, "-");
+    QCOMPARE(tolerance.text(), QString("0"));
     QTest::keyClick(&tolerance, Qt::Key_Return);
     // The other three write their fields and read them back.
     size.setCurrentIndex(2);
@@ -269,6 +274,98 @@ void LassoControlsTests::theWandsControlsWriteItsSettings()
     QCOMPARE(tolerance.text(), QString("32"));
     QCOMPARE(size.currentText(), QString("Point Sample"));
     QVERIFY(bar.button("wandThisLayer").isChecked() && contiguous.isChecked());
+}
+
+void LassoControlsTests::magicsModesAndObjectControlsWriteTheirSettings()
+{
+    Bar bar;
+    EditorSession &session = *bar.session;
+    auto &edge = find<QLineEdit>(bar.controls, "objectEdge");
+    auto &antialias = find<QCheckBox>(bar.controls, "selectionAntialiased");
+    QToolButton &wand = bar.button("magicWandMode"), &object = bar.button("magicObjectMode");
+    // The modes show with Magic alone, labelled as Swift's.
+    QVERIFY(!wand.isVisible() && !object.isVisible());
+    session.selectTool(NavigationTool::wand);
+    QVERIFY(wand.isVisible() && object.isVisible() && wand.isChecked() && !object.isChecked());
+    QCOMPARE(wand.text(), QString("Wand"));
+    QCOMPARE(object.text(), QString("Object"));
+    QCOMPARE(object.toolTip(), QString("Press Tab to switch between Wand and Object"));
+    QCOMPARE(antialias.toolTip(), QString("Smooth selection edges; turn off for hard pixel edges"));
+    QVERIFY(!edge.isVisible() && !bar.button("objectThisLayer").isVisible());
+    // Magic takes no outline, so a choice only switches.
+    session.beginLasso(QPointF(5, 5), SelectionMode::replace);
+    QVERIFY(!session.lassoDraft());
+    QTest::mouseClick(&object, Qt::LeftButton);
+    QCOMPARE(session.wandMode(), WandMode::object);
+    QVERIFY(object.isChecked() && !wand.isChecked());
+    // Object shows its own controls and hides the wand's.
+    QVERIFY(edge.isVisible() && bar.button("objectThisLayer").isVisible() && bar.button("objectAllLayers").isVisible());
+    QVERIFY(find<QLabel>(bar.controls, "objectEdgeLabel").isVisible());
+    QVERIFY(!find<QLineEdit>(bar.controls, "wandTolerance").isVisible() && !find<QCheckBox>(bar.controls, "wandContiguous").isVisible());
+    QVERIFY(!bar.button("wandThisLayer").isVisible());
+    QCOMPARE(antialias.toolTip(), QString("Smooth the detected object outline; turn off for the raw pixel mask"));
+    QCOMPARE(bar.button("objectAllLayers").toolTip(), QString("Analyze the active layer only, or every visible layer as shown"));
+    QCOMPARE(edge.toolTip(), QString("Positive values tighten the detected mask inward; negative values expand it outward"));
+    QVERIFY(bar.button("objectAllLayers").isChecked() && !bar.button("objectThisLayer").isChecked());
+    QCOMPARE(edge.text(), QString("0"));
+    // The source writes its field alone.
+    QTest::mouseClick(&bar.button("objectThisLayer"), Qt::LeftButton);
+    QVERIFY(!session.objectSelectionSettings().sampleAllLayers);
+    QTest::mouseClick(&bar.button("objectAllLayers"), Qt::LeftButton);
+    QVERIFY(session.objectSelectionSettings().sampleAllLayers);
+    // The edge takes a sign, clamped to ten either way.
+    edge.setFocus();
+    QTRY_VERIFY(edge.hasFocus());
+    edge.selectAll();
+    QTest::keyClicks(&edge, "-");
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, 0);
+    // A sign leads the digits, never follows them.
+    QTest::keyClicks(&edge, "-");
+    QCOMPARE(edge.text(), QString("-"));
+    QTest::keyClicks(&edge, "4");
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, -4);
+    QTest::keyClicks(&edge, "0");
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, -10);
+    edge.selectAll();
+    QTest::keyClicks(&edge, "12");
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, 10);
+    edge.selectAll();
+    edge.insert(QStringLiteral("-99999999999999999999"));
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, -10);
+    edge.selectAll();
+    edge.insert(QStringLiteral("99999999999999999999"));
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, 10);
+    edge.selectAll();
+    QTest::keyClick(&edge, Qt::Key_Backspace);
+    QTest::keyClicks(&edge, "a+");
+    QCOMPARE(edge.text(), QString());
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, 10);
+    QTest::keyClicks(&edge, "3");
+    QTest::keyClick(&edge, Qt::Key_Down, Qt::ShiftModifier);
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, -7);
+    QTest::keyClick(&edge, Qt::Key_Down, Qt::ShiftModifier);
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, -10);
+    QTest::keyClick(&edge, Qt::Key_Up);
+    QCOMPARE(session.objectSelectionSettings().edgeOffset, -9);
+    QVERIFY(session.objectSelectionSettings().sampleAllLayers);
+    QTest::keyClick(&edge, Qt::Key_Return);
+    // The session's own changes show; Wand brings its controls back.
+    ObjectSelectionSettings other;
+    other.sampleAllLayers = false;
+    other.edgeOffset = 6;
+    session.setObjectSelectionSettings(other);
+    QCOMPARE(edge.text(), QString("6"));
+    QVERIFY(bar.button("objectThisLayer").isChecked());
+    session.cycleToolMode();
+    QVERIFY(wand.isChecked() && !edge.isVisible() && find<QLineEdit>(bar.controls, "wandTolerance").isVisible());
+    session.setWandMode(WandMode::object);
+    QVERIFY(object.isChecked() && !wand.isChecked());
+    QTest::mouseClick(&object, Qt::LeftButton);
+    QTest::mouseClick(&wand, Qt::LeftButton);
+    QCOMPARE(session.wandMode(), WandMode::wand);
+    // The Lasso shows neither.
+    session.selectTool(NavigationTool::lasso);
+    QVERIFY(!wand.isVisible() && !edge.isVisible());
 }
 
 QTEST_MAIN(LassoControlsTests)

@@ -32,6 +32,19 @@ void SelectionIcons::paint(QPainter &painter, SelectionIcon icon)
         painter.drawPath(tail);
         return;
     }
+    // Swift's ObjectSelectionToolIcon: four corners round a pointer.
+    case SelectionIcon::objectSelection: {
+        QPen pen = painter.pen();
+        pen.setWidthF(1.6);
+        painter.setPen(pen);
+        for (const QPolygonF &corner : {QPolygonF{QPointF(2, 6), QPointF(2, 2), QPointF(6, 2)}, QPolygonF{QPointF(12, 2), QPointF(16, 2), QPointF(16, 6)},
+                                        QPolygonF{QPointF(16, 12), QPointF(16, 16), QPointF(12, 16)}, QPolygonF{QPointF(6, 16), QPointF(2, 16), QPointF(2, 12)}})
+            painter.drawPolyline(corner);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(pen.color());
+        painter.drawPolygon(QPolygonF{QPointF(7, 5), QPointF(7, 14), QPointF(9.6, 11.7), QPointF(11.3, 15.3), QPointF(13.2, 14.4), QPointF(11.5, 10.9), QPointF(14.5, 10.9)});
+        return;
+    }
     // Swift's PolygonalLassoToolIcon: loop, knot and rope as segments.
     case SelectionIcon::polygonalLasso:
         painter.drawPolygon(QPolygonF{QPointF(1.2, 7.0), QPointF(4.0, 2.4), QPointF(11.8, 1.8), QPointF(16.8, 5.2), QPointF(15.6, 10.4), QPointF(7.0, 11.6)});

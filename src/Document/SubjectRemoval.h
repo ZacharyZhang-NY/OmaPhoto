@@ -23,6 +23,8 @@ std::vector<float> modelInput(const QImage &image);
 QImage modelMask(const float *prediction, QSize size);
 // White over the subject in the layer's grid, times `existing`.
 QImage subjectMask(const QImage &image, const std::optional<QImage> &existing, const FilterSettings &settings);
+// The model's mask at the image's size, cached by image.
+QImage foreground(const QImage &image);
 // The preview: the layer with its background cleared.
 QImage run(const QImage &image, const FilterSettings &settings);
 }

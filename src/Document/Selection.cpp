@@ -54,6 +54,11 @@ QString rawValue(SelectionAmountOperation operation)
     throw std::logic_error("unknown selection amount operation");
 }
 
+QString rawValue(WandMode mode)
+{
+    return mode == WandMode::object ? QStringLiteral("Object") : QStringLiteral("Wand");
+}
+
 QString rawValue(SelectionMode mode)
 {
     switch (mode) {
@@ -173,31 +178,6 @@ void EditorSession::setSelectionAntialiased(bool antialiased)
     notify();
 }
 
-void EditorSession::setSelectionExpandAmount(int amount)
-{
-    m_selectionExpandAmount = amount;
-    notify();
-}
-
-void EditorSession::setSelectionContractAmount(int amount)
-{
-    m_selectionContractAmount = amount;
-    notify();
-}
-
-void EditorSession::setSelectionFeatherAmount(int amount)
-{
-    m_selectionFeatherAmount = amount;
-    notify();
-}
-
-void EditorSession::setSelectionAmountOperation(std::optional<SelectionAmountOperation> operation)
-{
-    m_selectionAmountOperation = operation;
-    resumeFileRequests();
-    notify();
-}
-
 void EditorSession::beginLasso(QPointF point, SelectionMode mode)
 {
     // The Magic Wand selects with a click, never an outline.
@@ -264,6 +244,12 @@ void EditorSession::cancelLasso()
 void EditorSession::pressMarqueeKey()
 {
     selectTool(NavigationTool::marquee);
+}
+
+// W picks the Magic tool; Tab switches its two modes.
+void EditorSession::pressWandKey()
+{
+    selectTool(NavigationTool::wand);
 }
 
 void EditorSession::pressLassoKey()
@@ -398,61 +384,6 @@ void EditorSession::nudgeSelection(double dx, double dy)
         return;
     moveSelection(QSizeF(dx, dy));
     endSelectionMove();
-}
-
-bool EditorSession::canModifySelection() const
-{
-    const std::optional<DocumentSelection> current = selection();
-    return current && !current->isEmpty() && canEditSelection() && !m_lassoDraft;
-}
-
-void EditorSession::expandSelection(int amount)
-{
-    resizeSelection(amount, QStringLiteral("Expand Selection"));
-}
-
-void EditorSession::contractSelection(int amount)
-{
-    resizeSelection(-amount, QStringLiteral("Contract Selection"));
-}
-
-void EditorSession::promptSelectionAmount(SelectionAmountOperation operation)
-{
-    if (!canModifySelection())
-        return;
-    setSelectionAmountOperation(operation);
-}
-
-void EditorSession::confirmSelectionAmount(int amount)
-{
-    const std::optional<SelectionAmountOperation> operation = m_selectionAmountOperation;
-    if (!operation || amount < 1 || amount > (*operation == SelectionAmountOperation::feather ? 250 : 500))
-        return;
-    setSelectionAmountOperation(std::nullopt);
-    switch (*operation) {
-    case SelectionAmountOperation::expand:
-        setSelectionExpandAmount(amount);
-        expandSelection(amount);
-        break;
-    case SelectionAmountOperation::contract:
-        setSelectionContractAmount(amount);
-        contractSelection(amount);
-        break;
-    case SelectionAmountOperation::feather:
-        setSelectionFeatherAmount(amount);
-        featherSelection(amount);
-        break;
-    }
-}
-
-void EditorSession::featherSelection(int amount)
-{
-    const std::optional<DocumentSelection> current = selection();
-    if (!canModifySelection() || !current || amount <= 0)
-        return;
-    // Two soft edges spread less than their sum.
-    const double softened = std::sqrt(current->feather * current->feather + double(amount) * amount);
-    setSelection(DocumentSelection{current->path, current->antialiased, std::min(250.0, softened)}, QStringLiteral("Feather Selection"));
 }
 
 void EditorSession::resizeSelection(double delta, const QString &name)
