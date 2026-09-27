@@ -99,6 +99,55 @@ jobs:
           name: appimage-x86_64
           path: OmaPhoto-x86_64.AppImage*
 
+  screenshot-alpine:
+    name: Launch on stock Alpine and screenshot
+    needs: build
+    runs-on: ubuntu-24.04
+    container:
+      image: alpine:3.20
+    steps:
+      # actions/* run via a Node binary the runner injects from the host, which is
+      # glibc-linked; without a compat shim it can't even exec inside a musl container.
+      - name: Install glibc compat for the injected actions runtime
+        run: apk add --no-cache libc6-compat
+
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: appimage-x86_64
+
+      - name: Install the minimal packages to run the AppImage and take a screenshot
+        run: |
+          apk add --no-cache gcompat libx11 libxcb libxkbcommon libxkbcommon-x11 \
+            mesa-gl mesa-dri-gallium ttf-dejavu xvfb ffmpeg
+
+      - name: Launch OmaPhoto under Xvfb and screenshot it
+        run: |
+          chmod +x OmaPhoto-x86_64.AppImage
+          ./OmaPhoto-x86_64.AppImage --appimage-extract
+
+          Xvfb :99 -screen 0 1280x800x24 &
+          XVFB_PID=$!
+          sleep 2
+
+          export DISPLAY=:99
+          export QT_QPA_PLATFORM=xcb
+          ./squashfs-root/AppRun &
+          APP_PID=$!
+          sleep 8
+
+          ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png
+
+          kill "$APP_PID" 2>/dev/null || true
+          kill "$XVFB_PID" 2>/dev/null || true
+          test -s screenshot.png
+
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpine-screenshot
+          path: screenshot.png
+
   upload:
     name: Create release
     needs: build
