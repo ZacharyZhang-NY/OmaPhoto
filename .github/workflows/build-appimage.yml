@@ -86,14 +86,15 @@ jobs:
           # carries its own copy instead of depending on the target providing it; resolve
           # each soname's real path with ldconfig rather than hardcoding a directory, since
           # that varies (lib vs lib/x86_64-linux-gnu).
-          # libGL.so.1 (GLVND's dispatcher) itself needs libGLX.so.0 and libOpenGL.so.0 as
-          # separate vendor libraries at runtime - Debian's test container happened to
-          # already have a system libGLX.so.0 (from some other package's dependency chain),
-          # which silently masked this one being missing from the bundle; Alpine's minimal
-          # container has no such incidental copy, and AppRun failed outright with "error
-          # while loading shared libraries: libGLX.so.0: cannot open shared object file".
+          # libGL.so.1 (GLVND's dispatcher) itself needs libGLX.so.0, libGLdispatch.so.0,
+          # and libOpenGL.so.0 as separate vendor/support libraries at runtime - Debian's
+          # test container happened to already have system copies of these (from some
+          # other package's dependency chain), which silently masked them being missing
+          # from the bundle; Alpine's minimal container has no such incidental copies, and
+          # each one that isn't bundled here surfaces as its own "error while loading
+          # shared libraries" only once the previous one is fixed - discovered one at a time.
           RUNTIME_LIBS="libX11.so.6 libxcb.so.1 libxkbcommon.so.0 libxkbcommon-x11.so.0 \
-            libSM.so.6 libICE.so.6 libGL.so.1 libGLX.so.0 libEGL.so.1 libOpenGL.so.0 \
+            libSM.so.6 libICE.so.6 libGL.so.1 libGLX.so.0 libGLdispatch.so.0 libEGL.so.1 libOpenGL.so.0 \
             libxcb-icccm.so.4 libxcb-image.so.0 libxcb-keysyms.so.1 \
             libxcb-render-util.so.0 libxcb-cursor.so.0 libgpg-error.so.0"
           LIBRARY_ARGS=""
