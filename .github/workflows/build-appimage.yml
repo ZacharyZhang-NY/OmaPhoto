@@ -86,8 +86,14 @@ jobs:
           # carries its own copy instead of depending on the target providing it; resolve
           # each soname's real path with ldconfig rather than hardcoding a directory, since
           # that varies (lib vs lib/x86_64-linux-gnu).
+          # libGL.so.1 (GLVND's dispatcher) itself needs libGLX.so.0 and libOpenGL.so.0 as
+          # separate vendor libraries at runtime - Debian's test container happened to
+          # already have a system libGLX.so.0 (from some other package's dependency chain),
+          # which silently masked this one being missing from the bundle; Alpine's minimal
+          # container has no such incidental copy, and AppRun failed outright with "error
+          # while loading shared libraries: libGLX.so.0: cannot open shared object file".
           RUNTIME_LIBS="libX11.so.6 libxcb.so.1 libxkbcommon.so.0 libxkbcommon-x11.so.0 \
-            libSM.so.6 libICE.so.6 libGL.so.1 libEGL.so.1 libOpenGL.so.0 \
+            libSM.so.6 libICE.so.6 libGL.so.1 libGLX.so.0 libEGL.so.1 libOpenGL.so.0 \
             libxcb-icccm.so.4 libxcb-image.so.0 libxcb-keysyms.so.1 \
             libxcb-render-util.so.0 libxcb-cursor.so.0 libgpg-error.so.0"
           LIBRARY_ARGS=""
@@ -222,10 +228,23 @@ jobs:
           # verdict from this job may have been this check failing, not the app. Use the
           # real property name and print (not swallow) identify's own error if it has one,
           # so a tool failure is visible instead of indistinguishable from a real blank frame.
+          #
+          # A non-flat screenshot alone is not proof the app rendered: icewm's own taskbar
+          # and desktop chrome are non-flat by themselves, so a run where AppRun crashed
+          # immediately (e.g. a missing bundled library) can still "pass" on pixel stddev
+          # with nothing but the window manager's own furniture on screen. Require an actual
+          # window owned by the app (matched on its WM_CLASS, "OmaPhoto") to exist first.
           START=$(date +%s)
           STDDEV=0
+          WINDOW_FOUND=0
           while [ "$(( $(date +%s) - START ))" -lt 15 ]; do
             sleep 2
+            if xwininfo -tree -root 2>/dev/null | grep -q '"OmaPhoto")'; then
+              WINDOW_FOUND=1
+            else
+              echo "OmaPhoto window not found yet" >&2
+              continue
+            fi
             ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png -loglevel error
             IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot.png 2>&1)
             IDENTIFY_RC=$?
@@ -235,7 +254,7 @@ jobs:
             else
               STDDEV="$IDENTIFY_OUT"
             fi
-            echo "frame stddev: $STDDEV" >&2
+            echo "OmaPhoto window found, frame stddev: $STDDEV" >&2
             if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
               break
             fi
@@ -260,9 +279,13 @@ jobs:
           kill "$ICEWM_PID" 2>/dev/null || true
           kill "$XVFB_PID" 2>/dev/null || true
 
+          if [ "$WINDOW_FOUND" -ne 1 ]; then
+            echo "::error::no window owned by OmaPhoto ever appeared in 15s - it likely crashed or failed to start (see the backtrace/exit status above)" >&2
+            exit 1
+          fi
           test -s screenshot.png
           if ! awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
-            echo "screenshot.png still looks blank/flat after 15s (pixel stddev=$STDDEV) - the app did not render" >&2
+            echo "::error::OmaPhoto's window exists but screenshot.png still looks blank/flat after 15s (pixel stddev=$STDDEV)" >&2
             exit 1
           fi
 
@@ -350,11 +373,24 @@ jobs:
           APP_PID=$!
 
           # Same retry-until-real-content check as the Debian job, using the correct
-          # ImageMagick property (see that job's comment for the bug this replaced).
+          # ImageMagick property (see that job's comment for the bug this replaced) and
+          # requiring an actual OmaPhoto-owned window first - a run where AppRun crashed
+          # immediately (e.g. a missing bundled library) can otherwise still "pass" on
+          # pixel stddev alone, since icewm's own taskbar and desktop chrome are non-flat
+          # by themselves. This exact false pass happened here once already: AppRun failed
+          # with "error while loading shared libraries: libGLX.so.0: ..." and the stddev
+          # check still measured 0.14 from icewm's desktop and reported success.
           START=$(date +%s)
           STDDEV=0
+          WINDOW_FOUND=0
           while [ "$(( $(date +%s) - START ))" -lt 15 ]; do
             sleep 2
+            if xwininfo -tree -root 2>/dev/null | grep -q '"OmaPhoto")'; then
+              WINDOW_FOUND=1
+            else
+              echo "OmaPhoto window not found yet" >&2
+              continue
+            fi
             ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot-alpine.png -loglevel error
             IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot-alpine.png 2>&1)
             IDENTIFY_RC=$?
@@ -364,7 +400,7 @@ jobs:
             else
               STDDEV="$IDENTIFY_OUT"
             fi
-            echo "frame stddev: $STDDEV" >&2
+            echo "OmaPhoto window found, frame stddev: $STDDEV" >&2
             if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
               break
             fi
@@ -383,9 +419,13 @@ jobs:
           kill "$ICEWM_PID" 2>/dev/null || true
           kill "$XVFB_PID" 2>/dev/null || true
 
+          if [ "$WINDOW_FOUND" -ne 1 ]; then
+            echo "::error::no window owned by OmaPhoto ever appeared in 15s - it likely crashed or failed to start (see the backtrace/exit status above)" >&2
+            exit 1
+          fi
           test -s screenshot-alpine.png
           if ! awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
-            echo "screenshot-alpine.png still looks blank/flat after 15s (pixel stddev=$STDDEV) - the app did not render" >&2
+            echo "::error::OmaPhoto's window exists but screenshot-alpine.png still looks blank/flat after 15s (pixel stddev=$STDDEV)" >&2
             exit 1
           fi
 
