@@ -8,7 +8,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: build-appimage-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -16,7 +20,9 @@ jobs:
     name: Build AppImage (x86_64)
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Install build dependencies
         run: |
@@ -129,7 +135,7 @@ jobs:
             AppDir OmaPhoto-x86_64.AppImage
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: appimage-x86_64
           path: OmaPhoto-x86_64.AppImage*
@@ -153,7 +159,7 @@ jobs:
       # `screenshot-alpine` job below tries Alpine again as a stricter, optional
       # stretch-goal test - no compat layer needed at all here on Debian either way.
       - name: Download AppImage artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: appimage-x86_64
 
@@ -246,14 +252,17 @@ jobs:
               echo "OmaPhoto window not found yet" >&2
               continue
             fi
-            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png -loglevel error
-            IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot.png 2>&1)
-            IDENTIFY_RC=$?
-            if [ "$IDENTIFY_RC" -ne 0 ]; then
-              echo "identify failed (exit $IDENTIFY_RC): $IDENTIFY_OUT" >&2
-              STDDEV=0
-            else
+            # GitHub Actions runs this under `bash -e`, so a plain `VAR=$(cmd)` assignment
+            # would abort the whole step the instant ffmpeg or identify ever failed,
+            # skipping the diagnostics and cleanup below - guard both explicitly instead
+            # of relying on the fallback logic ever actually being reached.
+            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png -loglevel error || {
+              echo "ffmpeg capture failed, retrying" >&2; continue; }
+            if IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot.png 2>&1); then
               STDDEV="$IDENTIFY_OUT"
+            else
+              echo "identify failed: $IDENTIFY_OUT" >&2
+              STDDEV=0
             fi
             echo "OmaPhoto window found, frame stddev: $STDDEV" >&2
             if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
@@ -292,7 +301,7 @@ jobs:
 
       - name: Upload screenshot
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: screenshot
           path: screenshot.png
@@ -314,7 +323,7 @@ jobs:
         run: apk add --no-cache libc6-compat
 
       - name: Download AppImage artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: appimage-x86_64
 
@@ -392,14 +401,14 @@ jobs:
               echo "OmaPhoto window not found yet" >&2
               continue
             fi
-            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot-alpine.png -loglevel error
-            IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot-alpine.png 2>&1)
-            IDENTIFY_RC=$?
-            if [ "$IDENTIFY_RC" -ne 0 ]; then
-              echo "identify failed (exit $IDENTIFY_RC): $IDENTIFY_OUT" >&2
-              STDDEV=0
-            else
+            # Same errexit guard as the Debian job - see its comment for why.
+            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot-alpine.png -loglevel error || {
+              echo "ffmpeg capture failed, retrying" >&2; continue; }
+            if IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot-alpine.png 2>&1); then
               STDDEV="$IDENTIFY_OUT"
+            else
+              echo "identify failed: $IDENTIFY_OUT" >&2
+              STDDEV=0
             fi
             echo "OmaPhoto window found, frame stddev: $STDDEV" >&2
             if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
@@ -432,7 +441,7 @@ jobs:
 
       - name: Upload screenshot
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: screenshot-alpine
           path: screenshot-alpine.png
@@ -448,12 +457,16 @@ jobs:
       always() && github.event_name == 'push' &&
       needs.build.result == 'success' && needs.screenshot-debian.result == 'success'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
 
       - name: Create release and upload
         env:
@@ -464,14 +477,21 @@ jobs:
           chmod +x pyuploadtool-x86_64.AppImage
           FILES="screenshot/screenshot.png"
           [ -f screenshot-alpine/screenshot-alpine.png ] && FILES="$FILES screenshot-alpine/screenshot-alpine.png"
-          GITHUB_RELEASE_NAME="$VERSION" GITHUB_CONTINUOUS_RELEASE_TYPE=stable \
+          # A rolling build should never show as the repo's "Latest" stable release.
+          GITHUB_RELEASE_NAME="$VERSION" GITHUB_CONTINUOUS_RELEASE_TYPE=prerelease \
             ./pyuploadtool-x86_64.AppImage **/OmaPhoto*.AppImage* $FILES
 
       - name: Add the screenshot(s) to the release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(gh release list --repo "${{ github.repository }}" --json tagName --jq '.[0].tagName')
+          # Derive the tag from the actual event instead of trusting "most recently
+          # created release" ordering, which a concurrent run or another release
+          # stream could make point at the wrong release.
+          case "$GITHUB_REF" in
+            refs/tags/*) TAG="${GITHUB_REF#refs/tags/}" ;;
+            *) TAG="continuous" ;;
+          esac
           gh release view "$TAG" --repo "${{ github.repository }}" --json body --jq .body > notes.md
           {
             echo ""
