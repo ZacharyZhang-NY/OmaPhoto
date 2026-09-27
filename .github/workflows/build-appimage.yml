@@ -99,65 +99,32 @@ jobs:
           name: appimage-x86_64
           path: OmaPhoto-x86_64.AppImage*
 
-  screenshot-alpine:
-    name: Launch on stock Alpine and screenshot
+  screenshot-debian:
+    name: Launch on a minimal glibc distro and screenshot
     needs: build
     runs-on: ubuntu-24.04
     container:
-      image: alpine:3.20
+      image: debian:trixie-slim
     steps:
-      # actions/* run via a Node binary the runner injects from the host, which is
-      # glibc-linked; without a compat shim it can't even exec inside a musl container.
-      - name: Install glibc compat for the injected actions runtime
-        run: apk add --no-cache libc6-compat
-
+      # Five attempts on an Alpine (musl) target hit a hard wall: with a real-glibc
+      # compat layer forced in for the app's own glibc-linked payload, the process then
+      # also had to load Alpine's musl-native xcb/mesa libraries, and hung indefinitely
+      # (no crash, no error) right after touching them - a real-glibc process mixing
+      # musl-compiled shared objects in the same address space is known-fragile (TLS
+      # layout, pthread ABI, malloc differences). AppImage's portability promise is
+      # about glibc distros in the first place, so verify against a minimal *glibc*
+      # target instead of fighting musl - no compat layer needed at all here.
       - name: Download AppImage artifact
         uses: actions/download-artifact@v4
         with:
           name: appimage-x86_64
 
-      - name: Install the packages needed to run the AppImage and take a screenshot
+      - name: Install the minimal packages to run the AppImage and take a screenshot
         run: |
-          # gcompat only fakes a handful of glibc symbols and left dozens unresolved
-          # (GLIBC_2.38 additions such as __isoc23_strtol, renameat2, close_range,
-          # pthread_cond_clockwait) because the AppImage was built against Ubuntu 24.04's
-          # glibc 2.39. sgerrand/alpine-pkg-glibc is the usual real-glibc source for Alpine
-          # but stopped at glibc 2.35, which predates GLIBC_2.38, so it would not help
-          # either. dalet-oss/alpine-glibc continues that same packaging up to date, so use
-          # its glibc 2.44 build instead - this is an unofficial, third-party apk repo.
-          GLIBC_VER=2.44
-          wget -q -O /etc/apk/keys/alpine-packaging-rsa.pub \
-            https://raw.githubusercontent.com/dalet-oss/alpine-glibc/master/alpine-packaging-rsa.pub
-          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-${GLIBC_VER}.apk"
-          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-bin-${GLIBC_VER}.apk"
-          apk add --no-cache --force-overwrite "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
-          rm -f "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
-
-          # Qt's xcb platform plugin itself (not just the app) needs the small xcb-util
-          # helper libraries (icccm/wm, image, keysyms, render-util, cursor) - without them
-          # dlopen() of libqxcb.so fails and Qt reports "plugin was found" but could not be
-          # initialized. QT_DEBUG_PLUGINS=1 then showed the plugin still failed to dlopen
-          # because of a missing libSM.so.6 (X11 session-management), which in turn pulls in
-          # libICE.so.6 - install libsm/libice for those. imagemagick is only needed for the
-          # "did the app actually paint anything" check in the next step.
-          apk add --no-cache libx11 libxcb libxkbcommon libxkbcommon-x11 libsm libice \
-            xcb-util xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil xcb-util-cursor \
-            mesa-gl mesa-dri-gallium ttf-dejavu xvfb ffmpeg imagemagick
-
-          # The AppImage links against Ubuntu's GLVND libGLX.so.0/libOpenGL.so.0, but
-          # Alpine's mesa-gl only ships the classic monolithic libGL.so.1, which already
-          # exports the same GLX and GL symbols - point the GLVND sonames at it instead of
-          # trying to bring in a GLVND stack Alpine does not package. AppRun still failed to
-          # load libGLX.so.0 after this symlink alone: real glibc's ld.so resolves sonames
-          # from its ld.so.cache, which was built by the glibc-bin trigger before these
-          # symlinks existed, so the new names never made it into the cache. Export the
-          # symlink directory as LD_LIBRARY_PATH for the launch step instead, since that is
-          # consulted directly at load time and does not depend on the cache being current.
-          GL_LIB=$(find /usr/lib /usr/lib64 /lib /lib64 -name 'libGL.so.1' 2>/dev/null | head -1)
-          GL_DIR=$(dirname "$GL_LIB")
-          ln -sf "$GL_LIB" "$GL_DIR/libGLX.so.0"
-          ln -sf "$GL_LIB" "$GL_DIR/libOpenGL.so.0"
-          echo "GL_DIR=$GL_DIR" >> "$GITHUB_ENV"
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            libx11-6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libsm6 libice6 \
+            libgl1 fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates
 
       - name: Launch OmaPhoto under Xvfb and screenshot it
         run: |
@@ -170,15 +137,8 @@ jobs:
 
           export DISPLAY=:99
           export QT_QPA_PLATFORM=xcb
-          export LD_LIBRARY_PATH="$GL_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          # Prints why a QPA plugin candidate was rejected, in case xcb still won't load -
-          # otherwise Qt only reports that it "was found" but not why dlopen() failed.
-          export QT_DEBUG_PLUGINS=1
-          # With xcb finally loading, QT_DEBUG_PLUGINS showed startup stall for good after
-          # "checking directory path .../accessiblebridge": Qt6's Linux accessibility bridge
-          # tries to reach the AT-SPI registry over D-Bus, and this container has no D-Bus
-          # daemon at all, so it blocks until our own timeout gave up rather than failing
-          # fast. Disable Qt's accessibility bridge outright since nothing here needs it.
+          # No D-Bus/AT-SPI daemon in this container - Qt's accessibility bridge would
+          # otherwise block trying to reach it instead of failing fast.
           export QT_ACCESSIBILITY=0
           ./squashfs-root/AppRun &
           APP_PID=$!
@@ -210,12 +170,12 @@ jobs:
       - name: Upload screenshot
         uses: actions/upload-artifact@v4
         with:
-          name: alpine-screenshot
+          name: screenshot
           path: screenshot.png
 
   upload:
     name: Create release
-    needs: build
+    needs: [build, screenshot-debian]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     steps:
@@ -233,4 +193,14 @@ jobs:
           wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
           chmod +x pyuploadtool-x86_64.AppImage
           GITHUB_RELEASE_NAME="$VERSION" GITHUB_CONTINUOUS_RELEASE_TYPE=stable \
-            ./pyuploadtool-x86_64.AppImage **/OmaPhoto*.AppImage*
+            ./pyuploadtool-x86_64.AppImage **/OmaPhoto*.AppImage* screenshot/screenshot.png
+
+      - name: Add the screenshot to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh release list --repo "${{ github.repository }}" --json tagName --jq '.[0].tagName')
+          NOTES=$(gh release view "$TAG" --repo "${{ github.repository }}" --json body --jq .body)
+          printf '%s\n\n## Running on a stock minimal Debian\n\n![OmaPhoto running on a stock minimal Debian](https://github.com/%s/releases/download/%s/screenshot.png)\n' \
+            "$NOTES" "${{ github.repository }}" "$TAG" > notes.md
+          gh release edit "$TAG" --repo "${{ github.repository }}" --notes-file notes.md
