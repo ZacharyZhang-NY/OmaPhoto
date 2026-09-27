@@ -116,10 +116,33 @@ jobs:
         with:
           name: appimage-x86_64
 
-      - name: Install the minimal packages to run the AppImage and take a screenshot
+      - name: Install the packages needed to run the AppImage and take a screenshot
         run: |
-          apk add --no-cache gcompat libx11 libxcb libxkbcommon libxkbcommon-x11 \
+          # gcompat only fakes a handful of glibc symbols and left dozens unresolved
+          # (GLIBC_2.38 additions such as __isoc23_strtol, renameat2, close_range,
+          # pthread_cond_clockwait) because the AppImage was built against Ubuntu 24.04's
+          # glibc 2.39. sgerrand/alpine-pkg-glibc is the usual real-glibc source for Alpine
+          # but stopped at glibc 2.35, which predates GLIBC_2.38, so it would not help
+          # either. dalet-oss/alpine-glibc continues that same packaging up to date, so use
+          # its glibc 2.44 build instead - this is an unofficial, third-party apk repo.
+          GLIBC_VER=2.44
+          wget -q -O /etc/apk/keys/alpine-packaging-rsa.pub \
+            https://raw.githubusercontent.com/dalet-oss/alpine-glibc/master/alpine-packaging-rsa.pub
+          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-${GLIBC_VER}.apk"
+          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-bin-${GLIBC_VER}.apk"
+          apk add --no-cache --force-overwrite "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
+          rm -f "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
+
+          apk add --no-cache libx11 libxcb libxkbcommon libxkbcommon-x11 \
             mesa-gl mesa-dri-gallium ttf-dejavu xvfb ffmpeg
+
+          # The AppImage links against Ubuntu's GLVND libGLX.so.0/libOpenGL.so.0, but
+          # Alpine's mesa-gl only ships the classic monolithic libGL.so.1, which already
+          # exports the same GLX and GL symbols - point the GLVND sonames at it instead of
+          # trying to bring in a GLVND stack Alpine does not package.
+          GL_LIB=$(find /usr/lib /usr/lib64 -name 'libGL.so.1' 2>/dev/null | head -1)
+          ln -sf "$GL_LIB" "$(dirname "$GL_LIB")/libGLX.so.0"
+          ln -sf "$GL_LIB" "$(dirname "$GL_LIB")/libOpenGL.so.0"
 
       - name: Launch OmaPhoto under Xvfb and screenshot it
         run: |
