@@ -1,0 +1,121 @@
+name: Build AppImage
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    name: Build AppImage (x86_64)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ cmake ninja-build qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev qt6-wayland \
+            fonts-dejavu-core qt6-image-formats-plugins libheif-dev libheif-plugin-libde265 \
+            libfontconfig-dev ca-certificates curl dpkg-dev file fakeroot \
+            patchelf desktop-file-utils
+
+      - name: Install ONNX Runtime
+        run: |
+          curl -fsSL -o /tmp/ort.tgz \
+            https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz
+          echo "7485c7e7aac6501b27e353dcbe068e45c61ab51fbaf598d13970dfae669d20bf  /tmp/ort.tgz" | sha256sum -c -
+          mkdir -p /tmp/ort
+          tar -xzf /tmp/ort.tgz -C /tmp/ort --strip-components=1
+          sudo mkdir -p /usr/local/include/onnxruntime /usr/local/lib64 /usr/local/lib/cmake
+          sudo cp -r /tmp/ort/include/. /usr/local/include/onnxruntime/
+          sudo mv /tmp/ort/lib/cmake/onnxruntime /usr/local/lib/cmake/
+          sudo cp -a /tmp/ort/lib/. /usr/local/lib64/
+          echo /usr/local/lib64 | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
+          sudo ldconfig
+          rm -rf /tmp/ort /tmp/ort.tgz
+
+      - name: Download Remove Background model
+        run: |
+          mkdir -p /tmp/omaphoto-share
+          curl -fsSL -o /tmp/omaphoto-share/u2net.onnx \
+            https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx
+          echo "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491  /tmp/omaphoto-share/u2net.onnx" | sha256sum -c -
+
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DOMAPHOTO_BUNDLE_ORT=ON -DOMAPHOTO_MODEL=/tmp/omaphoto-share/u2net.onnx
+          cmake --build build --target omaphoto
+
+      - name: Install into AppDir
+        run: |
+          rm -rf AppDir
+          DESTDIR="${{ github.workspace }}/AppDir" cmake --install build
+
+      - name: Deploy Qt dependencies into AppDir
+        env:
+          QMAKE: /usr/lib/qt6/bin/qmake6
+        run: |
+          wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          ./linuxdeploy-x86_64.AppImage --appimage-extract
+          mv squashfs-root squashfs-root-linuxdeploy
+          ./linuxdeploy-plugin-qt-x86_64.AppImage --appimage-extract
+          mv squashfs-root squashfs-root-linuxdeploy-qt
+          export PATH="${PWD}/squashfs-root-linuxdeploy-qt/usr/bin:${PATH}"
+          ./squashfs-root-linuxdeploy/usr/bin/linuxdeploy \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/omaphoto \
+            --desktop-file AppDir/usr/share/applications/io.github.ZacharyZhang_NY.OmaPhoto.desktop \
+            --icon-file packaging/icons/app-icon-256.png \
+            --plugin qt
+
+      - name: Download appimagetool
+        run: |
+          wget -c "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract
+
+      - name: Bundle AppImage
+        run: |
+          export PATH="${PWD}/squashfs-root/usr/bin:${PATH}"
+          ./squashfs-root/usr/bin/appimagetool \
+            --updateinformation "gh-releases-zsync|${{ github.repository_owner }}|${{ github.event.repository.name }}|continuous|OmaPhoto-x86_64.AppImage.zsync" \
+            AppDir OmaPhoto-x86_64.AppImage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage-x86_64
+          path: OmaPhoto-x86_64.AppImage*
+
+  upload:
+    name: Create release
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create release and upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep -oP 'project\(omaphoto VERSION \K[0-9.]+' CMakeLists.txt)
+          wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
+          chmod +x pyuploadtool-x86_64.AppImage
+          GITHUB_RELEASE_NAME="$VERSION" GITHUB_CONTINUOUS_RELEASE_TYPE=stable \
+            ./pyuploadtool-x86_64.AppImage **/OmaPhoto*.AppImage*
