@@ -52,6 +52,8 @@ double LayerEffectsSurface::reach() const
     // Swift forgets the inner shadow, whose blur reaches as far.
     if (m_effects.innerShadow)
         reach = std::max(reach, m_effects.innerShadow->distance + m_effects.innerShadow->blur * 3 + 2);
+    if (m_effects.outerGlow)
+        reach = std::max(reach, m_effects.outerGlow->size * 3 + 2);
     return reach;
 }
 

@@ -51,6 +51,7 @@ inline QStringList described(const EditorSession &session)
     result << QStringLiteral("brush %1 %2 %3 rgb %4 %5 %6 erase %7 mode %8 white %9 stroke %10 revision %11").arg(tip.diameter).arg(tip.hardness).arg(tip.opacity)
                   .arg(tip.red).arg(tip.green).arg(tip.blue).arg(int(tip.erasing)).arg(rawValue(session.brushMode())).arg(int(session.maskPaintWhite()))
                   .arg(session.brushStroke() ? int(session.brushStroke()->patches().size()) : -1).arg(session.brushRevision());
+    result << QStringLiteral("smoothing %1").arg(tip.smoothing);
     if (session.filterEdit().has_value()) {
         const FilterEdit &edit = session.filterEdit().value();
         result << QStringLiteral("filter %1 %2 preview %3 preparing %4 committing %5 error %6 grown %7").arg(rawValue(edit.kind), edit.layerID.toString())

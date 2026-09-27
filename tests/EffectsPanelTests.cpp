@@ -119,7 +119,7 @@ void EffectsPanelTests::theFooterAddsEachEffectAndOpensItsPanel()
     QStringList names;
     for (const QAction *entry : button.menu()->actions())
         names << entry->text();
-    QCOMPARE(names, QStringList({"Stroke…", "Drop Shadow…", "Color Overlay…", "Inner Shadow…"}));
+    QCOMPARE(names, QStringList({"Stroke…", "Drop Shadow…", "Color Overlay…", "Inner Shadow…", "Outer Glow…"}));
     QVERIFY(button.isEnabled());
     button.menu()->actions()[0]->trigger();
     QVERIFY((editor.session.effectsEditing() == LayerEffectSelection{editor.layer, LayerEffectKind::stroke}));
@@ -291,6 +291,7 @@ void EffectsPanelTests::eachKindHasSwiftsControls_data()
     QTest::newRow("overlay") << LayerEffectKind::colorOverlay << QString("Color Overlay") << QStringList{"Opacity:0:100:100"};
     QTest::newRow("inner shadow") << LayerEffectKind::innerShadow << QString("Inner Shadow")
                                   << QStringList{"Opacity:0:100:100", "Angle:-180:180:180", "Distance:0:5000:50", "Blur:0:500:100"};
+    QTest::newRow("outer glow") << LayerEffectKind::outerGlow << QString("Outer Glow") << QStringList{"Size:0:500:100", "Opacity:0:100:100"};
 }
 
 void EffectsPanelTests::eachKindHasSwiftsControls()
@@ -309,6 +310,8 @@ void EffectsPanelTests::eachKindHasSwiftsControls()
             head = label;
     }
     QVERIFY(head && head->font().pixelSize() == 13 && head->font().weight() == QFont::DemiBold);
+    // The stroke chooses its side; the rest show their colour.
+    QCOMPARE(sheet.findChild<QWidget *>("strokePosition") != nullptr, kind == LayerEffectKind::stroke);
     // Swift's fields in order, each clamped to its range's ends.
     QStringList names;
     for (const QLineEdit *field : sheet.findChildren<QLineEdit *>())

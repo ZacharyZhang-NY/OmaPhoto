@@ -1,10 +1,20 @@
 #include "UI/CompositorMenus.h"
 #include "Logging.h"
 #include "UI/KeyboardShortcuts.h"
+#include "UI/NativeLayerList.h"
 #include <QApplication>
 #include <QMenu>
 
 namespace {
+// The layer list holding the keys, as Swift's table.
+NativeLayerList *focusedList()
+{
+    for (QWidget *widget = QApplication::focusWidget(); widget; widget = widget->parentWidget())
+        if (auto *list = qobject_cast<NativeLayerList *>(widget))
+            return list;
+    return nullptr;
+}
+
 // An entry's name: Hue/Saturation is newHueSaturationAdjustment.
 QString adjustmentName(AdjustmentKind kind)
 {
@@ -157,12 +167,14 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     add(view, QStringLiteral("clearGuides"), QStringLiteral("Clear Guides"), QKeySequence(), [this] { session().clearGuides(); });
 
     QMenu *select = bar.addMenu(QStringLiteral("&Select"));
-    // Text fields keep their own Select All.
+    // The focus takes Select All first, as Swift's responder chain.
     add(select, QStringLiteral("selectAll"), QStringLiteral("All"), QKeySequence(Qt::CTRL | Qt::Key_A), [this] {
         if (m_field)
             m_field->selectAll();
         else if (InlineTextEditor *text = typedText())
             text->selectAll();
+        else if (NativeLayerList *list = focusedList())
+            list->selectAllRows();
         else
             session().selectAll();
     });
@@ -332,7 +344,6 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("transformControls"))->setChecked(s.showsTransformControls());
     action(QStringLiteral("transformControls"))->setEnabled(s.tool() == NavigationTool::move && s.document().has_value());
     const bool selected = s.selection().has_value();
-    action(QStringLiteral("selectAll"))->setEnabled(drawn);
     action(QStringLiteral("deselect"))->setEnabled(selected && s.canEditSelection());
     action(QStringLiteral("inverse"))->setEnabled(selected && s.canEditSelection());
     action(QStringLiteral("layerPixels"))->setEnabled(active && active->asset && s.canEditSelection());

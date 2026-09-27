@@ -1,4 +1,6 @@
 #include "MenuFixtures.h"
+#include "Rendering/EditorCanvas.h"
+#include "UI/NativeLayerList.h"
 #include <QApplication>
 #include <QLineEdit>
 #include <QRegularExpression>
@@ -23,9 +25,12 @@ private slots:
 void SelectMenuTests::selectEntriesFollowTheSelectionAndActOnIt()
 {
     Bar bar;
-    for (const char *name : {"selectAll", "deselect", "inverse", "layerPixels", "subject", "maskBlackAreas", "expandSelection", "contractSelection",
-                             "featherSelection"})
+    for (const char *name : {"deselect", "inverse", "layerPixels", "subject", "maskBlackAreas", "expandSelection", "contractSelection", "featherSelection"})
         QVERIFY2(!bar.action(name).isEnabled(), name);
+    // Select All never rests; without a canvas it does nothing.
+    QVERIFY(bar.action("selectAll").isEnabled());
+    bar.action("selectAll").trigger();
+    QVERIFY(!bar.session().document());
     bar.session().createDocument(50, 50, true);
     QVERIFY(bar.action("subject").isEnabled());
     QVERIFY(bar.action("selectAll").isEnabled());
@@ -95,10 +100,14 @@ void SelectMenuTests::selectAllInAFieldIsTheFields()
     Bar bar;
     bar.window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&bar.window));
-    // Without a canvas the entry rests; the welcome keeps Ctrl+A.
+    // Without a canvas the entry selects the welcome's field.
     QLineEdit &width = *bar.window.findChild<QLineEdit *>("widthInput");
     QTRY_VERIFY(width.hasFocus());
-    QVERIFY(!bar.action("selectAll").isEnabled());
+    width.setText(QStringLiteral("640"));
+    width.deselect();
+    QVERIFY(bar.action("selectAll").isEnabled());
+    bar.action("selectAll").trigger();
+    QCOMPARE(width.selectedText(), QString("640"));
     bar.session().createDocument(50, 50, true);
     QTRY_VERIFY(bar.action("selectAll").isEnabled());
     // A rename in progress: the editor's text, never the canvas.
@@ -112,6 +121,19 @@ void SelectMenuTests::selectAllInAFieldIsTheFields()
     QVERIFY(!bar.session().selection().has_value());
     QTest::keyClick(editor, Qt::Key_Escape);
     QTRY_VERIFY(!bar.session().renamingLayerID().has_value());
+    // The list holds the keys: its rows, as Swift's table.
+    bar.session().addBlankLayer();
+    NativeLayerList *list = bar.window.findChild<NativeLayerList *>();
+    list->setFocus();
+    QTRY_VERIFY(list->hasFocus());
+    const std::vector<ImageLayer> &layers = bar.session().document().value().layers;
+    bar.action("selectAll").trigger();
+    QCOMPARE(bar.session().selectedLayerIDs(), (QSet<QUuid>{layers[0].id, layers[1].id}));
+    QCOMPARE(bar.session().activeLayerID(), std::optional(layers[1].id));
+    QVERIFY(!bar.session().selection().has_value());
+    // Elsewhere it selects the canvas.
+    bar.window.findChild<CanvasView *>()->setFocus();
+    QTRY_VERIFY(!list->hasFocus());
     bar.action("selectAll").trigger();
     QVERIFY(bar.session().selection().has_value());
 }

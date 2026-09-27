@@ -80,9 +80,8 @@ std::optional<EffectsPreviewCache::Result> EffectsPreviewCache::preview(const Im
     if (m_entries.contains(layer.id)) {
         const Entry &old = m_entries.at(layer.id);
         old.request.cancelled->store(true);
-        // Kept while the settings change on the same pixels.
-        if (old.request.image.identity() == request.image.identity() && old.request.maskSource == maskSource
-            && old.request.effects.kinds() == effects.kinds())
+        // Kept on the same pixels, an effect hidden or not.
+        if (old.request.image.identity() == request.image.identity() && old.request.maskSource == maskSource)
             previous = old.result;
     }
     if (!previous && m_seeds.contains(layer.id))
@@ -151,11 +150,13 @@ std::optional<EffectsPreviewCache::Result> EffectsPreviewCache::render(const Req
             effects.shadow->distance *= factor;
             effects.shadow->blur *= factor;
         }
-        // Swift forgets the inner shadow, which then shows too wide.
+        // Swift forgets the inner shadow and glow: too wide.
         if (effects.innerShadow) {
             effects.innerShadow->distance *= factor;
             effects.innerShadow->blur *= factor;
         }
+        if (effects.outerGlow)
+            effects.outerGlow->size *= factor;
         const LayerEffectsRenderer::Rendered rendered = LayerEffectsRenderer::render(pixels, mask, effects);
         return Result{rendered.image, rendered.inset, std::nullopt};
     } catch (const ExportError &error) {

@@ -197,13 +197,22 @@ QImage LayerEffectsKernel::render(const QImage &pixels, const LayerEffects &effe
         for (qint64 index = 0; index < count; ++index)
             inside[index] = std::clamp(shape[index] * (1.f - inside[index]), 0.f, 1.f);
     }
+    const std::optional<OuterGlowEffect> glow = effects.outerGlow && effects.outerGlow->isEnabled() && effects.outerGlow->size > 0 && effects.outerGlow->opacity > 0
+        ? effects.outerGlow : std::nullopt;
+    Buffer glowing;
+    if (glow) {
+        // The shape softened every way, as Metal's glow buffer.
+        glowing = buffer(count);
+        std::copy(shape.get(), shape.get() + count, glowing.get());
+        blurred(glowing.get(), buffer(count).get(), width, height, float(glow->size / 2));
+    }
     const std::optional<ColorOverlayEffect> overlay = effects.colorOverlay && effects.colorOverlay->isEnabled() && effects.colorOverlay->opacity > 0
         ? effects.colorOverlay : std::nullopt;
     QImage result = BrushRaster::context(width, height, false);
     // Taken once: scanLine() detaches, which workers must not race.
     uchar *const bits = result.bits();
     const qsizetype stride = result.bytesPerLine();
-    // Shadow, outside stroke, pixels, overlay, inner shadow, inside stroke.
+    // Shadow, glow, outside stroke, pixels, overlay, inner shadow, inside stroke.
     bands(height, [&](int, int y) {
         const uchar *in = source.constScanLine(y);
         uchar *out = bits + y * stride;
@@ -212,6 +221,8 @@ QImage LayerEffectsKernel::render(const QImage &pixels, const LayerEffects &effe
             float colour[3] = {0, 0, 0}, alpha = 0;
             if (shadow)
                 over(colour, alpha, shadow->color(), std::clamp(cast[index] * float(shadow->opacity), 0.f, 1.f));
+            if (glow)
+                over(colour, alpha, glow->color(), std::clamp(glowing[index] * (1.f - shape[index]) * float(glow->opacity), 0.f, 1.f));
             const float strokeCoverage = stroke ? std::clamp(ring[index] * float(stroke->opacity), 0.f, 1.f) : 0.f;
             if (stroke && !stroke->inside)
                 over(colour, alpha, stroke->color(), strokeCoverage);

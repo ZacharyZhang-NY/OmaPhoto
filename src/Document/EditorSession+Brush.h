@@ -22,3 +22,5 @@ public:
 
 private:
     void finishRasterCommit();
+    // Where Smoothing lets the brush go; none while slack.
+    std::optional<QPointF> smoothed(QPointF point);

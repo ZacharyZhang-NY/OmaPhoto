@@ -74,10 +74,24 @@ struct InnerShadowEffect {
     friend bool operator==(const InnerShadowEffect &, const InnerShadowEffect &) = default;
 };
 
+// A soft glow round the outside of the layer.
+struct OuterGlowEffect {
+    std::optional<bool> enabled = std::nullopt;
+    double size = 20;
+    double red = 1;
+    double green = 1;
+    double blue = 1;
+    double opacity = 0.75;
+    bool isEnabled() const { return enabled.value_or(true); }
+    PaletteColor color() const { return {red, green, blue}; }
+    bool isValid() const;
+    friend bool operator==(const OuterGlowEffect &, const OuterGlowEffect &) = default;
+};
+
 // Swift's raw values are the panel's and the menu's words.
-enum class LayerEffectKind { stroke, shadow, colorOverlay, innerShadow };
+enum class LayerEffectKind { stroke, shadow, colorOverlay, innerShadow, outerGlow };
 inline constexpr std::array allLayerEffectKinds{LayerEffectKind::stroke, LayerEffectKind::shadow, LayerEffectKind::colorOverlay,
-                                                LayerEffectKind::innerShadow};
+                                                LayerEffectKind::innerShadow, LayerEffectKind::outerGlow};
 QString rawValue(LayerEffectKind kind);
 
 // What a layer draws round itself; its pixels stay untouched.
@@ -86,7 +100,8 @@ struct LayerEffects {
     std::optional<ShadowEffect> shadow = std::nullopt;
     std::optional<ColorOverlayEffect> colorOverlay = std::nullopt;
     std::optional<InnerShadowEffect> innerShadow = std::nullopt;
-    bool isEmpty() const { return !stroke && !shadow && !colorOverlay && !innerShadow; }
+    std::optional<OuterGlowEffect> outerGlow = std::nullopt;
+    bool isEmpty() const { return !stroke && !shadow && !colorOverlay && !innerShadow && !outerGlow; }
     bool isValid() const;
     std::vector<LayerEffectKind> kinds() const;
     bool contains(LayerEffectKind kind) const;

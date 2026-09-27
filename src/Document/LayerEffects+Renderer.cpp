@@ -104,6 +104,8 @@ double LayerEffectsRenderer::margin(const LayerEffects &all)
         margin = std::max(margin, effects.stroke->size);
     if (effects.shadow)
         margin = std::max(margin, effects.shadow->distance + effects.shadow->blur * 3);
+    if (effects.outerGlow)
+        margin = std::max(margin, effects.outerGlow->size * 3);
     return std::ceil(margin) + 2;
 }
 

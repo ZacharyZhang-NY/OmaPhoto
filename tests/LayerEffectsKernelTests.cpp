@@ -88,7 +88,7 @@ QImage replayed(const QImage &pixels, const LayerEffects &effects)
     }
     const auto on = [](const auto &effect) { return effect && effect->isEnabled() && effect->opacity > 0; };
     const bool stroke = on(effects.stroke) && effects.stroke->size > 0;
-    std::vector<float> ring(shader.shape.size()), cast(shader.shape.size()), inner(shader.shape.size());
+    std::vector<float> ring(shader.shape.size()), cast(shader.shape.size()), inner(shader.shape.size()), glow(shader.shape.size());
     if (stroke) {
         const int reach = std::max(1, int(std::lround(effects.stroke->size)));
         const std::vector<float> moved = shader.spread(shader.spread(shader.shape, reach, effects.stroke->inside, true), reach, effects.stroke->inside, false);
@@ -98,6 +98,9 @@ QImage replayed(const QImage &pixels, const LayerEffects &effects)
     if (on(effects.shadow))
         cast = shader.softened(shader.shift(shader.shape, float(effects.shadow->offset().width()), float(effects.shadow->offset().height())),
                                float(effects.shadow->blur / 2));
+    const bool glowing = on(effects.outerGlow) && effects.outerGlow->size > 0;
+    if (glowing)
+        glow = shader.softened(shader.shape, float(effects.outerGlow->size / 2));
     if (on(effects.innerShadow)) {
         const std::vector<float> moved = shader.softened(shader.shift(shader.shape, float(effects.innerShadow->offset().width()),
                                                                       float(effects.innerShadow->offset().height())),
@@ -118,6 +121,8 @@ QImage replayed(const QImage &pixels, const LayerEffects &effects)
             };
             if (on(effects.shadow))
                 blend(effects.shadow->color(), std::clamp(cast[index] * float(effects.shadow->opacity), 0.f, 1.f));
+            if (glowing)
+                blend(effects.outerGlow->color(), std::clamp(glow[index] * (1.f - shader.shape[index]) * float(effects.outerGlow->opacity), 0.f, 1.f));
             const float strokeCoverage = stroke ? std::clamp(ring[index] * float(effects.stroke->opacity), 0.f, 1.f) : 0.f;
             if (stroke && !effects.stroke->inside)
                 blend(effects.stroke->color(), strokeCoverage);
@@ -189,16 +194,19 @@ private slots:
 void LayerEffectsKernelTests::everyEffectMatchesTheShader_data()
 {
     QTest::addColumn<LayerEffects>("effects");
-    LayerEffects outside, inside, shadow, overlay, inner, all, wide;
+    LayerEffects outside, inside, shadow, overlay, inner, glow, hair, all, wide;
     outside.stroke = StrokeEffect{.size = 3, .red = 1, .green = 0.5, .blue = 0.25, .opacity = 0.8};
     inside.stroke = StrokeEffect{.size = 2.5, .red = 0.1, .green = 0.2, .blue = 0.9, .opacity = 1, .inside = true};
     shadow.shadow = ShadowEffect{.angle = 45, .distance = 3.5, .blur = 4, .red = 0.3, .green = 0.1, .blue = 0.6, .opacity = 0.75};
     overlay.colorOverlay = ColorOverlayEffect{.red = 0.9, .green = 0.8, .blue = 0.1, .opacity = 0.5};
     inner.innerShadow = InnerShadowEffect{.angle = -60, .distance = 2, .blur = 3, .red = 0, .green = 0.4, .blue = 0.2, .opacity = 0.9};
+    glow.outerGlow = OuterGlowEffect{.size = 6, .red = 0.2, .green = 0.9, .blue = 0.4, .opacity = 0.8};
+    hair.outerGlow = OuterGlowEffect{.size = 0.01, .opacity = 1};
     all = outside;
     all.shadow = shadow.shadow;
     all.colorOverlay = overlay.colorOverlay;
     all.innerShadow = inner.innerShadow;
+    all.outerGlow = glow.outerGlow;
     all.shadow->blur = 0;
     wide.stroke = StrokeEffect{.size = 9, .red = 1, .opacity = 1};
     wide.shadow = ShadowEffect{.angle = 200, .distance = 0.5, .blur = 0.01, .opacity = 1};
@@ -207,6 +215,8 @@ void LayerEffectsKernelTests::everyEffectMatchesTheShader_data()
     QTest::newRow("drop shadow") << shadow;
     QTest::newRow("colour overlay") << overlay;
     QTest::newRow("inner shadow") << inner;
+    QTest::newRow("outer glow") << glow;
+    QTest::newRow("a glow a hair wide") << hair;
     QTest::newRow("all, a sharp shadow") << all;
     QTest::newRow("wide stroke, a barely blurred shadow") << wide;
 }
@@ -233,11 +243,15 @@ void LayerEffectsKernelTests::switchedOffOrEmptyEffectsLeaveThePixels()
     hidden.shadow = ShadowEffect{.enabled = false, .distance = 2, .blur = 0, .opacity = 1};
     hidden.colorOverlay = ColorOverlayEffect{.enabled = false, .red = 1};
     hidden.innerShadow = InnerShadowEffect{.enabled = false};
+    hidden.outerGlow = OuterGlowEffect{.enabled = false};
+    LayerEffects dim, flat;
+    dim.outerGlow = OuterGlowEffect{.opacity = 0};
+    flat.outerGlow = OuterGlowEffect{.size = 0};
     LayerEffects thin;
     thin.stroke = StrokeEffect{.size = 0, .red = 1};
     LayerEffects clear;
     clear.shadow = ShadowEffect{.opacity = 0};
-    for (const LayerEffects &effects : {LayerEffects(), hidden, thin, clear})
+    for (const LayerEffects &effects : {LayerEffects(), hidden, thin, clear, dim, flat})
         QCOMPARE(gap(LayerEffectsKernel::render(pixels, effects), pixels), 0);
     // Stroke sizes round to whole pixels, one at least.
     LayerEffects fraction, one;

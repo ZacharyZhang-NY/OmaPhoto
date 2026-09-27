@@ -44,6 +44,10 @@ private:
     QLabel *const m_opacityLabel;
     QSlider *const m_opacitySlider;
     SelectionAmountField *const m_opacity;
+    // Paint and Erase only; other tools have their own feel.
+    QLabel *const m_smoothingLabel;
+    QSlider *const m_smoothingSlider;
+    SelectionAmountField *const m_smoothing;
     QLabel *const m_paintLabel;
     QComboBox *const m_maskPaint;
     // The foreground colour, the rail swatch's own picker.

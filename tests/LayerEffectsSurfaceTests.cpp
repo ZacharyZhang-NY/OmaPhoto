@@ -20,17 +20,19 @@ void addRows()
 {
     QTest::addColumn<LayerEffects>("effects");
     const LayerEffects all = everyKind();
-    LayerEffects outside, inside, cast, overlay, inner;
+    LayerEffects outside, inside, cast, overlay, inner, glow;
     outside.stroke = all.stroke;
     inside.stroke = StrokeEffect{.size = 10, .red = 1, .green = 0, .blue = 1, .opacity = 0.9, .inside = true};
     cast.shadow = all.shadow;
     overlay.colorOverlay = all.colorOverlay;
     inner.innerShadow = all.innerShadow;
+    glow.outerGlow = OuterGlowEffect{.size = 12, .red = 0, .green = 1, .blue = 1, .opacity = 0.9};
     QTest::newRow("outside stroke") << outside;
     QTest::newRow("inside stroke") << inside;
     QTest::newRow("shadow") << cast;
     QTest::newRow("overlay") << overlay;
     QTest::newRow("inner shadow") << inner;
+    QTest::newRow("outer glow") << glow;
     QTest::newRow("every kind") << all;
 }
 

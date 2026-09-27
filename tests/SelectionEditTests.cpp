@@ -3,7 +3,6 @@
 #include "AddressSpaceLimit.h"
 #include "RenderFixtures.h"
 #include "SelectionFixtures.h"
-#include <QElapsedTimer>
 
 // Masks from a selection, the delete target, and Invert.
 namespace {
@@ -61,7 +60,7 @@ private slots:
     void maskFromSelectionLinesUpOnScaledLayers();
     void deletingWithTheMaskTargetedRemovesOnlyTheMask();
     void invertKeepsTransparencyStaysInSelectionAndWorksOnMasks();
-    void invertIsFastOnLargeImagesAndHandlesUniformMasksWithASelection();
+    void invertHandlesLargeImagesAndUniformMasksWithASelection();
     void invertWorksInEveryTool();
     void invertIsRefusedWhereSwiftRefusesIt();
     void anInvertComputedFromOtherPixelsIsDropped();
@@ -242,20 +241,16 @@ void SelectionEditTests::invertKeepsTransparencyStaysInSelectionAndWorksOnMasks(
     QCOMPARE(int(placed.constScanLine(20)[75]), 255);
 }
 
-void SelectionEditTests::invertIsFastOnLargeImagesAndHandlesUniformMasksWithASelection()
+void SelectionEditTests::invertHandlesLargeImagesAndUniformMasksWithASelection()
 {
     const auto session = editSession(4000, 3000);
     QImage image = BrushRaster::context(4000, 3000, false);
     image.fill(Qt::red);
     session->insert(ImportedImage(image, image, "Big"));
-    QElapsedTimer clock;
-    clock.start();
+    // No clock: in a parallel suite it measures load (7c4512a).
     invert(*session);
-    const qint64 whole = clock.restart();
     select(*session, QRectF(0, 0, 2000, 3000));
     invert(*session);
-    const qint64 selected = clock.elapsed();
-    QVERIFY2(whole < 1500 && selected < 1500, qPrintable(QStringLiteral("whole %1 ms, selected %2 ms").arg(whole).arg(selected)));
     const QImage result = render(*session);
     // Inverted twice, then once.
     QCOMPARE(pixel(result, 100, 100), (std::vector<int>{255, 0, 0, 255}));

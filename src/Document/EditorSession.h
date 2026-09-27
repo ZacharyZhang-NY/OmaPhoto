@@ -427,6 +427,9 @@ private:
     // Clone Stamp and the Smear keep their own soft tips.
     std::map<int, ParkedTip> m_parkedBrushTips{{1, {40, 0, 1}}, {2, {40, 0, 1}}};
     std::optional<LastBrushPoint> m_lastBrushPoint;
+    // Smoothing's brush, and the pointer it trails.
+    std::optional<QPointF> m_brushAnchor;
+    std::optional<QPointF> m_brushPointer;
     int m_brushRevision = 0;
     std::optional<PendingOpacityDigit> m_pendingOpacityDigit;
     std::optional<CommittingRaster> m_committingRaster;

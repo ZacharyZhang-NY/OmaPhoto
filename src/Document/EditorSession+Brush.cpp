@@ -111,6 +111,8 @@ void EditorSession::beginBrush(QPointF point)
         m_brushStroke->clone = clone;
         m_brushStroke->isBlur = m_tool == NavigationTool::blur;
         m_brushStroke->append(point);
+        m_brushAnchor = point;
+        m_brushPointer = point;
         m_lastBrushPoint = LastBrushPoint{point, layer.id, m_isMaskSelected};
         ++m_brushRevision;
         resumeFileRequests();
@@ -135,9 +137,13 @@ void EditorSession::continueBrush(QPointF point)
     }
     if (!m_brushStroke)
         return;
+    m_brushPointer = point;
+    const std::optional<QPointF> painted = smoothed(point);
+    if (!painted)
+        return;
     try {
-        m_brushStroke->append(point);
-        m_lastBrushPoint->point = point;
+        m_brushStroke->append(*painted);
+        m_lastBrushPoint->point = *painted;
         ++m_brushRevision;
         notify();
     } catch (const ProjectError &error) {
@@ -147,6 +153,20 @@ void EditorSession::continueBrush(QPointF point)
         cancelBrush();
         setBrushError(QString::fromUtf8(error.what()));
     }
+}
+
+// Photoshop's string: the brush moves once pulled taut.
+std::optional<QPointF> EditorSession::smoothed(QPointF point)
+{
+    if (m_tool != NavigationTool::brush || !(m_brushSettings.smoothing > 0) || !m_brushAnchor)
+        return point;
+    const double radius = m_brushSettings.smoothing / std::max(0.01, viewport.zoom());
+    const QPointF delta = point - *m_brushAnchor;
+    const double distance = std::hypot(delta.x(), delta.y());
+    if (!(distance > radius))
+        return std::nullopt;
+    m_brushAnchor = *m_brushAnchor + delta * ((distance - radius) / distance);
+    return m_brushAnchor;
 }
 
 // Where a Shift-click's line starts, on the same target.
@@ -161,6 +181,8 @@ void EditorSession::cancelBrush()
 {
     m_warpStroke.reset();
     m_brushStroke.reset();
+    m_brushAnchor.reset();
+    m_brushPointer.reset();
     ++m_brushRevision;
     resumeFileRequests();
     notify();
@@ -180,6 +202,9 @@ bool EditorSession::finishBrushImmediately()
     if (m_isProjectBusy)
         return false;
     try {
+        // Smoothing leaves the brush short; the stroke ends there.
+        if (m_brushPointer && m_brushAnchor && *m_brushPointer != *m_brushAnchor && m_tool == NavigationTool::brush && m_brushSettings.smoothing > 0)
+            m_brushStroke->append(*m_brushPointer);
         m_brushStroke->flush();
         if (m_brushStroke->settings.healing)
             m_brushStroke->heal();

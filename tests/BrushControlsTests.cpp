@@ -38,6 +38,7 @@ private slots:
     void eachBrushToolTitlesTheBarAndShowsItsPicker();
     void cloneStampShowsAlignedSampleAndTheSourceNote();
     void theSmearShowsItsThreeModes();
+    void smoothingShowsWithTheBrushAlone();
 };
 
 void BrushControlsTests::theTitleAndModesFollowTheSession()
@@ -272,6 +273,37 @@ void BrushControlsTests::theSmearShowsItsThreeModes()
     QVERIFY(modes[1]->isChecked() && !modes[2]->isChecked());
     session.selectTool(NavigationTool::spotHealing);
     QVERIFY(!modes[1]->isVisible());
+}
+
+void BrushControlsTests::smoothingShowsWithTheBrushAlone()
+{
+    EditorSession session;
+    session.createDocument(8, 8, true);
+    session.selectTool(NavigationTool::brush);
+    BrushControls bar(session);
+    bar.show();
+    auto &field = find<QLineEdit>(bar, "brushSmoothing");
+    auto &slider = find<QSlider>(bar, "brushSmoothingSlider");
+    QVERIFY(field.isVisible() && slider.isVisible());
+    QCOMPARE(field.text(), QString("0"));
+    QCOMPARE(field.toolTip(), QString("The brush trails the pointer on a string this long, so a shaky hand still draws a smooth line"));
+    QVERIFY(slider.minimum() == 0 && slider.maximum() == 1000 && slider.width() == 100 && field.width() == 42);
+    slider.setValue(255);
+    QCOMPARE(session.brushSettings().smoothing, 25.5);
+    QCOMPARE(field.text(), QString("26"));
+    type(field, "140");
+    QCOMPARE(session.brushSettings().smoothing, 100.0);
+    QCOMPARE(slider.value(), 1000);
+    QTest::keyClick(&field, Qt::Key_Down, Qt::ShiftModifier);
+    QCOMPARE(session.brushSettings().smoothing, 90.0);
+    // The other brush tools have their own feel: no Smoothing.
+    for (const NavigationTool tool : {NavigationTool::spotHealing, NavigationTool::cloneStamp, NavigationTool::blur}) {
+        session.selectTool(tool);
+        QVERIFY(!field.isVisible() && !slider.isVisible());
+    }
+    session.selectTool(NavigationTool::brush);
+    session.setBrushMode(BrushToolMode::erase);
+    QVERIFY(field.isVisible());
 }
 
 QTEST_MAIN(BrushControlsTests)

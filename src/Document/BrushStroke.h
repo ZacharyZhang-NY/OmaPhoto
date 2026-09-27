@@ -31,6 +31,8 @@ struct BrushSettings {
     double blue = 0;
     // Caps the whole stroke: overlapping dabs never exceed it.
     double opacity = 1;
+    // 0–100: the brush trails the pointer on this string.
+    double smoothing = 0;
     // Erase clears the layer's pixels instead of painting on them.
     bool erasing = false;
     // Spot healing takes nearby pixels instead of the colour.

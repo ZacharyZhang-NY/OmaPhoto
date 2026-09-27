@@ -144,10 +144,11 @@ void EffectsPreviewCacheTests::settingsKeepTheLastPreviewButNewPixelsDropIt()
     // Same kinds: the old preview shows while the new renders.
     layer.effects = outline(5);
     QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), first);
-    QCOMPARE(landed(cache, layer, landings, 2).inset, 7.0);
-    // Another kind: nothing is shown until it lands.
+    const EffectsPreviewCache::Result second = landed(cache, layer, landings, 2);
+    QCOMPARE(second.inset, 7.0);
+    // Another kind shown or hidden: the last preview stands.
     layer.effects->colorOverlay = ColorOverlayEffect();
-    QVERIFY(!ask(cache, layer, landings));
+    QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), second.image.cacheKey());
     landed(cache, layer, landings, 3);
     // New pixels, or a mask switched on, drop it too.
     layer.asset = ImportedImage(filled(20, 10, QColor(255, 0, 0)), QImage(), QStringLiteral("Red"));
@@ -318,6 +319,7 @@ void EffectsPreviewCacheTests::aReducedPreviewScalesEveryLength()
     effects.shadow = ShadowEffect{.angle = 45, .distance = 8, .blur = 3, .red = 1, .green = 0, .blue = 0, .opacity = 0.8};
     effects.colorOverlay = ColorOverlayEffect{.red = 0, .green = 1, .blue = 0, .opacity = 0.5};
     effects.innerShadow = InnerShadowEffect{.angle = 120, .distance = 30, .blur = 12, .red = 0, .green = 0, .blue = 0, .opacity = 0.7};
+    effects.outerGlow = OuterGlowEffect{.size = 5, .red = 0, .green = 0, .blue = 1, .opacity = 0.6};
     const QImage image = noise(6000, 100, 7);
     const ImageLayer layer = layerOf(image, effects);
     const Landings landings;
@@ -332,6 +334,7 @@ void EffectsPreviewCacheTests::aReducedPreviewScalesEveryLength()
     effects.shadow->blur *= factor;
     effects.innerShadow->distance *= factor;
     effects.innerShadow->blur *= factor;
+    effects.outerGlow->size *= factor;
     QVERIFY(result.image == LayerEffectsRenderer::render(reduced, std::nullopt, effects).image);
 }
 

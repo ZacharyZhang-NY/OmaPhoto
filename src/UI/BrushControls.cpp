@@ -52,6 +52,11 @@ BrushControls::BrushControls(EditorSession &session, QWidget *parent)
                              [this](int value) { changeBrush(m_session, [value](BrushSettings &brush) { brush.opacity = value / 1000.0; }); })),
       m_opacity(new SelectionAmountField(session, 1, 100, [this] { return m_session.brushSettings().opacity * 100; },
                                          [this](double percent) { changeBrush(m_session, [percent](BrushSettings &brush) { brush.opacity = percent / 100; }); }, this)),
+      m_smoothingLabel(label(QStringLiteral("Smoothing"), this)),
+      m_smoothingSlider(slider(QStringLiteral("brushSmoothingSlider"), 0, 1000,
+                               [this](int value) { changeBrush(m_session, [value](BrushSettings &brush) { brush.smoothing = value / 10.0; }); })),
+      m_smoothing(new SelectionAmountField(session, 0, 100, [this] { return m_session.brushSettings().smoothing; },
+                                           [this](double value) { changeBrush(m_session, [value](BrushSettings &brush) { brush.smoothing = value; }); }, this)),
       m_paintLabel(label(QStringLiteral("Paint"), this)), m_maskPaint(new QComboBox(this)), m_colourLabel(label(QStringLiteral("Color"), this)),
       m_colour(new SwatchButton([&session] { return session.foregroundColor(); }, 4, 1, 1, this)),
       m_cloneNote(label(QStringLiteral("Alt-click to set the source"), this)), m_mask(label(QStringLiteral("Mask"), this))
@@ -73,6 +78,9 @@ BrushControls::BrushControls(EditorSession &session, QWidget *parent)
     m_opacity->setObjectName(QStringLiteral("brushOpacity"));
     m_opacity->setFixedWidth(42);
     m_opacity->setToolTip(QStringLiteral("Press 1–9 for 10–90%, 0 for 100%"));
+    m_smoothing->setObjectName(QStringLiteral("brushSmoothing"));
+    m_smoothing->setFixedWidth(42);
+    m_smoothing->setToolTip(QStringLiteral("The brush trails the pointer on a string this long, so a shaky hand still draws a smooth line"));
     m_maskPaint->setObjectName(QStringLiteral("maskPaint"));
     m_maskPaint->setFixedWidth(180);
     m_maskPaint->addItem(QStringLiteral("Black · Hide"), false);
@@ -95,7 +103,7 @@ BrushControls::BrushControls(EditorSession &session, QWidget *parent)
     widgets.insert(widgets.end(), {m_aligned, m_thisLayer, m_allLayers});
     widgets.insert(widgets.end(), {label(QStringLiteral("Size"), this), m_size, label(QStringLiteral("px"), this), label(QStringLiteral("Hardness"), this),
                                    m_hardnessSlider, m_hardness, label(QStringLiteral("%"), this), m_opacityLabel, m_opacitySlider, m_opacity,
-                                   label(QStringLiteral("%"), this), m_paintLabel, m_maskPaint, m_colourLabel, m_colour});
+                                   label(QStringLiteral("%"), this), m_smoothingLabel, m_smoothingSlider, m_smoothing, m_paintLabel, m_maskPaint, m_colourLabel, m_colour});
     for (QWidget *widget : widgets)
         row->insertWidget(row->count() - 1, widget);
     row->addWidget(m_cloneNote);
@@ -156,10 +164,14 @@ void BrushControls::synchronize()
     m_size->sync(int(std::lround(brush.diameter)));
     m_hardness->sync(int(std::lround(brush.hardness * 100)));
     m_opacity->sync(int(std::lround(brush.opacity * 100)));
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_smoothingLabel, m_smoothingSlider, m_smoothing})
+        widget->setVisible(tool == NavigationTool::brush);
+    m_smoothing->sync(int(std::lround(brush.smoothing)));
     // The sliders show the session's numbers without writing back.
-    const QSignalBlocker hardness(m_hardnessSlider), opacity(m_opacitySlider);
+    const QSignalBlocker hardness(m_hardnessSlider), opacity(m_opacitySlider), smoothing(m_smoothingSlider);
     m_hardnessSlider->setValue(int(std::lround(brush.hardness * 1000)));
     m_opacitySlider->setValue(int(std::lround(brush.opacity * 1000)));
+    m_smoothingSlider->setValue(int(std::lround(brush.smoothing * 10)));
     const bool mask = m_session.isMaskSelected();
     m_paintLabel->setVisible(mask);
     m_maskPaint->setVisible(mask);

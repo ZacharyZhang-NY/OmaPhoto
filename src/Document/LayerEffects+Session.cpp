@@ -10,6 +10,7 @@ void take(LayerEffects &into, const LayerEffects &from, LayerEffectKind kind)
     case LayerEffectKind::shadow: into.shadow = from.shadow; return;
     case LayerEffectKind::colorOverlay: into.colorOverlay = from.colorOverlay; return;
     case LayerEffectKind::innerShadow: into.innerShadow = from.innerShadow; return;
+    case LayerEffectKind::outerGlow: into.outerGlow = from.outerGlow; return;
     }
     throw std::logic_error("unknown effect kind");
 }
@@ -69,6 +70,10 @@ void EditorSession::addEffect(LayerEffectKind kind)
     case LayerEffectKind::innerShadow:
         if (!effects.innerShadow)
             effects.innerShadow = InnerShadowEffect();
+        break;
+    case LayerEffectKind::outerGlow:
+        if (!effects.outerGlow)
+            effects.outerGlow = OuterGlowEffect();
         break;
     }
     setEffects(effects, id, QStringLiteral("Add ") + rawValue(kind));
