@@ -85,12 +85,14 @@ void EditorSession::beginTransform(bool persistent)
 void EditorSession::setTransformAutoSelect(bool picks)
 {
     m_transformAutoSelect = picks;
+    ToolDefaults::set(picks, QStringLiteral("autoSelect"));
     notify();
 }
 
 void EditorSession::setShowsTransformControls(bool shows)
 {
     m_showsTransformControls = shows;
+    ToolDefaults::set(shows, QStringLiteral("transformControls"));
     notify();
 }
 

@@ -57,54 +57,63 @@ bool LayoutGrid::isMajor(double value)
 void EditorSession::setShowsGrid(bool shows)
 {
     m_showsGrid = shows;
+    ToolDefaults::set(shows, QStringLiteral("grid"));
     notify();
 }
 
 void EditorSession::setShowsGuides(bool shows)
 {
     m_showsGuides = shows;
+    ToolDefaults::set(shows, QStringLiteral("guides"));
     notify();
 }
 
 void EditorSession::setShowsRulers(bool shows)
 {
     m_showsRulers = shows;
+    ToolDefaults::set(shows, QStringLiteral("rulers"));
     notify();
 }
 
 void EditorSession::setSnapEnabled(bool enabled)
 {
     m_snapEnabled = enabled;
+    ToolDefaults::set(enabled, QStringLiteral("snap"));
     notify();
 }
 
 void EditorSession::setSnapToGuides(bool snaps)
 {
     m_snapToGuides = snaps;
+    ToolDefaults::set(snaps, QStringLiteral("snapGuides"));
     notify();
 }
 
 void EditorSession::setSnapToGrid(bool snaps)
 {
     m_snapToGrid = snaps;
+    ToolDefaults::set(snaps, QStringLiteral("snapGrid"));
     notify();
 }
 
 void EditorSession::setSnapToLayers(bool snaps)
 {
     m_snapToLayers = snaps;
+    ToolDefaults::set(snaps, QStringLiteral("snapLayers"));
     notify();
 }
 
 void EditorSession::setSnapToDocumentBounds(bool snaps)
 {
     m_snapToDocumentBounds = snaps;
+    ToolDefaults::set(snaps, QStringLiteral("snapBounds"));
     notify();
 }
 
 void EditorSession::setLocksGuides(bool locks)
 {
     m_locksGuides = locks;
+    ToolDefaults::set(locks, QStringLiteral("lockGuides"));
     notify();
 }
 
@@ -155,6 +164,7 @@ void EditorSession::beginGuideCreation(CanvasGuide::Axis axis, double position)
     if (!canEditGuides())
         return;
     m_showsGuides = true;
+    ToolDefaults::set(true, QStringLiteral("guides"));
     m_guideDrag = GuideDrag{QUuid::createUuid(), axis, snappedGuidePosition(position, axis, std::nullopt), true, std::nullopt};
     notify();
 }
@@ -225,6 +235,7 @@ void EditorSession::addGuide(const CanvasGuide &guide)
     if (!canEditGuides())
         return;
     m_showsGuides = true;
+    ToolDefaults::set(true, QStringLiteral("guides"));
     beginEdit(QStringLiteral("New Guide"));
     m_document->guides.push_back(guide);
     endEdit();

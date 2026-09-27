@@ -38,7 +38,7 @@ class DistortTests : public QObject {
     Q_OBJECT
 private slots:
     void cornersRunClockwiseFromTheTopLeft();
-    void perspectiveMappingHitsTheCornersAndTwistedShapesAreRefused();
+    void perspectiveMappingHitsTheCornersAndDegenerateShapesAreRefused();
     void distortingWarpsTheLayerIntoTheShapeAsOneUndoStep();
     void distortedLayerIsTrimmedToItsVisiblePixels();
     void foldedShapesWarpAsTwoTrianglesAndFlipsSwapCorners();
@@ -61,7 +61,7 @@ void DistortTests::cornersRunClockwiseFromTheTopLeft()
     QVERIFY(!near(corners[1], corners[0]));
 }
 
-void DistortTests::perspectiveMappingHitsTheCornersAndTwistedShapesAreRefused()
+void DistortTests::perspectiveMappingHitsTheCornersAndDegenerateShapesAreRefused()
 {
     const QTransform map = DistortWarp::homography(shape);
     const Corners unit = {QPointF(0, 0), QPointF(1, 0), QPointF(1, 1), QPointF(0, 1)};
@@ -108,6 +108,9 @@ void DistortTests::distortingWarpsTheLayerIntoTheShapeAsOneUndoStep()
     // A collapsed corner: ignored.
     session.previewCorners({shape[0], shape[0], shape[2], shape[3]});
     QCOMPARE(session.transformEdit().value().corners.value()[1], QPointF(30, 10));
+    // A folded shape is a distortion of its own.
+    session.previewCorners({shape[0], shape[2], shape[1], shape[3]});
+    QCOMPARE(session.transformEdit().value().corners.value()[1], shape[2]);
     session.previewCorners(shape);
     QCOMPARE(session.transformEdit().value().corners.value(), shape);
     const int count = session.history.undoCount();

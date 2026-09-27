@@ -1,4 +1,5 @@
 #include "Document/ProjectWorkspace.h"
+#include "Document/ToolDefaults.h"
 #include "Logging.h"
 #include "UI/OmarchyTheme.h"
 #include "UI/ProjectWorkspaceView.h"
@@ -11,6 +12,8 @@ int main(int argc, char **argv)
     qSetMessagePattern(QStringLiteral("%{time yyyy-MM-dd hh:mm:ss.zzz} %{type} %{category}: %{message}"));
     QApplication application(argc, argv);
     QApplication::setApplicationName(QStringLiteral("OmaPhoto"));
+    // Tool toggles outlive the run, as Swift's user defaults.
+    ToolDefaults::enable();
     QApplication::setApplicationVersion(QStringLiteral(OMAPHOTO_VERSION));
     // The desktop entry's name: icons and windows find each other.
     QGuiApplication::setDesktopFileName(QStringLiteral("io.github.ZacharyZhang_NY.OmaPhoto"));

@@ -47,6 +47,7 @@ private slots:
     void handlesResizeAndTheGripRotates();
     void movesSnapToTheCanvasAndOtherLayersUnlessCtrl();
     void autoSelectCanBeDisabledAndCtrlClickOverridesIt();
+    void autoSelectPicksTheForegroundOverASelectedBackground();
     void escapeMidDragRestoresAndAPersistentEditWaitsForReturn();
     void losingTheKeysOrTheWheelMidDrag();
     void aSelectionDragsAsOneBox();
@@ -190,16 +191,21 @@ void TransformPressTests::autoSelectCanBeDisabledAndCtrlClickOverridesIt()
     session.setTransformAutoSelect(true);
     shown.drag(QPointF(20, 250), QPointF(33, 250));
     QCOMPARE(shown.origin(), QPointF(163, 100));
-    // Inside the active layer's box, it drags, whatever lies above.
+    // Inside the active layer's box a layer above wins, auto-selecting.
     session.insert(filled(100, 100, qRgba(0, 255, 0, 255), "Green"), QPointF(220, 120));
+    const QUuid green = session.activeLayerID().value();
     session.selectLayer(shown.red);
+    shown.click(QPointF(213, 150));
+    QCOMPARE(session.activeLayerID(), std::optional(green));
+    session.selectLayer(shown.red);
+    session.setTransformAutoSelect(false);
     shown.click(QPointF(213, 150));
     QCOMPARE(session.activeLayerID(), std::optional(shown.red));
     // Ctrl picks what lies under the pointer, active included.
-    const QUuid green = session.activeLayerID() == shown.red ? session.document().value().layers.back().id : shown.red;
     shown.click(QPointF(213, 150), Qt::ControlModifier);
     QCOMPARE(session.activeLayerID(), std::optional(green));
     session.selectLayer(shown.red);
+    session.setTransformAutoSelect(true);
     // A selection's box drags them all; outside it auto-select picks.
     session.insert(filled(100, 100, qRgba(255, 255, 0, 255), "Yellow"), QPointF(60, 260));
     const QUuid yellow = session.activeLayerID().value();
@@ -209,6 +215,60 @@ void TransformPressTests::autoSelectCanBeDisabledAndCtrlClickOverridesIt()
     shown.click(QPointF(60, 260));
     QCOMPARE(session.activeLayerID(), std::optional(yellow));
     QCOMPARE(session.selectedLayerIDs(), QSet<QUuid>{yellow});
+}
+
+void TransformPressTests::autoSelectPicksTheForegroundOverASelectedBackground()
+{
+    Shown shown(QSize(400, 300), QSize(400, 300));
+    shown.settle();
+    EditorSession &session = shown.session;
+    session.zoom(1);
+    session.insert(filled(400, 300, qRgba(0, 0, 255, 255), "Sky"));
+    const QUuid background = session.activeLayerID().value();
+    session.insert(filled(80, 60, qRgba(255, 0, 0, 255), "Kite"), QPointF(190, 80));
+    const QUuid foreground = session.activeLayerID().value();
+    session.selectTool(NavigationTool::move);
+    shown.canvas->synchronizeDisplay();
+    const auto click = [&](QPoint at) {
+        QTest::mouseClick(shown.canvas, Qt::LeftButton, Qt::NoModifier, at);
+        session.commitTransform();
+    };
+    // Swift's test: the background holds every press; the kite wins.
+    session.selectLayer(background);
+    session.setTransformAutoSelect(true);
+    click(QPoint(180, 70));
+    QCOMPARE(session.activeLayerID(), std::optional(foreground));
+    click(QPoint(20, 20));
+    QCOMPARE(session.activeLayerID(), std::optional(background));
+    click(QPoint(180, 70));
+    QCOMPARE(session.activeLayerID(), std::optional(foreground));
+    session.selectLayer(background);
+    session.setTransformAutoSelect(false);
+    click(QPoint(180, 70));
+    QCOMPARE(session.activeLayerID(), std::optional(background));
+    // A Ctrl+T edit keeps its layer; a plain press picks.
+    session.setTransformAutoSelect(true);
+    session.beginTransform();
+    QTest::mouseClick(shown.canvas, Qt::LeftButton, Qt::NoModifier, QPoint(180, 70));
+    QCOMPARE(session.activeLayerID(), std::optional(background));
+    session.cancelTransform();
+    session.setTransformAutoSelect(false);
+    // A wide mask box keeps its layer over lower ones.
+    session.selectLayer(foreground);
+    session.addMask();
+    session.toggleMaskLink(foreground);
+    session.selectLayerTarget(foreground, true);
+    QVERIFY(session.transformTargetsMask());
+    session.beginTransform();
+    session.previewTransform(LayerTransform(QPointF(40, 20), QSizeF(300, 200)));
+    session.commitTransform();
+    session.setTransformAutoSelect(true);
+    click(QPoint(60, 40));
+    QCOMPARE(session.activeLayerID(), std::optional(foreground));
+    // Over empty canvas nothing lies under the pointer.
+    session.toggleLayerVisibility(background);
+    click(QPoint(60, 40));
+    QCOMPARE(session.activeLayerID(), std::optional(foreground));
 }
 
 void TransformPressTests::escapeMidDragRestoresAndAPersistentEditWaitsForReturn()

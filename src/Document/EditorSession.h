@@ -12,6 +12,7 @@
 #include "Document/SelectionClipboard.h"
 #include "Document/SelectionEdits.h"
 #include "Document/SmudgeLiquify.h"
+#include "Document/ToolDefaults.h"
 #include "Document/DocumentHistory.h"
 #include "Document/EditorSession+Jobs.h"
 #include "Document/EditorSession+Model.h"
@@ -344,8 +345,8 @@ private:
 
     std::optional<TransformEdit> m_transformEdit;
     std::optional<TransformDuplicate> m_transformDuplicate;
-    bool m_transformAutoSelect = false;
-    bool m_showsTransformControls = true;
+    bool m_transformAutoSelect = ToolDefaults::boolean(QStringLiteral("autoSelect"), false);
+    bool m_showsTransformControls = ToolDefaults::boolean(QStringLiteral("transformControls"), true);
     bool m_locksTransformRatio = true;
     std::optional<BlendPreview> m_blendPreview;
     std::optional<QUuid> m_opacityEditLayerID;
@@ -358,18 +359,18 @@ private:
     std::optional<QString> m_importError;
     std::optional<QUuid> m_renamingLayerID;
     std::optional<QString> m_projectPath;
-    bool m_showsPixelGrid = true;
+    bool m_showsPixelGrid = ToolDefaults::boolean(QStringLiteral("pixelGrid"), true);
     bool m_snappingEnabled = true;
     // The layout grid starts off; guides show; rulers hide.
-    bool m_showsGrid = false;
-    bool m_showsGuides = true;
-    bool m_showsRulers = false;
-    bool m_snapEnabled = true;
-    bool m_snapToGuides = true;
-    bool m_snapToGrid = false;
-    bool m_snapToLayers = true;
-    bool m_snapToDocumentBounds = true;
-    bool m_locksGuides = false;
+    bool m_showsGrid = ToolDefaults::boolean(QStringLiteral("grid"), false);
+    bool m_showsGuides = ToolDefaults::boolean(QStringLiteral("guides"), true);
+    bool m_showsRulers = ToolDefaults::boolean(QStringLiteral("rulers"), false);
+    bool m_snapEnabled = ToolDefaults::boolean(QStringLiteral("snap"), true);
+    bool m_snapToGuides = ToolDefaults::boolean(QStringLiteral("snapGuides"), true);
+    bool m_snapToGrid = ToolDefaults::boolean(QStringLiteral("snapGrid"), false);
+    bool m_snapToLayers = ToolDefaults::boolean(QStringLiteral("snapLayers"), true);
+    bool m_snapToDocumentBounds = ToolDefaults::boolean(QStringLiteral("snapBounds"), true);
+    bool m_locksGuides = ToolDefaults::boolean(QStringLiteral("lockGuides"), false);
     std::optional<GuideDrag> m_guideDrag;
     bool m_showsSampleRing = true;
     std::optional<QRectF> m_cropRect;

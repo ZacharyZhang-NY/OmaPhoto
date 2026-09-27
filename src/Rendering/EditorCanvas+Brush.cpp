@@ -114,7 +114,7 @@ void CanvasView::endBrushTipDrag(QPointF point)
 // The circle at the pointer, a stroke's own size.
 void CanvasView::updateBrushCursor()
 {
-    const bool shows = isBrushTool(m_session.tool()) && !m_spaceHeld && !picking();
+    const bool shows = isBrushTool(m_session.tool()) && !m_spaceHeld && !picking() && !m_middlePanPoint;
     const double diameter = m_session.brushStroke() ? m_session.brushStroke()->settings.diameter : m_session.brushSettings().diameter;
     // Clone Stamp marks its source; between strokes, previews a click.
     std::optional<QPointF> sample;

@@ -208,6 +208,7 @@ private:
     void dragBrushTip(QPointF point, Qt::KeyboardModifiers modifiers);
     void endBrushTipDrag(QPointF point);
     void updateBrushCursor();
+    void endMiddlePan();
     // Clone Stamp's preview: one click's coverage, and the source there.
     QImage cloneTip(double diameter, double hardness);
     QImage clonePreview(QPointF center, double diameter, const CanvasDocument &document);
@@ -268,6 +269,8 @@ private:
     std::optional<int> m_panKey;
     bool m_optionHeld = false;
     std::optional<QPointF> m_lastDragPoint;
+    // Where a middle-button pan last was, its own drag point.
+    std::optional<QPointF> m_middlePanPoint;
     std::optional<ZoomDrag> m_zoomDrag;
     bool m_shiftHeld = false;
     // Document point where a drag of the outline began.

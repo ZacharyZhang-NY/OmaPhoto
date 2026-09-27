@@ -250,8 +250,10 @@ QCursor CanvasView::pixelDragCursor(bool duplicate, double ratio)
 void CanvasView::updateCursor()
 {
     const NavigationTool tool = m_session.tool();
-    // A transform, outline or pixel drag keeps its cursor.
-    if (m_dragCursor)
+    // A middle-button pan outranks every drag; another keeps its cursor.
+    if (m_middlePanPoint)
+        setCursor(Qt::ClosedHandCursor);
+    else if (m_dragCursor)
         setCursor(*m_dragCursor);
     else if (m_selectionDragStart)
         setCursor(moveSelectionCursor(devicePixelRatio()));

@@ -318,6 +318,7 @@ void EditorSession::zoom(double value, std::optional<QPointF> anchor)
 void EditorSession::setShowsPixelGrid(bool shows)
 {
     m_showsPixelGrid = shows;
+    ToolDefaults::set(shows, QStringLiteral("pixelGrid"));
     notify();
 }
 

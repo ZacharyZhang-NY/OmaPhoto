@@ -114,6 +114,13 @@ void CanvasView::wheelEvent(QWheelEvent *event)
 
 void CanvasView::mousePressEvent(QMouseEvent *event)
 {
+    // The middle button pans in any tool, beside the left.
+    if (event->button() == Qt::MiddleButton && m_session.document()) {
+        m_middlePanPoint = event->position();
+        updateBrushCursor();
+        updateCursor();
+        return;
+    }
     if (event->button() == Qt::RightButton && isBrushTool(m_session.tool()) && !m_session.brushStroke() && !m_session.warpStroke() && !m_spaceHeld) {
         beginBrushTipDrag(event->position(), event->modifiers());
         return;
@@ -199,6 +206,16 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
     const QPointF point = event->position();
     m_hover = point;
     readModifiers(event->modifiers());
+    if (m_middlePanPoint && event->buttons().testFlag(Qt::MiddleButton)) {
+        m_session.viewport.translate(QSizeF(point.x() - m_middlePanPoint->x(), point.y() - m_middlePanPoint->y()));
+        m_middlePanPoint = point;
+        m_session.notify();
+        if (!event->buttons().testFlag(Qt::LeftButton))
+            return;
+    } else if (m_middlePanPoint) {
+        // Qt can lose a release: the pan ends here.
+        endMiddlePan();
+    }
     // Without the left button a text gesture's release was lost.
     const bool held = event->buttons().testFlag(Qt::LeftButton);
     if (m_textBoxAnchor) {
@@ -258,6 +275,10 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
 
 void CanvasView::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (event->button() == Qt::MiddleButton && m_middlePanPoint) {
+        endMiddlePan();
+        return;
+    }
     if (event->button() == Qt::RightButton && m_brushTipDrag) {
         endBrushTipDrag(event->position());
         return;
@@ -343,4 +364,12 @@ void CanvasView::leaveEvent(QEvent *event)
     m_brushPointer = std::nullopt;
     updateBrushCursor();
     QWidget::leaveEvent(event);
+}
+
+// The tool's own cursor and circle come back at once.
+void CanvasView::endMiddlePan()
+{
+    m_middlePanPoint.reset();
+    updateCursor();
+    updateBrushCursor();
 }

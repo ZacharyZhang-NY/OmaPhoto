@@ -9,6 +9,7 @@ private slots:
     void theHandToolAndSpaceDragTheView();
     void theWheelPansAndZoomsWithAModifier();
     void aPinchZoomsAboutThePointer();
+    void theMiddleButtonPansFromAnyTool();
 };
 
 void CanvasNavigationTests::theZoomToolClicksAndDrags()
@@ -165,6 +166,67 @@ void CanvasNavigationTests::aPinchZoomsAboutThePointer()
                               shown.canvas->mapToGlobal(pointer.toPoint()), 0.5, QPointF());
     QApplication::sendEvent(shown.canvas, &swipe);
     QCOMPARE(shown.session.viewport.zoom(), 1.5);
+}
+
+
+void CanvasNavigationTests::theMiddleButtonPansFromAnyTool()
+{
+    Shown shown;
+    CanvasView &canvas = *shown.canvas;
+    EditorSession &session = shown.session;
+    shown.settle();
+    session.zoom(1);
+    session.selectTool(NavigationTool::brush);
+    canvas.synchronizeDisplay();
+    const auto move = [&](QPointF to, Qt::MouseButtons buttons) {
+        QMouseEvent event(QEvent::MouseMove, to, to, canvas.mapToGlobal(to.toPoint()), Qt::NoButton, buttons, Qt::NoModifier);
+        QApplication::sendEvent(&canvas, &event);
+    };
+    move(QPointF(100, 100), Qt::NoButton);
+    const Qt::CursorShape brush = canvas.cursor().shape();
+    QVERIFY(canvas.brushCursor().circle().has_value());
+    const QSizeF pan = session.viewport.pan;
+    QSignalSpy changes(&session, &EditorSession::changed);
+    // The circle hides and nothing paints; the view follows.
+    QTest::mousePress(&canvas, Qt::MiddleButton, Qt::NoModifier, QPoint(100, 100));
+    QCOMPARE(canvas.cursor().shape(), Qt::ClosedHandCursor);
+    QVERIFY(!canvas.brushCursor().circle().has_value());
+    move(QPointF(130, 120), Qt::MiddleButton);
+    QCOMPARE(session.viewport.pan, pan + QSizeF(30, 20));
+    QCOMPARE(changes.count(), 1);
+    move(QPointF(150, 150), Qt::MiddleButton);
+    QCOMPARE(session.viewport.pan, pan + QSizeF(50, 50));
+    move(QPointF(130, 120), Qt::MiddleButton);
+    QCOMPARE(session.viewport.pan, pan + QSizeF(30, 20));
+    QVERIFY(!session.brushStroke() && !canvas.brushCursor().circle().has_value());
+    QCOMPARE(canvas.cursor().shape(), Qt::ClosedHandCursor);
+    QTest::mouseRelease(&canvas, Qt::MiddleButton, Qt::NoModifier, QPoint(130, 120));
+    QCOMPARE(canvas.cursor().shape(), brush);
+    QVERIFY(canvas.brushCursor().circle().has_value());
+    // Beside a Hand drag each button keeps its own point.
+    session.selectTool(NavigationTool::hand);
+    canvas.synchronizeDisplay();
+    QTest::mousePress(&canvas, Qt::LeftButton, Qt::NoModifier, QPoint(50, 50));
+    QTest::mousePress(&canvas, Qt::MiddleButton, Qt::NoModifier, QPoint(200, 200));
+    move(QPointF(60, 50), Qt::LeftButton | Qt::MiddleButton);
+    QCOMPARE(session.viewport.pan, pan + QSizeF(30, 20) + QSizeF(10, 0) + QSizeF(-140, -150));
+    QTest::mouseRelease(&canvas, Qt::MiddleButton, Qt::NoModifier, QPoint(60, 50));
+    QCOMPARE(canvas.cursor().shape(), Qt::ClosedHandCursor);
+    QTest::mouseRelease(&canvas, Qt::LeftButton, Qt::NoModifier, QPoint(60, 50));
+    QCOMPARE(canvas.cursor().shape(), Qt::OpenHandCursor);
+    // A lost release: a buttonless move ends the pan.
+    const QSizeF held = session.viewport.pan;
+    QTest::mousePress(&canvas, Qt::MiddleButton, Qt::NoModifier, QPoint(50, 50));
+    move(QPointF(70, 70), Qt::NoButton);
+    QCOMPARE(canvas.cursor().shape(), Qt::OpenHandCursor);
+    move(QPointF(90, 90), Qt::MiddleButton);
+    QCOMPARE(session.viewport.pan, held);
+    // Without a document the middle button does nothing.
+    Shown empty(std::nullopt);
+    empty.settle();
+    const Qt::CursorShape before = empty.canvas->cursor().shape();
+    QTest::mousePress(empty.canvas, Qt::MiddleButton, Qt::NoModifier, QPoint(50, 50));
+    QCOMPARE(empty.canvas->cursor().shape(), before);
 }
 
 QTEST_MAIN(CanvasNavigationTests)

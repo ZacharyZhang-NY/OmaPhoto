@@ -6,6 +6,19 @@
 #include <numbers>
 
 namespace {
+// Whether `upper` is painted above `lower`: later is higher.
+bool above(const std::vector<ImageLayer> &layers, QUuid upper, QUuid lower)
+{
+    const auto index = [&](QUuid id) -> std::optional<size_t> {
+        for (size_t at = 0; at < layers.size(); ++at)
+            if (layers[at].id == id)
+                return at;
+        return std::nullopt;
+    };
+    // Both are drawn: the pointer's layer, the visible active one.
+    return index(upper).value() > index(lower).value();
+}
+
 // Four arrows about `center`, each `reach` long, traced clockwise.
 QPainterPath fourArrowPath(QPointF center, double reach, double shaft, double head, double headLength)
 {
@@ -149,8 +162,12 @@ std::optional<CanvasView::PressTarget> CanvasView::transformPressLayer(QPointF p
         if ((box && box->contains(pixel)) || !(picks && m_session.transformAutoSelect()) || !underPointer)
             return PressTarget{*m_session.activeLayerID(), false};
     }
-    if (active && m_session.editedTransform(*active).contains(pixel))
+    if (active && m_session.editedTransform(*active).contains(pixel)) {
+        // Auto Select prefers a layer above, as over a background.
+        if (picks && m_session.transformAutoSelect() && underPointer && above(rendered, *underPointer, active->id))
+            return PressTarget{*underPointer, true};
         return PressTarget{active->id, false};
+    }
     if (picks && (m_session.transformAutoSelect() || control) && underPointer)
         return PressTarget{*underPointer, true};
     if (active)

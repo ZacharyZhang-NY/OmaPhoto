@@ -52,6 +52,7 @@ add_library(compositor_core STATIC
     src/Document/SelectionClipboard.cpp
     src/Document/Crop.cpp
     src/Document/Guides.cpp
+    src/Document/ToolDefaults.cpp
     src/Document/ObjectSelection.cpp
     src/Document/Filters.cpp
     src/Document/GuidedMatte.cpp

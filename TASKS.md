@@ -334,7 +334,9 @@ The panel of 4.6 shows and edits what the session holds so far. Each item adds i
 - 12.6a round 1: FAIL, seven findings. The cached LibRaw read its own last multipliers and halved size (the camera's now come from unpack's copy, `rawdata`); the tint's sign was the inverse of Adobe's (positive is a greener white now, D65 reads +9.5); `adjust_maximum_thr` stretched frames near white (off); a white the camera cannot see was dropped by LibRaw in silence (refused); dcraw's normalization by the smallest multiplier moved brightness with temperature (anchored on green); a test comment was wrong.
 - 12.6a round 2: FAIL, two findings. Unclipped highlights (round 1's anchor through `highlight` 1) turned magenta on real cameras: LibRaw clips again and the twin multiplies the smallest multiplier back, a clipped frame tested white; the refused white said Swift's words for a wrong file type: it is `ImageImportError(whiteBalance)` with words of its own.
 - 12.6a round 3: PASS. One wording note taken (the frame's white at the slider's ends).
-- [ ] 12.6b Version 1.2.1, part two: middle-button pan, persistent tool settings, Auto Select picking the foreground layer, the reshaped app icon (`45ab8fd`) in `packaging/icons`.
+- [x] 12.6b Version 1.2.1, part two: middle-button pan, persistent tool settings, Auto Select picking the foreground layer, the reshaped app icon (`45ab8fd`) in `packaging/icons`.
+- 12.6b round 1: FAIL, two findings: the middle pan's per-move point and the Auto Select branch's `underPointer` guard were held by no test (both tested now); the cosmetic notes taken (test order, the distort test's Swift name, the double pan named). A parallel run showed `SelectionCanvasTests` pressing before a nudge's move had ended; it waits for the move now.
+- 12.6b round 2: PASS.
 - [ ] 12.7 Version 1.2.2: Photoshop's remaining blend modes in its groups; Black & White, Color Balance and Invert adjustments.
 - [ ] 12.8a Version 1.2.3, part one: the Camera Raw filter's model and pixel kernels.
 - [ ] 12.8b Version 1.2.3, part two: the Camera Raw panel beside the canvas, its grading wheels turning the way their hue runs (1.2.9's `96edd5f`).

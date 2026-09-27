@@ -293,6 +293,8 @@ void SelectionCanvasTests::aCtrlDragMovesSelectedPixelsAndCtrlArrowsNudgeThem()
     QCOMPARE(session.history.undoCount(), count + 2);
     // Ctrl-Alt copies; losing the keys mid-drag cancels.
     session.selectTool(NavigationTool::marquee);
+    // The nudge's move ends a turn after its step lands.
+    QTRY_VERIFY(!session.pixelMove());
     shown.press(QPointF(270, 40), Qt::ControlModifier | Qt::AltModifier);
     QVERIFY(session.pixelMove() && session.pixelMove()->duplicate);
     shown.move(QPointF(300, 40), Qt::ControlModifier | Qt::AltModifier);
