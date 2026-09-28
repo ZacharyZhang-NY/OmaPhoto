@@ -163,32 +163,60 @@ void EditorSession::copyMergedSelection()
     }
 }
 
+bool EditorSession::canCopyLayer() const
+{
+    return canEditLayers() && activeLayer() && !selection() && !m_isMaskSelected;
+}
+
+// Swift's pasteboard type for a layer copied whole.
+static const QString copiedLayerType = QStringLiteral("com.compositor.copied-layer");
+
 void EditorSession::copySelection()
 {
-    const std::optional<ImageLayer> layer = activeLayer();
-    if (!canCopyPixels() || !layer)
+    if (!canCopyPixels() && !canCopyLayer())
         return;
+    const ImageLayer layer = activeLayer().value();
+    if (!canCopyPixels()) {
+        auto *data = new QMimeData;
+        data->setData(copiedLayerType, uuidString(layer.id).toUtf8());
+        QGuiApplication::clipboard()->setMimeData(data);
+        m_pixelClipboard = std::nullopt;
+        m_copiedLayer = CopiedLayer{copiedLayerIDs(), data};
+        return;
+    }
     try {
-        const std::optional<CopiedPixels> copied = renderSelectedPixels(*layer, m_isMaskSelected);
+        const std::optional<CopiedPixels> copied = renderSelectedPixels(layer, m_isMaskSelected);
         if (!copied) {
             qCWarning(lcApp) << "nothing to copy";
             return;
         }
         store(*copied);
+        if (canCopyLayer())
+            m_copiedLayer = CopiedLayer{copiedLayerIDs(), m_pixelClipboard.value().data};
     } catch (const ExportError &error) {
         setBrushError(QString::fromUtf8(error.what()));
     }
 }
 
+const std::optional<PixelClipboard> &EditorSession::pixelClipboard() const
+{
+    return m_pixelClipboard;
+}
+
+const std::optional<CopiedLayer> &EditorSession::copiedLayer() const
+{
+    return m_copiedLayer;
+}
+
+// Swift's change count: our own object while we own it.
+bool EditorSession::clipboardHolds(const QPointer<QMimeData> &data)
+{
+    return data && QGuiApplication::clipboard()->mimeData() == data.data();
+}
+
 // Keeps pixels for Paste; the system clipboard gets PNG.
 void EditorSession::store(const CopiedPixels &copied)
 {
-    QClipboard *clipboard = QGuiApplication::clipboard();
-    // Counted from the first copy: another since makes Paste external.
-    if (!m_watchingClipboard) {
-        m_watchingClipboard = true;
-        connect(clipboard, &QClipboard::dataChanged, this, [this] { ++m_clipboardChanges; });
-    }
     auto *data = new QMimeData;
     data->setImageData(copied.image);
     QByteArray png;
@@ -198,8 +226,9 @@ void EditorSession::store(const CopiedPixels &copied)
         data->setData(QStringLiteral("image/png"), png);
     else
         qCWarning(lcApp) << "the copied pixels could not be encoded as PNG:" << writer.errorString();
-    clipboard->setMimeData(data);
-    m_pixelClipboard = PixelClipboard{copied.image, copied.region.topLeft(), m_clipboardChanges};
+    QGuiApplication::clipboard()->setMimeData(data);
+    m_pixelClipboard = PixelClipboard{copied.image, copied.region.topLeft(), data};
+    m_copiedLayer = std::nullopt;
 }
 
 void EditorSession::cutSelection(std::function<void()> done)
@@ -217,7 +246,7 @@ bool EditorSession::canPaste() const
 {
     if (!m_document || !canEditLayers())
         return false;
-    if (m_pixelClipboard && m_clipboardChanges == m_pixelClipboard->changeCount)
+    if (m_pixelClipboard && clipboardHolds(m_pixelClipboard->data))
         return true;
     // An empty clipboard has no data object at all.
     const QMimeData *data = clipboardData();
@@ -229,7 +258,7 @@ void EditorSession::paste()
 {
     if (!canPaste())
         return;
-    if (m_pixelClipboard && m_clipboardChanges == m_pixelClipboard->changeCount) {
+    if (m_pixelClipboard && clipboardHolds(m_pixelClipboard->data)) {
         addPixelLayer(m_pixelClipboard->image, m_pixelClipboard->origin, nextLayerName(), QStringLiteral("Paste"));
         return;
     }
@@ -253,12 +282,15 @@ void EditorSession::layerViaCopy()
 {
     const std::optional<ImageLayer> layer = activeLayer();
     const std::optional<DocumentSelection> current = selection();
-    if (!canEditLayers() || !layer || layer->isGroup || (current && current->isEmpty()))
+    if (!canEditLayers() || !layer || (current && current->isEmpty()))
         return;
+    // Without a selection it duplicates, folders included.
     if (!current) {
         duplicateActiveLayer();
         return;
     }
+    if (layer->isGroup)
+        return;
     try {
         const std::optional<CopiedPixels> copied = renderSelectedPixels(*layer, m_isMaskSelected);
         if (!copied) {
@@ -314,13 +346,80 @@ QString EditorSession::nextLayerName() const
     return QStringLiteral("Layer %1").arg(number);
 }
 
+// Selected layers in document order, none inside a selected folder.
+std::vector<QUuid> EditorSession::copiedLayerIDs() const
+{
+    if (!m_document)
+        return {};
+    // The active layer is always selected: Swift's union is dead.
+    const QSet<QUuid> &selected = m_selectedLayerIDs;
+    QSet<QUuid> nested;
+    for (const QUuid &id : selected)
+        nested.unite(descendantIDs(id));
+    std::vector<QUuid> ids;
+    for (const ImageLayer &layer : m_document->layers) {
+        if (selected.contains(layer.id) && !nested.contains(layer.id))
+            ids.push_back(layer.id);
+    }
+    return ids;
+}
+
 void EditorSession::duplicateActiveLayer()
 {
-    const int index = canEditLayers() ? indexOf(m_document->layers, m_activeLayerID) : -1;
-    if (index < 0)
+    duplicateLayers(copiedLayerIDs());
+}
+
+// One copy sits above its original; several, above the topmost.
+void EditorSession::duplicateLayers(const std::vector<QUuid> &ids, const QString &editName)
+{
+    if (!canEditLayers() || ids.empty())
         return;
+    const std::optional<QUuid> active = m_activeLayerID;
+    beginEdit(editName);
+    QHash<QUuid, QUuid> copiesOf;
+    for (const QUuid &id : ids) {
+        if (const std::optional<QUuid> copy = insertCopy(id))
+            copiesOf.insert(id, *copy);
+    }
+    if (copiesOf.isEmpty()) {
+        endEdit();
+        return;
+    }
+    if (copiesOf.size() > 1) {
+        // Panel order, top first, so folders compare as seen.
+        std::vector<ProjectLayerRecord> records;
+        for (const ImageLayer &layer : m_document->layers)
+            records.push_back(layer.hierarchyRecord());
+        std::vector<QUuid> originals;
+        for (const LayerHierarchy::Entry &entry : LayerHierarchy::entries(records, true)) {
+            if (copiesOf.contains(entry.layer.id))
+                originals.push_back(entry.layer.id);
+        }
+        const std::optional<QUuid> parent = m_document->layers[indexOf(m_document->layers, originals.front())].parentID;
+        QUuid below = originals.front();
+        for (auto original = originals.rbegin(); original != originals.rend(); ++original) {
+            if (placeLayer(copiesOf.value(*original), parent, below))
+                below = copiesOf.value(*original);
+        }
+    }
+    // Else the first copy in order, where Swift takes any.
+    std::optional<QUuid> lead = active && copiesOf.contains(*active) ? std::optional(copiesOf.value(*active)) : std::nullopt;
+    for (const QUuid &id : ids) {
+        if (!lead && copiesOf.contains(id))
+            lead = copiesOf.value(id);
+    }
+    setActiveLayerID(lead.value());
+    m_selectedLayerIDs = QSet<QUuid>(copiesOf.cbegin(), copiesOf.cend());
+    endEdit();
+}
+
+// Copies the layer and all it holds, just above it.
+std::optional<QUuid> EditorSession::insertCopy(QUuid id)
+{
+    const int index = indexOf(m_document->layers, id);
+    if (index < 0)
+        return std::nullopt;
     // A folder carries its whole tree, links kept inside it.
-    const QUuid id = *m_activeLayerID;
     QSet<QUuid> included = descendantIDs(id);
     included.insert(id);
     std::vector<ImageLayer> copies;
@@ -329,7 +428,7 @@ void EditorSession::duplicateActiveLayer()
             copies.push_back(layer);
     }
     if (m_document->layers.size() + copies.size() > 10'000)
-        return;
+        return std::nullopt;
     QHash<QUuid, QUuid> mapping;
     for (const ImageLayer &copy : copies)
         mapping.insert(copy.id, QUuid::createUuid());
@@ -344,14 +443,12 @@ void EditorSession::duplicateActiveLayer()
         renamed(copy.parentID);
         renamed(copy.maskSourceID);
     }
-    beginEdit(QStringLiteral("Duplicate Layer"));
     m_document->layers.insert(m_document->layers.begin() + index + 1, copies.begin(), copies.end());
     for (auto original = mapping.cbegin(); original != mapping.cend(); ++original) {
         if (m_collapsedGroupIDs.contains(original.key()))
             m_collapsedGroupIDs.insert(original.value());
     }
-    setActiveLayerID(mapping.value(id));
-    endEdit();
+    return mapping.value(id);
 }
 
 // Alt-drag in the Layers panel: a copy placed where dropped.

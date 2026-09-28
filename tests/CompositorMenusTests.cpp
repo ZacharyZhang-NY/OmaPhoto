@@ -320,8 +320,12 @@ void CompositorMenusTests::duplicateMergeAndFlipEntriesActOnTheLayers()
     QCOMPARE(int(bar.session().document().value().layers.size()), 2);
     QCOMPARE(bar.session().history.undoName(), QString("Merge Layers"));
     const QUuid merged = bar.session().activeLayerID().value();
+    // A folder duplicates without a selection, copies nothing with one.
     bar.session().addGroup();
+    QVERIFY(bar.action("layerViaCopy").isEnabled());
+    bar.session().selectAll();
     QVERIFY(!bar.action("layerViaCopy").isEnabled());
+    bar.session().deselect();
     bar.session().selectLayer(merged);
     QVERIFY(bar.action("layerViaCopy").isEnabled());
     bar.session().setIsProjectBusy(true);

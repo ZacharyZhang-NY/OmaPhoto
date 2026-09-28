@@ -116,7 +116,6 @@ void EditorSession::beginDuplicateTransform()
     QSet<QUuid> carried;
     for (const QUuid &id : selection)
         carried.unite(descendantIDs(id));
-    // Bottom to top: the copies keep their order.
     std::vector<QUuid> targets;
     for (const ImageLayer &layer : m_document->layers) {
         if (selection.contains(layer.id) && !carried.contains(layer.id))
@@ -125,21 +124,17 @@ void EditorSession::beginDuplicateTransform()
     if (targets.empty())
         return;
     beginEdit(targets.size() > 1 ? QStringLiteral("Duplicate Layers") : QStringLiteral("Duplicate Layer"));
-    std::vector<QUuid> copies;
-    for (const QUuid &id : targets) {
-        selectLayer(id);
-        duplicateActiveLayer();
-        if (m_activeLayerID != id)
-            copies.push_back(m_activeLayerID.value());
-    }
+    // Stacked as Duplicate Layer stacks them.
+    duplicateLayers(targets);
+    const QSet<QUuid> copies = m_selectedLayerIDs - selection;
     // Past the layer limit nothing was copied.
-    if (copies.empty()) {
+    if (copies.isEmpty()) {
         endEdit();
         selectLayers(selection, primary);
         return;
     }
-    m_transformDuplicate = TransformDuplicate{copies, selection, primary};
-    selectLayers(QSet<QUuid>(copies.begin(), copies.end()), copies.back());
+    m_transformDuplicate = TransformDuplicate{std::vector<QUuid>(copies.begin(), copies.end()), selection, primary};
+    selectLayers(copies, m_activeLayerID);
     beginTransform(false);
 }
 

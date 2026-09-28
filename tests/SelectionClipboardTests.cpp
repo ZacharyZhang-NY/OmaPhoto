@@ -127,15 +127,31 @@ void SelectionClipboardTests::layerViaCopyCopiesTheSelectionOrDuplicatesTheLayer
     QCOMPARE(session->history.undoName(), QString("Duplicate Layer"));
     QCOMPARE(session->activeLayer().value().name, source.name + " copy");
     QVERIFY(session->activeLayer().value().asset.value().identity() == source.asset.value().identity());
-    // An empty selection and a folder make no layer.
-    const int count = session->history.undoCount();
+    // A folder duplicates; a folder under a selection copies nothing.
     session->addGroup();
+    const QUuid folder = session->activeLayerID().value();
     session->layerViaCopy();
-    session->selectLayer(source.id);
+    QCOMPARE(session->history.undoName(), QString("Duplicate Layer"));
+    QCOMPARE(session->activeLayer().value().name, QString("Folder 1 copy"));
+    session->selectLayer(folder);
     select(*session, QRectF(0, 0, 10, 10));
+    const int count = session->history.undoCount();
+    session->layerViaCopy();
+    QCOMPARE(session->history.undoCount(), count);
+    // Its chosen mask has pixels, yet Swift copies none.
+    session->deselect();
+    session->addMask(true);
+    select(*session, QRectF(0, 0, 10, 10));
+    QVERIFY(session->isMaskSelected() && session->canCopyPixels());
+    const int masked = session->history.undoCount();
+    session->layerViaCopy();
+    QCOMPARE(session->history.undoCount(), masked);
+    const int later = masked - count;
+    // An empty selection copies nothing either.
+    session->selectLayer(source.id);
     session->applySelection(rectPath(QRectF(0, 0, 100, 40)), SelectionMode::subtract, "Subtract");
     session->layerViaCopy();
-    QCOMPARE(session->history.undoCount(), count + 3);
+    QCOMPARE(session->history.undoCount(), count + later + 1);
 }
 
 void SelectionClipboardTests::lassoShapedSelectionCopiesAndPastes()

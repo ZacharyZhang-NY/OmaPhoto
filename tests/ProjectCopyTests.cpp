@@ -49,7 +49,7 @@ private slots:
     void aFolderTravelsWithItsContentsAndItsLinks();
     void aMaskFromOutsideTheCopyIsBakedIn();
     void anAdjustmentLetsGoOfItsBaseUnbaked();
-    void effectsStayBehindAsSwiftsListLeavesThem();
+    void effectsTravelWithTheCopy();
     void theCopyLandsAtThePointOrTheCentre();
     void aNewTabGetsTheSourcesCanvasInOneStep();
     void bothProjectsAreBusyWhileTheCopyBakes();
@@ -229,7 +229,7 @@ void ProjectCopyTests::anAdjustmentLetsGoOfItsBaseUnbaked()
     QVERIFY(!copy.maskSourceID && !copy.asset && copy.adjustment == LayerAdjustment{AdjustmentKind::curves});
 }
 
-void ProjectCopyTests::effectsStayBehindAsSwiftsListLeavesThem()
+void ProjectCopyTests::effectsTravelWithTheCopy()
 {
     ProjectWorkspace workspace;
     ProjectTab &from = workspace.current();
@@ -243,7 +243,7 @@ void ProjectCopyTests::effectsStayBehindAsSwiftsListLeavesThem()
     target.session.createDocument(2, 2);
     QVERIFY(copied(workspace, framed, target.id));
     const ImageLayer copy = target.session.document().value().layers.front();
-    QVERIFY(copy.name == QString("Framed") && !copy.effects);
+    QVERIFY(copy.name == QString("Framed") && copy.effects == effects);
     QVERIFY(layerWith(from.session, framed).effects == effects);
 }
 

@@ -60,6 +60,11 @@ public:
     static std::optional<QUuid> layerID(const QString &text);
     void copyLayer(QUuid id, std::optional<QUuid> destination, std::optional<QPointF> point = std::nullopt,
                    std::function<void()> done = {});
+    // Folders with all they hold, as one step there.
+    void copyLayers(const std::vector<QUuid> &ids, std::optional<QUuid> destination, std::optional<QPointF> point = std::nullopt,
+                    std::function<void()> done = {});
+    // Ctrl+V with layers copied whole; false when none.
+    bool pasteCopiedLayer();
 
 signals:
     void changed();
@@ -70,7 +75,7 @@ private:
         std::optional<QString> failure;
     };
     struct Copy {
-        QUuid id;
+        std::vector<QUuid> ids;
         std::shared_ptr<ProjectTab> from, target;
         CanvasDocument original;
         std::vector<ImageLayer> layers;

@@ -49,6 +49,7 @@ add_library(compositor_core STATIC
     src/Document/LiveLayerMask.cpp
     src/Document/PixelAdjust.cpp
     src/Document/ProjectWorkspace.cpp
+    src/Document/ProjectWorkspace+Copy.cpp
     src/Document/SelectionClipboard.cpp
     src/Document/Crop.cpp
     src/Document/Guides.cpp

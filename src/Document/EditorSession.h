@@ -276,8 +276,6 @@ public:
     int canvasFocusRequest() const { return m_canvasFocusRequest; }
     void requestCanvasFocus();
 
-    // What Paste puts back in place, until another copy.
-    const std::optional<PixelClipboard> &pixelClipboard() const { return m_pixelClipboard; }
     // What went wrong in a tool; the window shows it.
     const std::optional<QString> &brushError() const { return m_brushError; }
     void setBrushError(std::optional<QString> error);
@@ -481,9 +479,7 @@ private:
     std::optional<LayerEffects> m_effectsEditingOriginal;
     std::optional<LayerEffectSelection> m_effectSelection;
     std::optional<PixelClipboard> m_pixelClipboard;
-    // Swift's pasteboard change count, counted from the first copy.
-    int m_clipboardChanges = 0;
-    bool m_watchingClipboard = false;
+    std::optional<CopiedLayer> m_copiedLayer;
     std::optional<LassoDraft> m_lassoDraft;
     LassoKind m_lassoKind = LassoKind::freehand;
     LassoKind m_marqueeKind = LassoKind::rectangle;

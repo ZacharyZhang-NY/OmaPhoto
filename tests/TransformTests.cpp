@@ -389,10 +389,11 @@ void TransformTests::duplicateTransformCopiesLayersAndFoldersWithTheirContents()
     QCOMPARE(int(session.document().value().layers.size()), 6);
     QCOMPARE(session.selectedLayerIDs().size(), 3);
     QVERIFY(!session.selectedLayerIDs().contains(first) && !session.selectedLayerIDs().contains(folder));
-    // The topmost copy leads; copies sit above their sources.
-    QCOMPARE(session.document().value().layers[1].name, QString("Painted layer copy"));
+    // The copies stack above the topmost source; the primary's leads.
+    QCOMPARE(session.document().value().layers[2].id, folder);
+    QCOMPARE(session.document().value().layers[3].name, QString("Painted layer copy"));
     QCOMPARE(session.document().value().layers[5].name, QString("Folder 1 copy"));
-    QCOMPARE(session.activeLayerID(), std::optional(session.document().value().layers[5].id));
+    QCOMPARE(session.activeLayerID(), std::optional(session.document().value().layers[3].id));
     session.cancelTransform();
     QCOMPARE(int(session.document().value().layers.size()), 3);
     QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{first, second, folder}));

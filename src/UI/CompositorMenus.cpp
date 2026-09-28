@@ -82,7 +82,7 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
             m_field->copy();
         else if (InlineTextEditor *text = typedText())
             text->copy();
-        else if (session().canCopyPixels())
+        else if (session().canCopyPixels() || session().canCopyLayer())
             session().copySelection();
         else
             qCWarning(lcApp) << "nothing to copy";
@@ -93,6 +93,8 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
             m_field->paste();
         else if (InlineTextEditor *text = typedText())
             text->paste();
+        else if (m_workspace.pasteCopiedLayer())
+            return;
         else if (session().canPaste())
             session().paste();
         else
@@ -395,7 +397,7 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("fillBackground"))->setEnabled(s.canEditPixels());
     action(QStringLiteral("clearSelectionPixels"))->setEnabled(s.selection().has_value() && s.canEditPixels());
     action(QStringLiteral("layerViaCopy"))->setText(s.selection() ? QStringLiteral("Layer via Copy") : QStringLiteral("Duplicate Layer"));
-    action(QStringLiteral("layerViaCopy"))->setEnabled(s.canCopyPixels() || (!s.selection() && s.canEditLayers() && active && !active->isGroup));
+    action(QStringLiteral("layerViaCopy"))->setEnabled(s.canCopyPixels() || (!s.selection() && s.canEditLayers() && active));
     action(QStringLiteral("mergeLayers"))->setText(s.mergeTitle());
     action(QStringLiteral("mergeLayers"))->setEnabled(s.canMergeLayers());
     action(QStringLiteral("flipHorizontal"))->setEnabled(s.canTransform());
