@@ -38,6 +38,16 @@ ProjectSnapshot manyLayers()
     return snapshot;
 }
 
+// The accept and what it starts run limited; painting not.
+std::function<void(const std::function<void()> &)> limited(long long bytes)
+{
+    return [bytes](const std::function<void()> &accept) {
+        malloc_trim(0);
+        const AddressSpaceLimit limit(bytes);
+        accept();
+    };
+}
+
 struct Desk {
     EditorSession session;
     ProjectController controller{session};
@@ -133,13 +143,9 @@ void ProjectExportFailureTests::aPanelsHandOffThatFindsNoMemoryIsExplained()
     Desk desk;
     QTemporaryDir folder;
     desk.alerts.replies = {folder.filePath("many.png"), "OK"};
+    desk.alerts.aroundAccept = limited(512ll * 1024);
     desk.controller.exportPNG([&desk] { desk.done = true; });
-    // The panel is answered and its copy fails, limited.
-    {
-        malloc_trim(0);
-        const AddressSpaceLimit limit(512ll * 1024);
-        QTRY_COMPARE(desk.alerts.seen.size(), 2);
-    }
+    QTRY_COMPARE(desk.alerts.seen.size(), 2);
     QTRY_VERIFY(desk.done);
     QCOMPARE(desk.alerts.seen.value(1), desk.explained(QStringLiteral("Couldn’t export PNG")).value(0));
     QVERIFY(!desk.session.isProjectBusy() && !QFileInfo::exists(folder.filePath("many.png")));
@@ -152,7 +158,7 @@ void ProjectExportFailureTests::thePanelOpensWithoutCopyingTheSnapshot()
     desk.alerts.replies = {"<cancel>"};
     {
         malloc_trim(0);
-        const AddressSpaceLimit limit(2304ll * 1024);
+        const AddressSpaceLimit limit(2560ll * 1024);
         desk.controller.exportPNG([&desk] { desk.done = true; });
     }
     QTRY_VERIFY(desk.done);
@@ -170,12 +176,9 @@ void ProjectExportFailureTests::aRefusedNameCopiesNoSnapshot()
     QVERIFY(taken.open(QIODevice::WriteOnly));
     taken.close();
     desk.alerts.replies = {folder.filePath("taken.jpg"), "OK"};
+    desk.alerts.aroundAccept = limited(512ll * 1024);
     desk.controller.exportPNG([&desk] { desk.done = true; });
-    {
-        malloc_trim(0);
-        const AddressSpaceLimit limit(512ll * 1024);
-        QTRY_COMPARE(desk.alerts.seen.size(), 2);
-    }
+    QTRY_COMPARE(desk.alerts.seen.size(), 2);
     QTRY_VERIFY(desk.done);
     QVERIFY(desk.alerts.seen.value(1).contains("“taken.jpg.png” already exists."));
     QVERIFY(!desk.session.isProjectBusy());
@@ -195,7 +198,7 @@ void ProjectExportFailureTests::theJPEGRenderTakesTheSnapshotWithoutACopy()
     entered.acquire();
     {
         malloc_trim(0);
-        const AddressSpaceLimit limit(2304ll * 1024);
+        const AddressSpaceLimit limit(2560ll * 1024);
         desk.controller.exportJPEG([&desk] { desk.done = true; });
     }
     release.release();

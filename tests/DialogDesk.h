@@ -21,6 +21,8 @@ public:
     std::function<QString()> note;
     // Typed into a panel's name field before "<cancel>".
     QString typeBeforeCancel;
+    // Wraps a panel's accept, as a memory limit might.
+    std::function<void(const std::function<void()> &)> aroundAccept;
 
     DialogDesk()
     {
@@ -89,7 +91,11 @@ private:
         // Typed like a user; several files quoted, as panels read.
         const QStringList paths = reply.split(QLatin1Char('|'));
         name->setText(paths.size() == 1 ? reply : QStringLiteral("\"") + paths.join(QStringLiteral("\" \"")) + QStringLiteral("\""));
-        static_cast<QDialog *>(panel)->accept();
+        const auto accept = [panel] { static_cast<QDialog *>(panel)->accept(); };
+        if (aroundAccept)
+            aroundAccept(accept);
+        else
+            accept();
     }
 
     QTemporaryDir m_folder;
