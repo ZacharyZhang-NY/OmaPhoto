@@ -324,6 +324,8 @@ bool CanvasView::eventFilter(QObject *watched, QEvent *event)
     key = typed.get();
     // Shift-+ and Shift-− step the blend mode, except while typing.
     const bool typing = qobject_cast<QLineEdit *>(QApplication::focusWidget()) || (m_inlineTextEditor && hasFocus());
+    if (event->type() == QEvent::KeyPress && !typing && handleKeyboardZoom(*key))
+        return true;
     if (event->type() != QEvent::KeyPress || typing || key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))
         return false;
     const bool forward = key->key() == Qt::Key_Plus || key->key() == Qt::Key_Equal;
@@ -333,6 +335,22 @@ bool CanvasView::eventFilter(QObject *watched, QEvent *event)
     }
     // Brush brackets too; the canvas's own keys take its own.
     return QApplication::focusWidget() != this && !m_session.levels() && brushBracket(key->text());
+}
+
+// Zoom In's plus, which its Ctrl+= entry cannot hold.
+bool CanvasView::handleKeyboardZoom(const QKeyEvent &key)
+{
+    const Qt::KeyboardModifiers held = key.modifiers();
+    if (!m_session.document() || key.key() != Qt::Key_Plus || !held.testFlag(Qt::ControlModifier) || held & (Qt::AltModifier | Qt::MetaModifier))
+        return false;
+    // Only while the entry keeps its default key, as Swift's.
+    for (const ShortcutDefinition &definition : ShortcutDefinition::all()) {
+        if (definition.isMenu() && definition.title == QLatin1String("Zoom In") && !(ShortcutSettings::shared().chord(definition) == definition.original))
+            return false;
+    }
+    m_session.zoomKeyboard(1);
+    synchronizeDisplay();
+    return true;
 }
 
 // A key changed: badge, box and cursor follow at once.

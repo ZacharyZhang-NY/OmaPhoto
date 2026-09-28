@@ -1,4 +1,6 @@
 #include "MenuFixtures.h"
+#include "Rendering/EditorCanvas.h"
+#include <QLineEdit>
 
 // The View menu: zoom, the pixel grid and Snap.
 class ViewMenuTests : public QObject {
@@ -24,9 +26,32 @@ void ViewMenuTests::viewEntriesZoomTheFrontSession()
     QCOMPARE(bar.session().viewport.zoom(), 1.25);
     bar.action("zoomOut").trigger();
     bar.action("zoomOut").trigger();
-    QCOMPARE(bar.session().viewport.zoom(), 0.8);
+    QCOMPARE(bar.session().viewport.zoom(), 2.0 / 3.0);
     bar.action("fit").trigger();
     QVERIFY(bar.session().viewport.followsFit());
+    // A text field or open text keeps the keys.
+    bar.window.show();
+    QVERIFY(QTest::qWaitForWindowActive(&bar.window));
+    bar.session().zoom(1);
+    auto *field = new QLineEdit(&bar.window);
+    field->show();
+    field->setFocus();
+    QTRY_VERIFY(field->hasFocus());
+    bar.action("zoomIn").trigger();
+    QCOMPARE(bar.session().viewport.zoom(), 1.0);
+    auto &canvas = *bar.window.findChild<CanvasView *>();
+    canvas.setFocus();
+    QTRY_VERIFY(canvas.hasFocus());
+    bar.session().selectTool(NavigationTool::type);
+    bar.session().beginText(QPointF(10, 10), true);
+    QVERIFY(bar.session().textDraft());
+    canvas.setFocus();
+    QTRY_VERIFY(canvas.hasFocus());
+    bar.action("zoomIn").trigger();
+    QCOMPARE(bar.session().viewport.zoom(), 1.0);
+    bar.session().cancelText();
+    bar.action("zoomIn").trigger();
+    QCOMPARE(bar.session().viewport.zoom(), 1.25);
 }
 
 void ViewMenuTests::thePixelGridEntryTogglesTheSession()

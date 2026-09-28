@@ -253,6 +253,8 @@ public:
     void createDocument(int width, int height, bool emptyLayer = false);
     void fit();
     void zoom(double value, std::optional<QPointF> anchor = std::nullopt);
+    // Swift's stepped keyboard zoom about the view's centre.
+    void zoomKeyboard(int step);
     // The View menu's grid, shown from 800%.
     bool showsPixelGrid() const { return m_showsPixelGrid; }
     void setShowsPixelGrid(bool shows);

@@ -150,6 +150,8 @@ compositor_test(ProjectWorkspaceFlowTests)
 compositor_test(ProjectWorkspaceSignalTests)
 compositor_test(ProjectWorkspaceTests)
 compositor_test(ProjectWorkspaceViewTests)
+compositor_test(ProjectTabStripTests)
+compositor_test(KeyboardZoomTests)
 # It starts the real app beside itself.
 add_dependencies(ProjectWorkspaceViewTests omaphoto)
 compositor_test(ProjectSessionTests)

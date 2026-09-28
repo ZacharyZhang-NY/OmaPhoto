@@ -129,8 +129,13 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     QMenu *view = bar.addMenu(QStringLiteral("&View"));
     add(view, QStringLiteral("fit"), QStringLiteral("Fit Canvas"), QKeySequence(Qt::CTRL | Qt::Key_0), [this] { session().fit(); });
     add(view, QStringLiteral("actualPixels"), QStringLiteral("Actual Pixels"), QKeySequence(Qt::CTRL | Qt::Key_1), [this] { session().zoom(1); });
-    add(view, QStringLiteral("zoomIn"), QStringLiteral("Zoom In"), QKeySequence(Qt::CTRL | Qt::Key_Equal), [this] { session().zoom(session().viewport.zoom() * 1.25); });
-    add(view, QStringLiteral("zoomOut"), QStringLiteral("Zoom Out"), QKeySequence(Qt::CTRL | Qt::Key_Minus), [this] { session().zoom(session().viewport.zoom() / 1.25); });
+    // Swift's stops; open text keeps the keys, as NSText does.
+    const auto zoomBy = [this](int step) {
+        if (!m_field && !(m_canvas && session().textDraft()))
+            session().zoomKeyboard(step);
+    };
+    add(view, QStringLiteral("zoomIn"), QStringLiteral("Zoom In"), QKeySequence(Qt::CTRL | Qt::Key_Equal), [zoomBy] { zoomBy(1); });
+    add(view, QStringLiteral("zoomOut"), QStringLiteral("Zoom Out"), QKeySequence(Qt::CTRL | Qt::Key_Minus), [zoomBy] { zoomBy(-1); });
     add(view, QStringLiteral("pixelGrid"), QStringLiteral("Pixel Grid (800% and above)"), QKeySequence(), [this] { session().setShowsPixelGrid(!session().showsPixelGrid()); })
         ->setCheckable(true);
     add(view, QStringLiteral("snap"), QStringLiteral("Snap"), QKeySequence(), [this] { session().setSnappingEnabled(!session().snappingEnabled()); })

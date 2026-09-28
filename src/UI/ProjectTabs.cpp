@@ -4,9 +4,13 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QEvent>
+#include <QFontMetricsF>
 #include <QHBoxLayout>
 #include <QPainter>
 #include <QScrollBar>
+#include <QStyleOptionToolButton>
+#include <QStylePainter>
+#include <QTimer>
 
 namespace {
 QFont tabFont(bool active)
@@ -16,17 +20,40 @@ QFont tabFont(bool active)
     font.setWeight(active ? QFont::DemiBold : QFont::Medium);
     return font;
 }
+
+// Swift's leading label: text from the left, 8 kept after.
+class TabTitle : public QToolButton {
+public:
+    using QToolButton::QToolButton;
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QStylePainter painter(this);
+        QStyleOptionToolButton option;
+        initStyleOption(&option);
+        option.text.clear();
+        painter.drawComplexControl(QStyle::CC_ToolButton, option);
+        painter.setPen(palette().color(isEnabled() ? QPalette::Active : QPalette::Disabled, QPalette::ButtonText));
+        painter.drawText(rect().adjusted(0, 0, -8, 0), Qt::AlignLeft | Qt::AlignVCenter, text());
+    }
+};
+
+// Swift's projectTabLabelWidth: the title's own width, 35 to 155.
+int labelWidth(const QString &title, bool active, bool modified)
+{
+    const double titleWidth = QFontMetricsF(tabFont(active)).horizontalAdvance(title);
+    return int(std::min(155.0, std::max(35.0, std::ceil(titleWidth) + (modified ? 10 : 0))));
+}
 }
 
 ProjectTabButton::ProjectTabButton(ProjectWorkspace &workspace, std::shared_ptr<ProjectTab> tab, QWidget *parent)
-    : QWidget(parent), tab(std::move(tab)), m_workspace(workspace), m_select(new QToolButton(this)), m_close(new QToolButton(this))
+    : QWidget(parent), tab(std::move(tab)), m_workspace(workspace), m_select(new TabTitle(this)), m_close(new QToolButton(this))
 {
     // 28 high: the strip's 34 less its margins.
     m_select->setObjectName(QStringLiteral("selectTab"));
     m_select->setAutoRaise(true);
     m_select->setFocusPolicy(Qt::NoFocus);
-    m_select->setMinimumWidth(35);
-    m_select->setMaximumWidth(155);
     m_close->setObjectName(QStringLiteral("closeTab"));
     m_close->setAutoRaise(true);
     m_close->setFocusPolicy(Qt::NoFocus);
@@ -48,9 +75,15 @@ ProjectTabButton::ProjectTabButton(ProjectWorkspace &workspace, std::shared_ptr<
 void ProjectTabButton::synchronize()
 {
     const bool active = m_workspace.selectedID() == tab->id;
-    // Swift's dot for unsaved changes stands before the title.
-    m_select->setText((tab->session.isModified() ? QStringLiteral("● ") : QString()) + tab->title());
+    // The unsaved dot leads; fixed widths move later tabs only.
+    const bool modified = tab->session.isModified();
+    const int label = labelWidth(tab->title(), active, modified);
+    const QString dot = modified ? QStringLiteral("● ") : QString();
+    const QFontMetrics metrics(tabFont(active));
+    m_select->setText(dot + metrics.elidedText(tab->title(), Qt::ElideRight, label - (modified ? 10 : 0)));
     m_select->setFont(tabFont(active));
+    // Swift's trailing 8 inside; a character dot outgrows Swift's 10.
+    m_select->setFixedWidth(label + 8 + (modified ? metrics.horizontalAdvance(dot) - 10 : 0));
     m_select->setToolTip(tab->title());
     m_select->setEnabled(m_workspace.canSwitch() || active);
     m_close->setToolTip(QStringLiteral("Close %1").arg(tab->title()));
@@ -265,18 +298,21 @@ void ProjectTabStrip::synchronize()
 bool ProjectTabStrip::eventFilter(QObject *watched, QEvent *event)
 {
     // A title changed size: the row takes its new width.
-    if (event->type() == QEvent::LayoutRequest) {
+    if (event->type() == QEvent::LayoutRequest)
         m_row->resize(m_row->sizeHint());
-        showFront();
-    }
     return QScrollArea::eventFilter(watched, event);
 }
 
-// The front tab scrolls into view.
+// Only a new front tab scrolls into view.
 void ProjectTabStrip::showFront()
 {
-    for (ProjectTabButton *button : buttons()) {
-        if (button->tab->id == m_workspace.selectedID())
-            ensureWidgetVisible(button, 0, 0);
-    }
+    if (std::exchange(m_shownFront, m_workspace.selectedID()) == m_workspace.selectedID())
+        return;
+    // Posted, as Swift's: the row's layout request runs first.
+    QTimer::singleShot(0, this, [this] {
+        for (ProjectTabButton *button : buttons()) {
+            if (button->tab->id == m_workspace.selectedID())
+                ensureWidgetVisible(button, 0, 0);
+        }
+    });
 }

@@ -156,13 +156,14 @@ void ProjectWorkspaceViewTests::tabsShowTheirTitlesDotsAndState()
     QCOMPARE(buttons[0]->height(), 28);
     QCOMPARE(buttons[0]->sizeHint().height(), 28);
     QCOMPARE(buttons[0]->findChild<QToolButton *>("closeTab")->size(), QSize(16, 28));
-    // Titles stop at 155 and start at 35.
+    // Titles span 35 to 155, plus 8 and the dot.
     QToolButton &title = *buttons[0]->findChild<QToolButton *>("selectTab");
+    const int dot = QFontMetrics(title.font()).horizontalAdvance(QStringLiteral("● ")) - 10;
     workspace.tabs()[0]->session.setProjectPath(QString("/x/") + QString(80, QLatin1Char('W')) + ".comp");
-    QTRY_COMPARE(title.width(), 155);
+    QTRY_COMPARE(title.width(), 155 + 8 + dot);
     QCOMPARE(buttons[0]->height(), 28);
     workspace.tabs()[0]->session.setProjectPath(QString("/x/I.comp"));
-    QTRY_COMPARE(title.width(), 35);
+    QTRY_COMPARE(title.width(), 35 + 8 + dot);
     workspace.tabs()[0]->session.setProjectPath(std::nullopt);
     QCOMPARE(buttons[1]->findChild<QToolButton *>("selectTab")->font().weight(), QFont::DemiBold);
     QCOMPARE(buttons[0]->findChild<QToolButton *>("selectTab")->font().weight(), QFont::Medium);
@@ -210,22 +211,21 @@ void ProjectWorkspaceViewTests::tabsShowTheirTitlesDotsAndState()
     const auto wholeInView = [&](const ProjectTabButton *button) {
         return strip.viewport()->rect().contains(QRect(button->mapTo(strip.viewport(), QPoint(0, 0)), button->size()));
     };
-    // In view at once, and still after the layout settles.
-    QVERIFY(last->tab->id == workspace.selectedID() && wholeInView(last));
+    // In view once laid out, as Swift posts its reveal.
+    QVERIFY(last->tab->id == workspace.selectedID());
+    QTRY_VERIFY(wholeInView(last));
     QVERIFY(strip.widget()->width() > strip.viewport()->width());
     QVERIFY(last->findChild<QToolButton *>("selectTab")->width() >= 35 && strip.horizontalScrollBar()->maximum() > 0);
-    QCoreApplication::processEvents();
-    QVERIFY(wholeInView(last));
-    // The front title grows: the scroll follows the layout.
+    // Since 1.2.4 a growing title keeps the offset.
+    const int offset = strip.horizontalScrollBar()->value();
     workspace.tabs().back()->session.setProjectPath(QString("/x/") + QString(60, QLatin1Char('W')) + ".comp");
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
-    QVERIFY(last->width() > 180 && wholeInView(last));
+    QVERIFY(last->width() > 180);
+    QCOMPARE(strip.horizontalScrollBar()->value(), offset);
     workspace.select(workspace.tabs()[0]->id);
     const ProjectTabButton *head = strip.buttons().first();
-    QVERIFY(wholeInView(head));
-    QCoreApplication::processEvents();
-    QVERIFY(wholeInView(head));
+    QTRY_VERIFY(wholeInView(head));
 }
 
 void ProjectWorkspaceViewTests::tabButtonsSelectAndClose()
@@ -271,7 +271,7 @@ void ProjectWorkspaceViewTests::theToolbarFollowsTheFrontSession()
     QVERIFY(fit.isEnabled() && actual.isEnabled() && in.isEnabled() && out.isEnabled());
     actual.trigger();
     out.trigger();
-    QCOMPARE(session.viewport.zoom(), 0.8);
+    QCOMPARE(session.viewport.zoom(), 2.0 / 3.0);
     in.trigger();
     in.trigger();
     QCOMPARE(session.viewport.zoom(), 1.25);

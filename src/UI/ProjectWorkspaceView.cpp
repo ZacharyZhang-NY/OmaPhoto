@@ -41,14 +41,8 @@ ProjectWorkspaceView::ProjectWorkspaceView(ProjectWorkspace &workspace, QWidget 
     connect(m_newCanvas, &QAction::triggered, this, [this] { m_workspace.current().controller.newCanvas(); });
     connect(m_fit, &QAction::triggered, this, [this] { m_workspace.current().session.fit(); });
     connect(m_actualPixels, &QAction::triggered, this, [this] { m_workspace.current().session.zoom(1); });
-    connect(m_zoomIn, &QAction::triggered, this, [this] {
-        EditorSession &session = m_workspace.current().session;
-        session.zoom(session.viewport.zoom() * 1.25);
-    });
-    connect(m_zoomOut, &QAction::triggered, this, [this] {
-        EditorSession &session = m_workspace.current().session;
-        session.zoom(session.viewport.zoom() / 1.25);
-    });
+    connect(m_zoomIn, &QAction::triggered, this, [this] { m_workspace.current().session.zoomKeyboard(1); });
+    connect(m_zoomOut, &QAction::triggered, this, [this] { m_workspace.current().session.zoomKeyboard(-1); });
     connect(&m_workspace, &ProjectWorkspace::changed, this, &ProjectWorkspaceView::synchronize);
     synchronize();
 }

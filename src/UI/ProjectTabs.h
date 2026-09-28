@@ -70,4 +70,6 @@ private:
 
     ProjectWorkspace &m_workspace;
     QWidget *const m_row;
+    // Swift's lastSelectedID: only a new front tab scrolls.
+    std::optional<QUuid> m_shownFront;
 };

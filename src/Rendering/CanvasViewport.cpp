@@ -56,6 +56,19 @@ void CanvasViewport::setZoom(double value, QPointF anchoredAt, QSizeF documentSi
     m_followsFit = false;
 }
 
+double CanvasViewport::keyboardZoomTarget(int step) const
+{
+    if (step == 0)
+        return m_zoom;
+    const double tolerance = std::max(0.000000001, std::abs(m_zoom) * 0.000000001);
+    if (step > 0) {
+        const auto next = std::find_if(keyboardZoomLevels.begin(), keyboardZoomLevels.end(), [&](double level) { return level > m_zoom + tolerance; });
+        return next == keyboardZoomLevels.end() ? m_zoom : *next;
+    }
+    const auto next = std::find_if(keyboardZoomLevels.rbegin(), keyboardZoomLevels.rend(), [&](double level) { return level < m_zoom - tolerance; });
+    return next == keyboardZoomLevels.rend() ? m_zoom : *next;
+}
+
 void CanvasViewport::translate(QSizeF by)
 {
     pan += by;

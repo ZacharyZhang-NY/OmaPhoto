@@ -176,6 +176,8 @@ private:
     Qt::KeyboardModifiers heldModifiers() const;
     void readModifiers(Qt::KeyboardModifiers modifiers);
     void modifiersChanged();
+    // Swift's zoom keys on key-down; true when it zoomed.
+    bool handleKeyboardZoom(const QKeyEvent &key);
     std::optional<PressTarget> transformPressLayer(QPointF pixel, Qt::KeyboardModifiers modifiers) const;
     bool pressMovesLayer(QPointF point, Qt::KeyboardModifiers modifiers) const;
     QCursor transformCursor(QPointF point, Qt::KeyboardModifiers modifiers) const;

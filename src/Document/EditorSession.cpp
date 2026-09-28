@@ -315,6 +315,17 @@ void EditorSession::zoom(double value, std::optional<QPointF> anchor)
         notify();
 }
 
+void EditorSession::zoomKeyboard(int step)
+{
+    if (!m_document)
+        return;
+    const double target = viewport.keyboardZoomTarget(step);
+    if (target == viewport.zoom())
+        return;
+    viewport.setZoom(target, viewport.center(), m_document->size());
+    notify();
+}
+
 void EditorSession::setShowsPixelGrid(bool shows)
 {
     m_showsPixelGrid = shows;
