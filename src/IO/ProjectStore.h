@@ -50,9 +50,13 @@ struct ProjectLayerRecord {
 QString uuidString(const QUuid &id);
 
 struct ProjectManifest {
+    // Swift's current and supported: what saves write, what loads accept.
+    static constexpr qint64 current = 9;
+    static constexpr std::pair<qint64, qint64> supported{1, current};
+    static bool supports(qint64 version) { return version >= supported.first && version <= supported.second; }
     QString format = QStringLiteral("com.compositor.project");
     // Swift's Int: a wild number must reach validation whole.
-    qint64 version = 9;
+    qint64 version = current;
     QString colorSpace = QStringLiteral("sRGB");
     // Version-1 projects carry none: 72 pixels per inch.
     std::optional<double> resolution = std::nullopt;

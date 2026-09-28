@@ -1,6 +1,7 @@
 #include "UI/NativeLayerList.h"
 #include "SelectionFixtures.h"
 #include <QAction>
+#include <QMenu>
 #include <QtTest>
 
 // The layer rows: what they show, select, rename and key.
@@ -261,7 +262,10 @@ void NativeLayerListTests::disclosureLinkAndTheMenuReachTheSession()
     QCOMPARE(shown.list.cells().size(), size_t(3));
     // The green row's menu acts on green, whatever is active.
     session.selectLayer(blue);
-    const auto trigger = [&](int row, const char *name) { shown.row(row).findChild<QAction *>(QString::fromLatin1(name))->trigger(); };
+    const auto trigger = [&](int row, const char *name) {
+        LayerCell &cell = shown.row(row);
+        shown.list.menuFor(cell, QPoint(cell.width() - 20, 20))->findChild<QAction *>(QString::fromLatin1(name))->trigger();
+    };
     trigger(1, "addBlackMask");
     QVERIFY(layerWith(session, green).mask.has_value());
     QCOMPARE(layerWith(session, green).mask.value().asset.image().pixelColor(0, 0), QColor(0, 0, 0));
@@ -274,7 +278,7 @@ void NativeLayerListTests::disclosureLinkAndTheMenuReachTheSession()
     QVERIFY(!layerWith(session, green).mask.has_value());
     trigger(1, "addWhiteMask");
     QCOMPARE(layerWith(session, green).mask.value().asset.image().pixelColor(0, 0), QColor(255, 255, 255));
-    trigger(1, "toggleVisibility");
+    trigger(1, "layerVisibility");
     QVERIFY(!layerWith(session, green).isVisible);
     QCOMPARE(layerWith(session, green).parentID, std::optional(folder));
     trigger(1, "moveOut");

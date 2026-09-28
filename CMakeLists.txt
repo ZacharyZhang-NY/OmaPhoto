@@ -118,6 +118,7 @@ add_library(compositor_core STATIC
     src/UI/NativeLayerList+Cell.cpp
     src/UI/NativeLayerList+Drag.cpp
     src/UI/NativeLayerList+Effects.cpp
+    src/UI/NativeLayerList+Menu.cpp
     src/UI/NavigationToolHeader.cpp
     src/UI/TransformInspector.cpp
     src/UI/EffectsSheet.cpp

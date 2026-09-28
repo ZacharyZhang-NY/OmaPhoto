@@ -8,6 +8,7 @@
 class ProjectTests : public QObject {
     Q_OBJECT
 private slots:
+    void theCurrentFormatVersionIsOneTheReaderAccepts();
     void projectRoundTripSurvivesPackageMove();
     void masksAndLargeImagesRoundTrip();
     void overwriteReplacesPackageAndDropsRemovedAssets();
@@ -19,6 +20,16 @@ private slots:
     void numbersThatAreNoNumbersAreRefusedOnSave();
     void savesAndLoadsAreLogged();
 };
+
+// Saves write current; loads take supported: they must agree.
+void ProjectTests::theCurrentFormatVersionIsOneTheReaderAccepts()
+{
+    QVERIFY(ProjectManifest::supports(ProjectManifest::current));
+    QVERIFY((ProjectManifest::supported == std::pair<qint64, qint64>(1, 9)));
+    QCOMPARE(ProjectManifest{}.version, ProjectManifest::current);
+    QVERIFY(!ProjectManifest::supports(0) && !ProjectManifest::supports(ProjectManifest::current + 1));
+    QCOMPARE(QString(ProjectError::unsupportedVersion(10).what()), QString("This project uses format version 10. This app supports versions 1–9."));
+}
 
 void ProjectTests::projectRoundTripSurvivesPackageMove()
 {

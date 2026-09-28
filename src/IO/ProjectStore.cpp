@@ -62,7 +62,7 @@ void validate(const ProjectManifest &manifest)
 {
     if (manifest.format != QLatin1String("com.compositor.project"))
         throw ProjectError(ProjectError::Kind::invalid);
-    if (manifest.version < 1 || manifest.version > 9)
+    if (!ProjectManifest::supports(manifest.version))
         throw ProjectError::unsupportedVersion(manifest.version);
     if (manifest.colorSpace != QLatin1String("sRGB"))
         throw ProjectError(ProjectError::Kind::invalid);
@@ -256,7 +256,10 @@ ProjectError::ProjectError(Kind kind) : ProjectError(kind, std::nullopt, descrip
 ProjectError ProjectError::unsupportedVersion(qint64 version)
 {
     return ProjectError(Kind::version, version,
-                        QStringLiteral("This project uses format version %1. This app supports versions 1–9.").arg(version));
+                        QStringLiteral("This project uses format version %1. This app supports versions %2–%3.")
+                            .arg(version)
+                            .arg(ProjectManifest::supported.first)
+                            .arg(ProjectManifest::supported.second));
 }
 
 ProjectError::ProjectError(Kind kind, std::optional<qint64> version, const QString &description)
@@ -332,7 +335,7 @@ ProjectSnapshot ProjectStore::load(const QString &path)
     const auto [format, version] = ProjectManifest::header(metadata);
     if (format != QLatin1String("com.compositor.project"))
         throw ProjectError(ProjectError::Kind::invalid);
-    if (version < 1 || version > 9)
+    if (!ProjectManifest::supports(version))
         throw ProjectError::unsupportedVersion(version);
     const ProjectManifest manifest = ProjectManifest::decoded(metadata);
     validate(manifest);

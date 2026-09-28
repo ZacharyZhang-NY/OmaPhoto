@@ -6,6 +6,7 @@
 #include <QSettings>
 #include <QStackedWidget>
 #include <QToolButton>
+#include <QMenu>
 #include <QtTest>
 #include "SessionFixtures.h"
 
@@ -200,13 +201,8 @@ void LayersPanelTests::theMaskButtonUsesTheSelection()
     // The row's menu: black shows only the selection.
     session.undo();
     QVERIFY(session.selection().has_value());
-    QAction *black = nullptr;
-    for (QAction *action : panel.list().cells().at(0)->actions()) {
-        if (action->objectName() == "addBlackMask")
-            black = action;
-    }
-    QVERIFY(black);
-    black->trigger();
+    LayerCell &cell = *panel.list().cells().at(0);
+    panel.list().menuFor(cell, QPoint(cell.width() - 20, 20))->findChild<QAction *>("addBlackMask")->trigger();
     QCOMPARE(session.history.undoName(), QString("Add Mask from Selection"));
     QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(20)[30]), 255);
     QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(5)[5]), 0);

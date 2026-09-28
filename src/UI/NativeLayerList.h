@@ -12,6 +12,7 @@
 #include <memory>
 
 class NativeLayerList;
+class QMenu;
 
 // A layer's eye: a press toggles, a drag swipes rows.
 class EyeSwipeButton : public QToolButton {
@@ -145,7 +146,6 @@ protected:
 private:
     void relayout();
     void endRenaming(bool keeping);
-    QAction *menuAction(const QString &name, const QString &title, const std::function<void()> &run);
 
     NativeLayerList &m_list;
     EyeSwipeButton *const m_eye;
@@ -226,6 +226,9 @@ public:
     // Photoshop's strip along the bottom of a row.
     static bool isClippingZone(const LayerCell &cell, QPoint cellPoint);
     void focusList();
+    // Swift's contextMenu(for:) and menu(for:): entries, then the press's routing.
+    std::unique_ptr<QMenu> contextMenu(QUuid id);
+    std::unique_ptr<QMenu> menuFor(LayerCell &cell, QPoint cellPoint);
     // What a drag of this row carries: its selection.
     std::unique_ptr<QMimeData> dragData(const LayerCell &cell) const;
     void startDrag(LayerCell &cell, Qt::KeyboardModifiers modifiers);

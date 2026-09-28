@@ -57,52 +57,6 @@ LayerCell::LayerCell(NativeLayerList &list)
     m_editor->setFont(name);
     m_editor->hide();
     m_editor->installEventFilter(this);
-    menuAction(QStringLiteral("renameLayer"), QStringLiteral("Rename…"), [this] {
-        if (!m_list.session().canEditLayers())
-            return;
-        m_list.session().setActiveLayerID(m_layerID);
-        m_list.session().setRenamingLayerID(m_layerID);
-    });
-    menuAction(QStringLiteral("toggleVisibility"), QStringLiteral("Hide/Show Layer"), [this] { m_list.session().toggleLayerVisibility(m_layerID); });
-    // With a selection, white hides it, black shows it alone.
-    menuAction(QStringLiteral("addWhiteMask"), QStringLiteral("Add White Mask"), [this] {
-        m_list.session().selectLayerTarget(m_layerID, false);
-        m_list.session().addMask();
-    });
-    menuAction(QStringLiteral("addBlackMask"), QStringLiteral("Add Black Mask"), [this] {
-        m_list.session().selectLayerTarget(m_layerID, false);
-        m_list.session().addMask(false);
-    });
-    menuAction(QStringLiteral("toggleMask"), QStringLiteral("Enable/Disable Mask"), [this] {
-        m_list.session().selectLayerTarget(m_layerID, false);
-        m_list.session().toggleLayerMask();
-    });
-    menuAction(QStringLiteral("deleteMask"), QStringLiteral("Delete Mask"), [this] {
-        m_list.session().selectLayerTarget(m_layerID, false);
-        m_list.session().deleteLayerMask();
-    });
-    menuAction(QStringLiteral("releaseClippingMask"), QStringLiteral("Release Clipping Mask"), [this] { m_list.session().removeLiveMask(m_layerID); });
-    menuAction(QStringLiteral("moveOut"), QStringLiteral("Move Out of Folder"), [this] {
-        m_list.session().selectLayer(m_layerID);
-        m_list.session().moveActiveLayerOutOfGroup();
-    });
-    menuAction(QStringLiteral("deleteLayer"), QStringLiteral("Delete Layer / Folder"), [this] {
-        // Part of a multi-selection, the whole selection goes.
-        EditorSession &session = m_list.session();
-        if (session.selectedLayerIDs().size() > 1 && session.selectedLayerIDs().contains(m_layerID))
-            session.deleteSelectedLayers();
-        else
-            session.deleteLayer(m_layerID);
-    });
-}
-
-QAction *LayerCell::menuAction(const QString &name, const QString &title, const std::function<void()> &run)
-{
-    auto *action = new QAction(title, this);
-    action->setObjectName(name);
-    connect(action, &QAction::triggered, this, run);
-    addAction(action);
-    return action;
 }
 
 void LayerCell::configure(const ImageLayer &layer, bool enabled, int depth, bool visible)
@@ -315,9 +269,10 @@ void LayerCell::mouseDoubleClickEvent(QMouseEvent *event)
     session.setRenamingLayerID(m_layerID);
 }
 
+// The list routes the press and builds the menu.
 void LayerCell::contextMenuEvent(QContextMenuEvent *event)
 {
-    QMenu::exec(actions(), event->globalPos(), nullptr, this);
+    m_list.menuFor(*this, event->pos())->exec(event->globalPos());
 }
 
 void LayerCell::beginRenaming()
