@@ -60,7 +60,11 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     for (int index = 3; index < 8; ++index)
         adjustments << menus[4]->actions()[index]->objectName();
     QCOMPARE(adjustments, (QStringList{"blackWhite", "colorBalance", "exposure", "gradientMap", "grain"}));
-    QCOMPARE(menus[5]->actions().size(), 5);
+    // Swift's Filter menu: Camera Raw after Lens Correction.
+    QStringList filters;
+    for (QAction *entry : menus[5]->actions())
+        filters << entry->text();
+    QCOMPARE(filters, (QStringList{"Gaussian Blur…", "Motion Blur…", "Add Noise…", "Lens Correction…", "Camera Raw Filter…", "Remove Background…"}));
     QCOMPARE(menus[6]->actions().size(), 22);
 }
 

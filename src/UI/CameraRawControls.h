@@ -3,7 +3,7 @@
 #include "UI/CameraRawSlider.h"
 #include <QWidget>
 
-class PickerField;
+class CameraRawRow;
 class QComboBox;
 class QLabel;
 class QToolButton;
@@ -30,12 +30,6 @@ private:
         QToolButton *eye;
         QWidget *body;
     };
-    struct Row {
-        std::function<double &(CameraRawSettings &)> key;
-        int decimals;
-        CameraRawSlider *slider;
-        PickerField *field;
-    };
     QVBoxLayout *group(Section section, QVBoxLayout *column);
     // Swift's slider: a title, the slider and an exact field.
     void slider(QVBoxLayout *column, const QString &name, const QString &title, std::function<double &(CameraRawSettings &)> key, double low, double high, int decimals,
@@ -54,7 +48,7 @@ private:
     QWidget *const m_scope;
     QLabel *const m_readout;
     std::vector<Group> m_groups;
-    std::vector<Row> m_rows;
+    std::vector<CameraRawRow *> m_rows;
     QComboBox *m_whiteBalance = nullptr;
     QToolButton *m_whiteBalanceSampler = nullptr;
     QLabel *m_whiteBalanceHint = nullptr;

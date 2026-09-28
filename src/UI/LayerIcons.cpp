@@ -208,6 +208,16 @@ void sparkles(QPainter &painter)
     star(QPointF(14, 4.5), 3);
     star(QPointF(14.5, 14), 2);
 }
+
+// Swift's scope: a ring with four ticks toward its middle.
+void scope(QPainter &painter)
+{
+    painter.drawEllipse(QPointF(9, 9), 6, 6);
+    painter.drawLine(QPointF(9, 1.5), QPointF(9, 6));
+    painter.drawLine(QPointF(9, 12), QPointF(9, 16.5));
+    painter.drawLine(QPointF(1.5, 9), QPointF(6, 9));
+    painter.drawLine(QPointF(12, 9), QPointF(16.5, 9));
+}
 }
 
 void LayerIcons::paint(QPainter &painter, LayerIcon icon, QPointF origin, double side, const QColor &colour)
@@ -243,6 +253,8 @@ void LayerIcons::paint(QPainter &painter, LayerIcon icon, QPointF origin, double
     case LayerIcon::rightHalfCircle: rightHalfCircle(painter); break;
     case LayerIcon::hatchedCircle: hatchedCircle(painter); break;
     case LayerIcon::axes: axes(painter); break;
+    case LayerIcon::scope: scope(painter); break;
+    case LayerIcon::lineDiagonal: painter.drawLine(QPointF(3, 15), QPointF(15, 3)); break;
     }
     painter.restore();
 }

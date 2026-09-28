@@ -1,5 +1,8 @@
 #include "UI/CameraRawControls.h"
-#include "UI/ColorPickerSheet.h"
+#include "UI/CameraRawColorControls.h"
+#include "UI/CameraRawDetailOpticsControls.h"
+#include "UI/CameraRawGeometryCalibrationControls.h"
+#include "UI/CameraRawRow.h"
 #include "UI/LayerIcons.h"
 #include "Rendering/EyedropperIcon.h"
 #include <QApplication>
@@ -49,20 +52,6 @@ bool adjusts(const CameraRawSettings &raw, int section)
     case 9: return raw.calibration.adjusts();
     }
     throw std::logic_error("unknown Camera Raw section");
-}
-
-// Swift's `.number`: at most `decimals` places, none trailing.
-QString shown(double value, int decimals, QLocale locale)
-{
-    locale.setNumberOptions(QLocale::OmitGroupSeparator);
-    QString text = locale.toString(value, 'f', decimals);
-    if (decimals == 0)
-        return text;
-    while (text.endsWith(locale.zeroDigit()))
-        text.chop(locale.zeroDigit().size());
-    if (text.endsWith(locale.decimalPoint()))
-        text.chop(locale.decimalPoint().size());
-    return text;
 }
 
 // Swift's graph: the three ribbons, or the vectorscope's cells.
@@ -206,10 +195,13 @@ CameraRawControls::CameraRawControls(EditorSession &session, QWidget *parent)
     light(group(Section::light, groups));
     color(group(Section::color, groups));
     effects(group(Section::effects, groups));
-    // Curve to Calibration fill their groups with 12.8b2.
-    for (const Section section : {Section::curve, Section::colorMixer, Section::colorGrading, Section::detail, Section::optics, Section::geometry,
-                                  Section::calibration})
-        group(section, groups);
+    group(Section::curve, groups)->addWidget(new CameraRawCurveControls(session));
+    group(Section::colorMixer, groups)->addWidget(new CameraRawMixerControls(session));
+    group(Section::colorGrading, groups)->addWidget(new CameraRawGradingControls(session));
+    group(Section::detail, groups)->addWidget(new CameraRawDetailControls(session));
+    group(Section::optics, groups)->addWidget(new CameraRawOpticsControls(session));
+    group(Section::geometry, groups)->addWidget(new CameraRawGeometryControls(session));
+    group(Section::calibration, groups)->addWidget(new CameraRawCalibrationControls(session));
     groups->addStretch(1);
     auto *scroll = new QScrollArea(this);
     scroll->setObjectName(QStringLiteral("cameraRawGroups"));
@@ -274,43 +266,17 @@ void CameraRawControls::slider(QVBoxLayout *column, const QString &name, const Q
                                double low, double high, int decimals, std::optional<CameraRawClipping> clipping, const QString &help,
                                CameraRawSliderTrack track, double reset)
 {
-    auto *box = new QWidget;
-    auto *label = new QLabel(title, box);
-    label->setMinimumWidth(labelWidth);
-    label->setToolTip(help);
     const double step = std::pow(10.0, decimals);
-    auto *slider = new CameraRawSlider(
-        low, high, track, help, [this, key, step, clipping](double value) { assign(key, std::round(value * step) / step, clipping); },
-        [this, key, reset] { assign(key, reset, std::nullopt); }, box);
-    slider->setObjectName(name + QStringLiteral("Slider"));
-    const size_t index = m_rows.size();
-    auto *field = new PickerField([this, index] {
-        PickerField &edited = *m_rows[index].field;
-        bool number = false;
-        const double typed = edited.locale().toDouble(edited.text(), &number);
-        if (edited.isModified() && number && std::isfinite(typed))
-            assign(m_rows[index].key, typed, std::nullopt);
-        edited.setModified(false);
-        synchronize();
-    }, nullptr, box);
-    field->setObjectName(name + QStringLiteral("Field"));
-    field->setAccessibleName(title);
-    field->setPlaceholderText(title);
-    field->setToolTip(help);
-    field->setAlignment(Qt::AlignRight);
-    field->setFixedWidth(56);
-    // Swift's double click on the title resets the slider.
-    label->setProperty("resetRow", qulonglong(index));
-    label->setProperty("resetValue", reset);
-    auto *row = new QHBoxLayout(box);
-    row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(10);
-    row->addWidget(label);
-    row->addWidget(slider, 1);
-    row->addWidget(field);
-    box->setAccessibleName(title);
-    column->addWidget(box);
-    m_rows.push_back(Row{std::move(key), decimals, slider, field});
+    auto *row = new CameraRawRow(
+        {.name = name, .title = title, .help = help, .low = low, .high = high, .decimals = decimals, .track = track, .titleResets = true},
+        [this, key] {
+            CameraRawSettings settings = raw();
+            return key(settings);
+        },
+        [this, key, step, clipping](double value) { assign(key, std::round(value * step) / step, clipping); },
+        [this, key](double typed) { assign(key, typed, std::nullopt); }, [this, key, reset] { assign(key, reset, std::nullopt); });
+    column->addWidget(row);
+    m_rows.push_back(row);
 }
 
 QLabel *CameraRawControls::subheadline(const QString &title, QVBoxLayout *column)
@@ -372,11 +338,6 @@ CameraRawSettings CameraRawControls::raw() const
 
 bool CameraRawControls::eventFilter(QObject *watched, QEvent *event)
 {
-    if (event->type() == QEvent::MouseButtonDblClick && watched->property("resetRow").isValid()) {
-        const Row &row = m_rows.at(size_t(watched->property("resetRow").toULongLong()));
-        assign(row.key, watched->property("resetValue").toDouble(), std::nullopt);
-        return true;
-    }
     // Alt let go ends the clipping and sharpen-mask views.
     if (event->type() == QEvent::KeyRelease && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Alt && !static_cast<QKeyEvent *>(event)->isAutoRepeat()
         && m_session.filterEdit()) {
@@ -409,13 +370,8 @@ void CameraRawControls::synchronize()
         group.eye->setToolTip((shown ? QStringLiteral("Hide %1 in the preview") : QStringLiteral("Show %1 in the preview")).arg(name));
         group.eye->setAccessibleName((shown ? QStringLiteral("Hide %1") : QStringLiteral("Show %1")).arg(name));
     }
-    for (Row &row : m_rows) {
-        CameraRawSettings copy = settings;
-        const double value = row.key(copy);
-        row.slider->display(value);
-        if (!(row.field->hasFocus() && row.field->isModified()))
-            row.field->setText(shown(value, row.decimals, row.field->locale()));
-    }
+    for (CameraRawRow *row : m_rows)
+        row->synchronize();
     const std::optional<std::array<int, 3>> readout = edit ? edit->rawPanel.readout : std::nullopt;
     m_readout->setText(readout ? QStringLiteral("R %1   G %2   B %3").arg((*readout)[0]).arg((*readout)[1]).arg((*readout)[2])
                                : QStringLiteral("R —   G —   B —"));

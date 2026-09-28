@@ -119,7 +119,13 @@ add_library(compositor_core STATIC
     src/UI/NavigationToolHeader.cpp
     src/UI/TransformInspector.cpp
     src/UI/EffectsSheet.cpp
+    src/UI/CameraRawColorControls.cpp
+    src/UI/CameraRawColorControls+Grading.cpp
+    src/UI/CameraRawColorControls+Mixer.cpp
     src/UI/CameraRawControls.cpp
+    src/UI/CameraRawDetailOpticsControls.cpp
+    src/UI/CameraRawGeometryCalibrationControls.cpp
+    src/UI/CameraRawRow.cpp
     src/UI/CameraRawControls+Basic.cpp
     src/UI/CameraRawSlider.cpp
     src/UI/FilterSheet.cpp
