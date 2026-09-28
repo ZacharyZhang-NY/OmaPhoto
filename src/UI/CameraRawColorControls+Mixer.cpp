@@ -293,7 +293,8 @@ void CameraRawMixerControls::synchronize()
         }
     }
     for (size_t index = 0; index < points.size(); ++index) {
-        auto *pick = m_picked->findChild<Swatch *>(QStringLiteral("pickedColor%1").arg(index));
+        // Newer Qt finds only Q_OBJECT classes: found by base.
+        auto *pick = static_cast<Swatch *>(m_picked->findChild<QAbstractButton *>(QStringLiteral("pickedColor%1").arg(index)));
         pick->colour = hsb(points[index].hue, points[index].saturation, points[index].luminance);
         pick->chosen = int(index) == shown.pointIndex;
         pick->update();

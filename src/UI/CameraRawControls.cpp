@@ -380,8 +380,9 @@ void CameraRawControls::synchronize()
                                                    "Right-click to show the vectorscope.")
                                   : QStringLiteral("Hue around the wheel, saturation outward from the center. Right-click to show the histogram."));
     m_scope->setAccessibleName(histogram ? QStringLiteral("RGB histogram") : QStringLiteral("Vectorscope"));
-    for (auto *clip : m_scope->findChildren<ClipButton *>()) {
-        const bool shadows = clip->objectName() == QLatin1String("shadowClipping");
+    // Found as QToolButtons: newer Qt finds only Q_OBJECT classes.
+    for (const bool shadows : {true, false}) {
+        auto *clip = static_cast<ClipButton *>(m_scope->findChild<QToolButton *>(shadows ? QStringLiteral("shadowClipping") : QStringLiteral("highlightClipping")));
         clip->on = edit && (shadows ? edit->rawPanel.showsShadowClipping : edit->rawPanel.showsHighlightClipping);
         clip->update();
     }
