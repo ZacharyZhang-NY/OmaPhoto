@@ -31,3 +31,16 @@ void EyedropperIcon::paint(QPainter &painter)
     painter.drawPath(tube);
     painter.restore();
 }
+
+QIcon EyedropperIcon::icon(const QColor &ink, double ratio)
+{
+    QPixmap pixmap(QSize(14, 14) * ratio);
+    pixmap.setDevicePixelRatio(ratio);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(14.0 / 18, 14.0 / 18);
+    painter.setPen(QPen(ink, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    paint(painter);
+    return QIcon(pixmap);
+}

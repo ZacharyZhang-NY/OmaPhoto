@@ -1,4 +1,5 @@
 #pragma once
+#include <QIcon>
 #include <QPainter>
 #include <QPointF>
 
@@ -8,4 +9,6 @@ namespace EyedropperIcon {
 QPointF tip();
 // Draws with the painter's pen, as the rail's icons.
 void paint(QPainter &painter);
+// The glyph in one ink, 14 points, for buttons.
+QIcon icon(const QColor &ink, double ratio);
 }

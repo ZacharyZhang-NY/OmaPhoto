@@ -119,6 +119,9 @@ add_library(compositor_core STATIC
     src/UI/NavigationToolHeader.cpp
     src/UI/TransformInspector.cpp
     src/UI/EffectsSheet.cpp
+    src/UI/CameraRawControls.cpp
+    src/UI/CameraRawControls+Basic.cpp
+    src/UI/CameraRawSlider.cpp
     src/UI/FilterSheet.cpp
     src/UI/FilterSheet+Adjustments.cpp
     src/UI/FloatingPanel.cpp
@@ -156,6 +159,7 @@ add_library(compositor_core STATIC
     src/Rendering/DownsampleCache.cpp
     src/Rendering/EffectsPreviewCache.cpp
     src/Rendering/EditorCanvas.cpp
+    src/Rendering/EditorCanvas+CameraRaw.cpp
     src/Rendering/EditorCanvas+Brush.cpp
     src/Rendering/EditorCanvas+Crop.cpp
     src/Rendering/EditorCanvas+Effects.cpp

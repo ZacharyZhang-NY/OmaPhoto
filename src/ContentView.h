@@ -70,6 +70,8 @@ private:
     QGridLayout *const m_canvasSlot;
     CanvasView *const m_canvas;
     LayersPanel *const m_layersPanel;
+    // Swift's docked panel: a slot at the window's right.
+    QWidget *const m_dock;
     // An accent ring while a drop may land.
     QWidget *const m_dropRing;
     // Swift 1.1.7's rulers: the corner, then the two strips.

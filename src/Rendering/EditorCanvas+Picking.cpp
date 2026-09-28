@@ -13,7 +13,11 @@ bool CanvasView::palettePicking() const
 
 bool CanvasView::picking() const
 {
-    return palettePicking() || m_session.colorPicker() || m_session.hueSampleMode() || (m_session.levels() && m_session.levels()->sampleMode);
+    const std::optional<FilterEdit> &edit = m_session.filterEdit();
+    return palettePicking() || m_session.colorPicker() || m_session.hueSampleMode() || (m_session.levels() && m_session.levels()->sampleMode)
+        || (edit
+            && (edit->rawPanel.samplesWhiteBalance || edit->rawPanel.samplesPointColor || edit->rawPanel.samplesDefringe
+                || edit->rawPanel.drawingGeometryGuide));
 }
 
 // Picking or targeting begins or ends: a sampling goes.

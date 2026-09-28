@@ -6,6 +6,7 @@
 #include "UI/LevelsSheet.h"
 #include <QApplication>
 #include <QLabel>
+#include <QVBoxLayout>
 #include <QWindow>
 #include <QtTest>
 
@@ -32,6 +33,7 @@ private slots:
     void aPanelOpensOverTheCanvasThenWhereItWasLeft();
     void itsCloseButtonAndEscapeCancel();
     void aPanelRemembersWhereItIsMovedAndCentresWithoutACanvas();
+    void dockedPlacementLeavesTheSavedFilterPosition();
 };
 
 void FloatingPanelTests::colorPickerPanelSurvivesALayoutPass()
@@ -281,6 +283,27 @@ void FloatingPanelTests::aPanelRemembersWhereItIsMovedAndCentresWithoutACanvas()
     const QPoint middle = plain.geometry().center();
     QVERIFY(std::abs(window->pos().x() + window->width() / 2 - middle.x()) <= 1);
     QVERIFY(std::abs(window->pos().y() + window->height() / 2 - middle.y()) <= 1);
+}
+
+// Swift's test: a docked frame never sets where panels reopen.
+void FloatingPanelTests::dockedPlacementLeavesTheSavedFilterPosition()
+{
+    Shown shown;
+    auto *slot = new QWidget(&shown.window);
+    auto *layout = new QVBoxLayout(slot);
+    slot->setGeometry(250, 0, 150, 300);
+    FloatingPanel panel(QStringLiteral("testDockedPanel"), shown.window);
+    panel.show(QStringLiteral("Docked"), new QLabel(QStringLiteral("Docked")), slot);
+    QVERIFY(!visiblePanel(QStringLiteral("testDockedPanel")) && panel.isVisible());
+    // The docked panel moves inside its slot; nothing is kept.
+    layout->setContentsMargins(20, 20, 0, 0);
+    layout->activate();
+    panel.close();
+    QVERIFY(!slot->isVisible() && !panel.isVisible());
+    panel.show(QStringLiteral("Floating"), new QLabel(QStringLiteral("Floating")));
+    QWidget *window = visiblePanel(QStringLiteral("testDockedPanel"));
+    const QPoint middle = shown.canvas->mapToGlobal(shown.canvas->rect().center());
+    QVERIFY(std::abs(window->pos().x() + window->width() / 2 - middle.x()) <= 1);
 }
 
 QTEST_MAIN(FloatingPanelTests)

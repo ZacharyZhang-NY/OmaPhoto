@@ -213,20 +213,6 @@ void dragHandle(LevelRange &range, bool output, size_t index, double tone)
         range.gamma = std::log(std::min(0.999, std::max(0.001, (x - range.black) / (range.white - range.black)))) / std::log(0.5);
 }
 
-// The eyedropper glyph in one ink, 14 points.
-QIcon eyedropper(const QColor &ink, double ratio)
-{
-    QPixmap pixmap(QSize(14, 14) * ratio);
-    pixmap.setDevicePixelRatio(ratio);
-    pixmap.fill(Qt::transparent);
-    QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.scale(14.0 / 18, 14.0 / 18);
-    painter.setPen(QPen(ink, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    EyedropperIcon::paint(painter);
-    return QIcon(pixmap);
-}
-
 // Swift's HStack: spread by Spacers, or packed to the left.
 QHBoxLayout *row(std::initializer_list<QWidget *> widgets, bool spread)
 {
@@ -411,7 +397,7 @@ void LevelsSheet::synchronize()
     for (size_t index = 0; index < 3; ++index) {
         const bool chosen = edit->sampleMode == allLevelsSamples[index];
         m_samples[index]->setChecked(chosen);
-        m_samples[index]->setIcon(eyedropper(palette().color(chosen ? QPalette::Highlight : QPalette::PlaceholderText), devicePixelRatioF()));
+        m_samples[index]->setIcon(EyedropperIcon::icon(palette().color(chosen ? QPalette::Highlight : QPalette::PlaceholderText), devicePixelRatioF()));
         m_autos[index]->setEnabled(edit->histogramReady);
     }
     m_sampleHint->setVisible(edit->sampleMode.has_value());

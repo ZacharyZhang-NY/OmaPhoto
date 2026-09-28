@@ -139,6 +139,8 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
         return;
     const QPointF point = event->position();
     m_hover = point;
+    if (cameraRawPress(point))
+        return;
     // A Levels eyedropper sets its point; the panel keeps keys.
     if (m_session.levels() && m_session.levels()->sampleMode && !m_spaceHeld) {
         m_session.sampleLevels(m_session.viewport.documentPoint(point, m_session.document()->size()));
@@ -206,6 +208,9 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
     const QPointF point = event->position();
     m_hover = point;
     readModifiers(event->modifiers());
+    // Swift's mouseMoved: the readout follows a hover alone.
+    if (!event->buttons() && m_session.document())
+        m_session.updateCameraRawReadout(m_session.viewport.documentPoint(point, m_session.document()->size()));
     if (m_middlePanPoint && event->buttons().testFlag(Qt::MiddleButton)) {
         m_session.viewport.translate(QSizeF(point.x() - m_middlePanPoint->x(), point.y() - m_middlePanPoint->y()));
         m_middlePanPoint = point;
@@ -229,6 +234,8 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
         return;
     if (m_inlineTextEditor && !held)
         m_inlineTextEditor->release();
+    if (cameraRawMove(point, event->buttons()))
+        return;
     if (pickingMove(point, event->buttons()) || targetingMove(point, event->buttons(), event->modifiers())
         || cropMove(point, event->buttons(), event->modifiers()) || guideMove(point, event->buttons()))
         return;
@@ -287,6 +294,7 @@ void CanvasView::mouseReleaseEvent(QMouseEvent *event)
         QWidget::mouseReleaseEvent(event);
         return;
     }
+    cameraRawRelease();
     if (m_textBoxAnchor) {
         finishTextGesture();
         return;
@@ -363,6 +371,7 @@ void CanvasView::leaveEvent(QEvent *event)
 {
     m_brushPointer = std::nullopt;
     updateBrushCursor();
+    clearCameraRawReadout();
     QWidget::leaveEvent(event);
 }
 

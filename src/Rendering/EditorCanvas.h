@@ -242,6 +242,11 @@ private:
     bool beginGuideDrag(QPointF point);
     bool guideMove(QPointF point, Qt::MouseButtons buttons);
     void endGuideDrag(QPointF point);
+    // Camera Raw's tools on the canvas (EditorCanvas+CameraRaw.cpp).
+    bool cameraRawPress(QPointF point);
+    bool cameraRawMove(QPointF point, Qt::MouseButtons buttons);
+    void cameraRawRelease();
+    void clearCameraRawReadout();
     // Swift's targeted drag: right raises; Ctrl drags the hue.
     bool targetingMove(QPointF point, Qt::MouseButtons buttons, Qt::KeyboardModifiers modifiers);
     void targetingRelease();

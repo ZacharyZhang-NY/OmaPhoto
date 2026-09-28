@@ -45,7 +45,8 @@ void ContentView::synchronizePanels()
         m_filterShown = m_session.filterEdit().has_value();
         if (m_filterShown) {
             m_filterPanel.onClose = [this] { m_session.cancelFilter(); };
-            m_filterPanel.show(rawValue(m_session.filterEdit()->kind), new FilterSheet(m_session));
+            const FilterKind kind = m_session.filterEdit()->kind;
+            m_filterPanel.show(rawValue(kind), new FilterSheet(m_session), kind == FilterKind::cameraRaw ? m_dock : nullptr);
         } else {
             m_filterPanel.close();
         }

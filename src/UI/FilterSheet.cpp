@@ -2,7 +2,9 @@
 #include "UI/KeyboardShortcuts.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/ColorPickerSheet.h"
+#include "UI/CameraRawControls.h"
 #include "UI/CurvesControls.h"
+#include "UI/FloatingPanel.h"
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QFrame>
@@ -147,7 +149,8 @@ FilterSheet::FilterSheet(EditorSession &session, QWidget *parent)
       m_spinner(new QProgressBar(this)), m_activity(words(QString(), true, this)), m_cancel(new QPushButton(QStringLiteral("Cancel"), this)),
       m_ok(new QPushButton(QStringLiteral("OK"), this))
 {
-    setFixedWidth(380);
+    const bool cameraRaw = m_session.filterEdit() && m_session.filterEdit()->kind == FilterKind::cameraRaw;
+    setFixedWidth(cameraRaw ? FloatingPanel::dockedWidth : 380);
     m_column->setContentsMargins(24, 24, 24, 24);
     m_column->setSpacing(16);
     const auto key = [](double FilterSettings::*field) { return [field](FilterSettings &settings) -> double & { return settings.*field; }; };
@@ -182,8 +185,7 @@ FilterSheet::FilterSheet(EditorSession &session, QWidget *parent)
         break;
     case FilterKind::removeBackground: background(); break;
     case FilterKind::blackWhite: blackWhite(); break;
-    // CameraRawControls arrive with the panel (12.8b).
-    case FilterKind::cameraRaw: break;
+    case FilterKind::cameraRaw: m_column->addWidget(new CameraRawControls(m_session, this), 1); break;
     case FilterKind::colorBalance: colorBalance(); break;
     case FilterKind::contentAwareFill:
         m_column->addWidget(words(QStringLiteral("Fill the selection using surrounding pixels from this layer."), false, this));

@@ -196,7 +196,7 @@ protected:
 
 ContentView::ContentView(EditorSession &session, ProjectController *projects, QWidget *parent)
     : QWidget(parent), m_session(session), m_projects(projects), m_column(new QVBoxLayout(this)), m_canvasSlot(new QGridLayout),
-      m_canvas(new CanvasView(session, this)), m_layersPanel(new LayersPanel(session, this)), m_dropRing(new DropRing(this)), m_zoom(statusText(new QLabel(this))), m_dimensions(statusText(new QLabel(this))), m_colour(statusText(new QLabel(this))),
+      m_canvas(new CanvasView(session, this)), m_layersPanel(new LayersPanel(session, this)), m_dock(new QWidget(this)), m_dropRing(new DropRing(this)), m_zoom(statusText(new QLabel(this))), m_dimensions(statusText(new QLabel(this))), m_colour(statusText(new QLabel(this))),
       m_activity(statusText(new ElidedLabel(this))),
       m_spinner(new QProgressBar(this))
 {
@@ -261,6 +261,12 @@ ContentView::ContentView(EditorSession &session, ProjectController *projects, QW
     m_layersPanel->setFixedWidth(int(layersPanelWidth()));
     middle->addWidget(new PanelResizeEdge(*m_layersPanel, this));
     middle->addWidget(m_layersPanel);
+    m_dock->setObjectName(QStringLiteral("panelDock"));
+    m_dock->setFixedWidth(FloatingPanel::dockedWidth);
+    auto *docked = new QVBoxLayout(m_dock);
+    docked->setContentsMargins(0, 0, 0, 0);
+    m_dock->hide();
+    middle->addWidget(m_dock);
 
     m_zoom->setObjectName(QStringLiteral("zoomStatus"));
     m_zoom->setFixedWidth(62);
