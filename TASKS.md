@@ -362,7 +362,10 @@ The panel of 4.6 shows and edits what the session holds so far. Each item adds i
 - [x] 12.8c Version 1.2.3, part four: Inner Glow, Image Trim, blur and noise adjustment layers (`98ad817`, `24052b5`, `feb39f3`, `cd0ca3c`). The layer context menu is 1.2.5's (`func menu(for:)` first appears there), so it moved to 12.10.
 - 12.8c round 1: FAIL, two unpinned behaviours and two wordings: the Trim sheet was missing from `everySheetBindsSwiftsKeys`, the canvas's widest margin had no test with two blurs, a test comment contradicted the resizer's own shortcut, and AGENTS.md lacked the crisp path's noise field, its unconditional surface and the untested conversion failure. All fixed, each mutant caught.
 - 12.8c round 2: PASS. Its notes taken: the halo test's zooms named, `versionupdate.md` left to 12.8r.
-- [ ] 12.8r Release OmaPhoto 1.2.3 once 12.8b2 and 12.8c are in (the user's decision, 2026-09-27): the GitHub release, and `versionupdate.md` with what changed since 1.0.1.
+- [x] 12.8r Release OmaPhoto 1.2.3 once 12.8b2 and 12.8c are in (the user's decision, 2026-09-27): the GitHub release, and `versionupdate.md` with what changed since 1.0.1.
+- 12.8r work: version 1.2.3 in CMakeLists.txt, the PKGBUILD and the flake; `versionupdate.md` says what changed since 1.0.1 and is the release's notes. Reviews now run on codex (`codex-reviewer`, GPT-6-Astra at max; the user's order, 2026-09-28: Fable 5.1 is gone).
+- 12.8r round 1: FAIL, the change log's words: format 9 is what every save writes, the blend modes are eleven new ones (three of Photoshop's still missing), the shortcuts window covers the defined shortcuts, the crash fixed is the export's hash allocations, and the Inner Shadow preview fix predates 1.0.1. All fixed, with its coverage notes.
+- 12.8r round 2: PASS, no findings.
 - [x] 12.8d A `std::bad_alloc` aborted `ProjectExportFailureTests` under a parallel run (seen in 12.7b and 12.8a; alone it passed ten of ten): the panel tests held a memory limit while dialogs painted, and the panel limits sat at the edge of what the panel and its snapshot need.
 - 12.8d round 1: PASS. Its notes taken: the snapshot's measured peak named in AGENTS.md, `malloc_trim` in `limited` named equivalent.
 - [ ] 12.9 Version 1.2.4: the finishing filters, stepped keyboard zoom, a steady tool rail and tab strip, the project format's version in one place.
