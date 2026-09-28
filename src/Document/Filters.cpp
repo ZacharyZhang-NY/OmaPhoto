@@ -12,6 +12,7 @@
 #include <numbers>
 
 extern "C" {
+#include "AdjustPixels.h"
 #include "BrushPixels.h"
 #include "LensPixels.h"
 #include "NoisePixels.h"
@@ -23,6 +24,9 @@ QString rawValue(FilterKind kind)
     case FilterKind::gaussianBlur: return QStringLiteral("Gaussian Blur");
     case FilterKind::motionBlur: return QStringLiteral("Motion Blur");
     case FilterKind::addNoise: return QStringLiteral("Add Noise");
+    case FilterKind::vignette: return QStringLiteral("Vignette");
+    case FilterKind::bloomGlow: return QStringLiteral("Bloom / Glow");
+    case FilterKind::tonalContrast: return QStringLiteral("Tonal Contrast");
     case FilterKind::lensCorrection: return QStringLiteral("Lens Correction");
     case FilterKind::cameraRaw: return QStringLiteral("Camera Raw Filter");
     case FilterKind::removeBackground: return QStringLiteral("Remove Background");
@@ -61,6 +65,19 @@ FilterSettings FilterSettings::normalized() const
     result.angle = clamp(angle, -90, 90, 0);
     result.distance = clamp(distance, 1, 2000, 10);
     result.amount = clamp(amount, 0.1, 400, 10);
+    result.vignetteAmount = clamp(vignetteAmount, 0, 100, 35);
+    result.vignetteColor = vignetteColor.clamped();
+    result.vignetteMidpoint = clamp(vignetteMidpoint, 0, 100, 50);
+    result.vignetteRoundness = clamp(vignetteRoundness, -100, 100, 0);
+    result.vignetteFeather = clamp(vignetteFeather, 0, 100, 60);
+    result.vignetteHighlights = clamp(vignetteHighlights, 0, 100, 25);
+    result.bloomAmount = clamp(bloomAmount, 0, 100, 40);
+    result.bloomRadius = clamp(bloomRadius, 1, 150, 24);
+    result.tonalAmount = clamp(tonalAmount, 0, 100, 50);
+    result.tonalRadius = clamp(tonalRadius, 1, 100, 16);
+    result.tonalShadows = clamp(tonalShadows, -100, 100, 40);
+    result.tonalMidtones = clamp(tonalMidtones, -100, 100, 60);
+    result.tonalHighlights = clamp(tonalHighlights, -100, 100, 30);
     result.distortion = clamp(distortion, -100, 100, 0);
     result.refineEdges = clamp(refineEdges, 0, 40, 12);
     result.matteContrast = clamp(matteContrast, 0, 100, 25);
@@ -107,6 +124,19 @@ QImage drawn(const QImage &image)
     BrushRaster::draw(image, QRectF(0, 0, image.width(), image.height()), painter);
     return context;
 }
+
+// CIBloom is private: the pixels plus their Gaussian glow, scaled.
+QImage bloom(QImage pixels, double sigma, double intensity)
+{
+    const QImage glow = PixelAdjust::gaussianBlur(pixels, sigma, false);
+    for (int y = 0; y < pixels.height(); ++y) {
+        uchar *row = pixels.scanLine(y);
+        const uchar *light = glow.constScanLine(y);
+        for (int index = 0; index < pixels.width() * 4; ++index)
+            row[index] = uchar(std::min(255.0, std::round(row[index] + intensity * light[index])));
+    }
+    return pixels;
+}
 }
 
 QImage PixelFilter::run(const FilterJob &job)
@@ -137,6 +167,21 @@ QImage PixelFilter::run(const FilterJob &job)
         noise_add_at(image.bits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), float(settings.amount), settings.gaussian ? 1 : 0,
                      settings.monochromatic ? 1 : 0, job.seed, int64_t(std::floor(job.noiseOrigin.x())), int64_t(std::floor(job.noiseOrigin.y())));
         break;
+    case FilterKind::vignette:
+        image = drawn(job.image);
+        adjust_colored_vignette(image.bits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), settings.vignetteAmount,
+                                settings.vignetteMidpoint, settings.vignetteRoundness, settings.vignetteFeather, settings.vignetteHighlights,
+                                settings.vignetteColor.red, settings.vignetteColor.green, settings.vignetteColor.blue);
+        break;
+    case FilterKind::bloomGlow: image = bloom(drawn(job.image), settings.bloomRadius * job.scale, settings.bloomAmount / 50); break;
+    case FilterKind::tonalContrast: {
+        // The detail's base: the layer softened, clear past its edge.
+        const QImage base = PixelAdjust::gaussianBlur(drawn(job.image), settings.tonalRadius * job.scale, false);
+        image = drawn(job.image);
+        adjust_tonal_contrast(image.bits(), base.constBits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), size_t(base.bytesPerLine()),
+                              settings.tonalAmount, settings.tonalShadows, settings.tonalMidtones, settings.tonalHighlights);
+        break;
+    }
     case FilterKind::lensCorrection: {
         // Relative to the image's size, so previews bend alike.
         const QImage source = drawn(job.image);
@@ -173,6 +218,7 @@ double FilterEdit::blurMargin(FilterKind kind, const FilterSettings &settings)
     switch (kind) {
     case FilterKind::gaussianBlur: return settings.radius * 3 + 2;
     case FilterKind::motionBlur: return settings.distance / 2 + 2;
+    case FilterKind::bloomGlow: return settings.bloomRadius * 3 + 2;
     default: return 0;
     }
 }
@@ -218,6 +264,7 @@ void FilterEdit::grow(const QRectF &extent)
 void FilterEdit::prepare(const ImportedImage &source, const LayerTransform &placed)
 {
     const QSize size = source.size();
+    ++previewSourceVersion;
     mapping = BrushRaster::pixelToDocument(placed, size.width(), size.height());
     // Noise and grain preview whole: enlarged, grain looks coarse.
     const bool whole = kind == FilterKind::addNoise || kind == FilterKind::grain || kind == FilterKind::contentAwareFill || kind == FilterKind::removeBackground;

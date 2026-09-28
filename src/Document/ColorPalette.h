@@ -35,9 +35,9 @@ struct PickerHSB {
 
 enum class LayerEffectKind;
 
-// The picker's targets: palette, text, effect, Gradient Map end.
+// The picker's targets: palette, text, effect, a filter's colour.
 struct ColorPickerTarget {
-    enum class Kind { palette, text, gradientMap, effect };
+    enum class Kind { palette, text, gradientMap, effect, vignette };
     Kind kind;
     bool background = false;
     std::optional<QUuid> draftID = std::nullopt;

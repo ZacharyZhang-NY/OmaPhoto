@@ -201,6 +201,9 @@ FilterSheet::FilterSheet(EditorSession &session, QWidget *parent)
         control(QStringLiteral("Amount"), key(&FilterSettings::amount), 0.1, 400, QStringLiteral("%"), 1, true);
         noise();
         break;
+    case FilterKind::vignette:
+    case FilterKind::bloomGlow:
+    case FilterKind::tonalContrast: finishing(m_session.filterEdit()->kind); break;
     case FilterKind::lensCorrection:
         control(QStringLiteral("Remove Distortion"), key(&FilterSettings::distortion), -100, 100, QString(), 0, false);
         m_column->addWidget(words(QStringLiteral("Positive straightens lines that bow outward (barrel); negative, lines that bow inward (pincushion)."),
@@ -388,7 +391,10 @@ void FilterSheet::synchronize()
     if (picked != m_pickerColour) {
         m_pickerColour = picked;
         m_session.previewGradientMapColor();
+        m_session.previewVignetteColor();
     }
+    if (m_vignetteSwatch)
+        m_vignetteSwatch->update();
     const FilterEdit &edit = m_session.filterEdit().value();
     for (Control &control : m_controls) {
         FilterSettings copy = edit.settings;

@@ -102,6 +102,8 @@ struct SessionJobs {
         FilterSettings settings;
         // Camera Raw's scope of the grade itself.
         std::optional<CameraRawScope> scope = std::nullopt;
+        // Its grid's version: a newer grid drops it.
+        quint64 sourceVersion = 0;
     };
     struct FilterMade {
         std::optional<ImportedImage> asset;

@@ -105,6 +105,8 @@ QString ColorPickerTarget::title() const
         return highlights ? QStringLiteral("Color Picker (Gradient Map Highlights)") : QStringLiteral("Color Picker (Gradient Map Shadows)");
     if (kind == Kind::effect)
         return QStringLiteral("Color Picker (%1 Color)").arg(rawValue(effect));
+    if (kind == Kind::vignette)
+        return QStringLiteral("Color Picker (Vignette Color)");
     return background ? QStringLiteral("Color Picker (Background Color)") : QStringLiteral("Color Picker (Foreground Color)");
 }
 
@@ -241,6 +243,8 @@ void EditorSession::closeColorPicker(bool commit)
     } else if (picker.target.kind == ColorPickerTarget::Kind::gradientMap) {
         // The end previewed the working colour; Cancel puts it back.
         setGradientMapColor(commit ? color : picker.original, picker.target.highlights);
+    } else if (picker.target.kind == ColorPickerTarget::Kind::vignette) {
+        setVignetteColor(commit ? color : picker.original);
     } else if (picker.target.kind == ColorPickerTarget::Kind::effect) {
         const PaletteColor chosen = commit ? color : picker.original;
         changeEffects([&](LayerEffects &effects) { effects.setColor(chosen, picker.target.effect); });
@@ -255,6 +259,16 @@ void EditorSession::openGradientMapColorPicker(bool highlights)
         return;
     const AdjustmentColor value = highlights ? m_filterEdit->settings.gradientMap.highlights : m_filterEdit->settings.gradientMap.shadows;
     m_colorPicker = ColorPickerState({ColorPickerTarget::Kind::gradientMap, false, std::nullopt, highlights}, PaletteColor{value.red, value.green, value.blue});
+    notify();
+}
+
+void EditorSession::openVignetteColorPicker()
+{
+    // A commit keeps the project busy: no `committing` term.
+    if (!canEditPalette() || m_colorPicker || !m_filterEdit || m_filterEdit->kind != FilterKind::vignette)
+        return;
+    const AdjustmentColor value = m_filterEdit->settings.vignetteColor;
+    m_colorPicker = ColorPickerState({ColorPickerTarget::Kind::vignette}, PaletteColor{value.red, value.green, value.blue});
     notify();
 }
 
@@ -279,6 +293,22 @@ void EditorSession::previewGradientMapColor()
 {
     if (m_colorPicker && m_colorPicker->target.kind == ColorPickerTarget::Kind::gradientMap)
         setGradientMapColor(m_colorPicker->color(), m_colorPicker->target.highlights);
+}
+
+void EditorSession::previewVignetteColor()
+{
+    if (m_colorPicker && m_colorPicker->target.kind == ColorPickerTarget::Kind::vignette)
+        setVignetteColor(m_colorPicker->color());
+}
+
+// Its picker lives only while its Vignette edit is open.
+void EditorSession::setVignetteColor(const PaletteColor &color)
+{
+    FilterSettings settings = m_filterEdit.value().settings;
+    settings.vignetteColor = AdjustmentColor(color);
+    if (settings == m_filterEdit->settings)
+        return;
+    updateFilter(settings, m_filterEdit->preview);
 }
 
 void EditorSession::setGradientMapColor(const PaletteColor &color, bool highlights)

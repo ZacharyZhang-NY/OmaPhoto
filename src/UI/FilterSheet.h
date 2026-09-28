@@ -53,6 +53,8 @@ private:
     void control(const QString &title, std::function<double &(FilterSettings &)> key, double low, double high, const QString &unit,
                  int decimals, bool logarithmic);
     void noise();
+    // Vignette's colour and rows, Bloom / Glow's, Tonal Contrast's.
+    void finishing(FilterKind kind);
     // Remove Background's words, Quality, and Advanced's three rows.
     void background();
     // Black & White's six families and Tint; Color Balance's nine.
@@ -72,6 +74,7 @@ private:
     std::vector<Control> m_controls;
     CurvesControls *m_curves = nullptr;
     GradientMapControls *m_gradientMap = nullptr;
+    SwatchButton *m_vignetteSwatch = nullptr;
     QButtonGroup *m_distribution = nullptr;
     QCheckBox *m_monochromatic = nullptr;
     QButtonGroup *m_quality = nullptr;

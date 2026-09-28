@@ -18,6 +18,9 @@ public:
     void openGradientMapColorPicker(bool highlights);
     // The Gradient Map follows the picker's working colour.
     void previewGradientMapColor();
+    // The picker on the open Vignette's colour, which follows it.
+    void openVignetteColorPicker();
+    void previewVignetteColor();
     // The picker on an effect of the open panel.
     void openEffectColorPicker(LayerEffectKind kind);
     // The effect follows the picker's working colour.
@@ -30,3 +33,4 @@ public:
 
 private:
     void setGradientMapColor(const PaletteColor &color, bool highlights);
+    void setVignetteColor(const PaletteColor &color);

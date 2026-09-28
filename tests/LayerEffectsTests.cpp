@@ -298,6 +298,14 @@ void LayerEffectsTests::duplicatesAndBrushCommitsKeepThem()
     QVERIFY(awaited([&](std::function<void()> done) { session->fillSelection(EditorSession::FillSource::foreground, std::move(done)); }));
     QCOMPARE(session->history.undoName(), QString("Fill"));
     QVERIFY(session->activeLayer().value().effects == every());
+    // Since 1.2.4 (`e08dd8c`) a filter's commit keeps them.
+    session->beginFilter(FilterKind::exposure);
+    FilterSettings settings = session->filterEdit().value().settings;
+    settings.exposure.exposure = 1;
+    session->updateFilter(settings, false);
+    QVERIFY(awaited([&](std::function<void()> done) { session->commitFilter(std::move(done)); }));
+    QCOMPARE(session->history.undoName(), QString("Exposure"));
+    QVERIFY(session->activeLayer().value().effects == every());
 }
 
 void LayerEffectsTests::rebuildsCopiesAndResizesDropThem()
@@ -321,13 +329,6 @@ void LayerEffectsTests::rebuildsCopiesAndResizesDropThem()
         session.updateHueSaturation(HueSaturationSettings(90), false);
         QVERIFY(awaited([&](std::function<void()> done) { session.commitHueSaturation(std::move(done)); }));
     }, "Hue/Saturation"));
-    QVERIFY(dropped([](EditorSession &session) {
-        session.beginFilter(FilterKind::exposure);
-        FilterSettings settings = session.filterEdit().value().settings;
-        settings.exposure.exposure = 1;
-        session.updateFilter(settings, false);
-        QVERIFY(awaited([&](std::function<void()> done) { session.commitFilter(std::move(done)); }));
-    }, "Exposure"));
     QVERIFY(dropped([](EditorSession &session) {
         session.applySelection(rectPath(QRectF(2, 2, 6, 4)), SelectionMode::replace, QStringLiteral("Select"));
         QVERIFY(awaited([&](std::function<void()> done) { session.beginSelectionTransform(std::move(done)); }));

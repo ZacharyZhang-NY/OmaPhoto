@@ -69,6 +69,9 @@ void EditorSession::updateFilter(const FilterSettings &settings, bool preview)
         try {
             edit.growForBlur();
             edit.preparedPreview.reset();
+            // A waiting job moves to the grid its version names.
+            if (edit.pending)
+                edit.pending = edit.previewJob();
         } catch (const ProjectError &error) {
             setBrushError(QString::fromUtf8(error.what()));
         } catch (const ExportError &error) {
@@ -112,22 +115,22 @@ void EditorSession::renderFilterPreview()
         const FilterJob job = *std::exchange(edit.pending, std::nullopt);
         m_filterPreviewFor = edit.id;
         m_filterRendering = true;
-        m_filterPreview.setFuture(QtConcurrent::run([job]() -> Filtered {
+        m_filterPreview.setFuture(QtConcurrent::run([job, version = edit.previewSourceVersion]() -> Filtered {
             try {
                 if (job.kind == FilterKind::cameraRaw) {
                     auto [image, scope] = CameraRawScope::preview(job);
-                    return Filtered{std::move(image), std::nullopt, job.settings, std::move(scope)};
+                    return Filtered{std::move(image), std::nullopt, job.settings, std::move(scope), version};
                 }
-                return Filtered{PixelFilter::run(job), std::nullopt, job.settings};
+                return Filtered{PixelFilter::run(job), std::nullopt, job.settings, std::nullopt, version};
             } catch (const ContentFillError &error) {
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
             } catch (const SubjectRemovalError &error) {
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
             } catch (const ExportError &error) {
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
             } catch (const ProjectError &error) {
                 // Settings past their bounds: Black & White, Color Balance.
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
             }
         }));
     }
@@ -138,8 +141,11 @@ void EditorSession::finishFilterPreview()
 {
     m_filterRendering = false;
     const Filtered result = m_filterPreview.result();
-    // An edit cancelled meanwhile takes nothing; a new one waited.
-    if (m_filterEdit && m_filterEdit->id == m_filterPreviewFor) {
+    // A cancelled edit takes nothing; an older grid renders again.
+    if (m_filterEdit && m_filterEdit->id == m_filterPreviewFor && result.sourceVersion != m_filterEdit->previewSourceVersion) {
+        m_filterEdit->preparing = false;
+        notify();
+    } else if (m_filterEdit && m_filterEdit->id == m_filterPreviewFor) {
         FilterEdit &edit = *m_filterEdit;
         edit.preparing = false;
         edit.previewError = result.failure;
@@ -164,8 +170,8 @@ void EditorSession::finishFilterPreview()
 
 void EditorSession::cancelFilter()
 {
-    // A Gradient Map colour being picked goes with the panel.
-    if (m_colorPicker && m_colorPicker->target.kind == ColorPickerTarget::Kind::gradientMap)
+    // A filter colour being picked goes with the panel.
+    if (m_colorPicker && (m_colorPicker->target.kind == ColorPickerTarget::Kind::gradientMap || m_colorPicker->target.kind == ColorPickerTarget::Kind::vignette))
         closeColorPicker(false);
     if (finishAdjustmentEditing(false) || !m_filterEdit || m_filterEdit->committing)
         return;
@@ -181,7 +187,7 @@ void EditorSession::commitFilter(std::function<void()> done)
         if (done)
             QMetaObject::invokeMethod(this, done, Qt::QueuedConnection);
     };
-    if (m_colorPicker && m_colorPicker->target.kind == ColorPickerTarget::Kind::gradientMap)
+    if (m_colorPicker && (m_colorPicker->target.kind == ColorPickerTarget::Kind::gradientMap || m_colorPicker->target.kind == ColorPickerTarget::Kind::vignette))
         closeColorPicker(true);
     if (finishAdjustmentEditing(true) || !m_filterEdit || m_filterEdit->committing) {
         finish();
@@ -204,6 +210,11 @@ void EditorSession::commitFilter(std::function<void()> done)
     // Nothing to change closes as Cancel does, with no step.
     if ((edit.kind == FilterKind::lensCorrection && edit.settings.distortion == 0)
         || (edit.kind == FilterKind::exposure && edit.settings.exposure == ExposureSettings())
+        || (edit.kind == FilterKind::vignette && edit.settings.vignetteAmount == 0)
+        || (edit.kind == FilterKind::bloomGlow && edit.settings.bloomAmount == 0)
+        || (edit.kind == FilterKind::tonalContrast
+            && (edit.settings.tonalAmount == 0
+                || (edit.settings.tonalShadows == 0 && edit.settings.tonalMidtones == 0 && edit.settings.tonalHighlights == 0)))
         || (edit.kind == FilterKind::grain && edit.settings.grain.amount == 0)
         || (edit.kind == FilterKind::cameraRaw && rendered.cameraRaw.isIdentity())) {
         cancelFilter();
@@ -224,7 +235,7 @@ void EditorSession::commitFilter(std::function<void()> done)
         return;
     }
     const std::optional<QImage> cached = isAutomatic(edit.kind) && edit.preparedSettings == edit.settings ? edit.preparedPreview : std::nullopt;
-    const bool spreads = edit.kind == FilterKind::gaussianBlur || edit.kind == FilterKind::motionBlur;
+    const bool spreads = edit.kind == FilterKind::gaussianBlur || edit.kind == FilterKind::motionBlur || edit.kind == FilterKind::bloomGlow;
     // A painted layer flattens in the worker, which catches failures.
     m_filterCommit.setFuture(QtConcurrent::run([kind = edit.kind, original = edit.original, grownImage = edit.grownImage, settings = rendered,
                                                 selection = edit.selection, mapping = edit.mapping, seed = edit.seed, cached,
@@ -339,9 +350,8 @@ void EditorSession::finishFilterCommit()
         layer.asset = made.asset;
         layer.transform = made.transform.value_or(current.transform);
         layer.mask = mask;
-        // Swift rebuilds the layer without shape, effects and text.
+        // Swift rebuilds the layer without shape and text; effects stay.
         layer.shape = std::nullopt;
-        layer.effects = std::nullopt;
         layer.text = std::nullopt;
         m_document->layers[index] = layer;
         endEdit();

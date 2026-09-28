@@ -16,8 +16,8 @@ struct ImageLayer;
 
 // The Filter and Image menus' filters.
 enum class FilterKind {
-    gaussianBlur, motionBlur, addNoise, lensCorrection, cameraRaw, removeBackground, contentAwareFill, curves, exposure, gradientMap, grain, blackWhite,
-    colorBalance
+    gaussianBlur, motionBlur, addNoise, vignette, bloomGlow, tonalContrast, lensCorrection, cameraRaw, removeBackground, contentAwareFill, curves,
+    exposure, gradientMap, grain, blackWhite, colorBalance
 };
 // The menu's title, Swift's rawValue.
 QString rawValue(FilterKind kind);
@@ -27,6 +27,7 @@ bool isAutomatic(FilterKind kind);
 bool isImageAdjustment(FilterKind kind);
 // Swift's allCases, the menus' order.
 inline constexpr std::array allFilterKinds{FilterKind::gaussianBlur,     FilterKind::motionBlur,       FilterKind::addNoise,
+                                           FilterKind::vignette,         FilterKind::bloomGlow,        FilterKind::tonalContrast,
                                            FilterKind::lensCorrection,   FilterKind::cameraRaw,        FilterKind::removeBackground,
                                            FilterKind::contentAwareFill,
                                            FilterKind::curves,           FilterKind::exposure,         FilterKind::gradientMap,
@@ -49,6 +50,22 @@ struct FilterSettings {
     bool gaussian = false;
     // The same noise on every channel: brightness alone.
     bool monochromatic = false;
+    // Vignette: the edge colour, its strength and falloff.
+    double vignetteAmount = 35;
+    AdjustmentColor vignetteColor = AdjustmentColor(0, 0, 0);
+    double vignetteMidpoint = 50;
+    double vignetteRoundness = 0;
+    double vignetteFeather = 60;
+    double vignetteHighlights = 25;
+    // Bloom / Glow: strength, and blur radius in layer pixels.
+    double bloomAmount = 40;
+    double bloomRadius = 24;
+    // Tonal Contrast: one detail radius, a strength per tone.
+    double tonalAmount = 50;
+    double tonalRadius = 16;
+    double tonalShadows = 40;
+    double tonalMidtones = 60;
+    double tonalHighlights = 30;
     // Positive straightens barrel distortion, negative pincushion.
     double distortion = 0;
     CurvesSettings curves{};
@@ -151,6 +168,8 @@ public:
     std::optional<QImage> preparedPreview;
     // The settings the prepared preview was made with.
     std::optional<FilterSettings> preparedSettings;
+    // Moves with each new grid: an older render lands nothing.
+    quint64 previewSourceVersion = 0;
     std::optional<FilterJob> pending;
     CameraRawPanel rawPanel;
 

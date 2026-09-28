@@ -62,6 +62,16 @@ void adjust_camera_raw_effects(uint8_t *rgba, size_t width, size_t height, size_
                                double vignetteAmount, double vignetteMidpoint, double vignetteRoundness,
                                double vignetteFeather, double vignetteHighlights, int vignetteStyle,
                                double scale);
+// Standalone Vignette: blends straight sRGB toward the selected edge color using Camera Raw's
+// falloff shape and Highlight Priority. Preserves the source alpha and premultiplied storage.
+void adjust_colored_vignette(uint8_t *rgba, size_t width, size_t height, size_t stride,
+                             double amount, double midpoint, double roundness, double feather,
+                             double highlights, double red, double green, double blue);
+// Local luminance contrast with independent shadow, midtone, and highlight gains.
+// `blurred` is the same premultiplied RGBA image blurred at the chosen detail radius.
+void adjust_tonal_contrast(uint8_t *rgba, const uint8_t *blurred, size_t width, size_t height,
+                           size_t stride, size_t blurredStride, double amount,
+                           double shadows, double midtones, double highlights);
 // Manual noise reduction, then sharpening. `scale` maps radius to preview pixels. Applied after the creative grade.
 void adjust_camera_raw_detail(uint8_t *rgba, size_t width, size_t height, size_t stride,
                               double sharpenAmount, double sharpenRadius, double sharpenDetail, double sharpenMasking,
