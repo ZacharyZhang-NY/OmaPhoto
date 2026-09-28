@@ -92,6 +92,13 @@ EffectsSheet::EffectsSheet(EditorSession &session, LayerEffectKind kind, QWidget
         slider(QStringLiteral("Opacity"), [](const LayerEffects &e) { return percent(e.outerGlow); },
                [](LayerEffects &e, double value) { e.outerGlow->opacity = value / 100; }, 0, 100, QStringLiteral("%"));
         break;
+    case LayerEffectKind::innerGlow:
+        header(QStringLiteral("Inner Glow"), false);
+        slider(QStringLiteral("Size"), [](const LayerEffects &e) { return e.innerGlow ? std::optional(e.innerGlow->size) : std::nullopt; },
+               [](LayerEffects &e, double value) { e.innerGlow->size = value; }, 0, 100, QStringLiteral("px"), 500);
+        slider(QStringLiteral("Opacity"), [](const LayerEffects &e) { return percent(e.innerGlow); },
+               [](LayerEffects &e, double value) { e.innerGlow->opacity = value / 100; }, 0, 100, QStringLiteral("%"));
+        break;
     }
     auto *cancel = new QPushButton(QStringLiteral("Cancel"), this);
     cancel->setObjectName(QStringLiteral("effectsCancel"));

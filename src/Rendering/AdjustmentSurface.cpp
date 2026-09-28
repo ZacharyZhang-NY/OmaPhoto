@@ -3,14 +3,18 @@
 #include "Logging.h"
 #include <QPaintEngine>
 
-void AdjustmentSurface::draw(QPainter &context, const std::function<void(QPainter &)> &body, qint64 pixelBudget)
+void AdjustmentSurface::draw(QPainter &context, const std::function<void(QPainter &)> &body, double padding, qint64 pixelBudget)
 {
     // The engine's device holds the pixels: a widget's window store.
     const QPaintDevice &target = *context.paintEngine()->paintDevice();
     const QRect device(0, 0, target.width(), target.height());
-    const QRect area = context.deviceTransform().mapRect(BrushRaster::visibleRect(context)).toAlignedRect().intersected(device);
-    if (area.isEmpty())
+    const QTransform toDevice = context.deviceTransform();
+    const QRect output = toDevice.mapRect(BrushRaster::visibleRect(context)).toAlignedRect().intersected(device);
+    if (output.isEmpty())
         return;
+    // Spatial adjustments read a halo; the clip keeps what shows.
+    const QRectF shown = toDevice.inverted().mapRect(QRectF(output));
+    const QRect area = padding > 0 ? toDevice.mapRect(shown.adjusted(-padding, -padding, padding, padding)).toAlignedRect() : output;
     if (qint64(area.width()) * area.height() > pixelBudget) {
         qCWarning(lcRendering) << "an adjustment surface passes its pixel budget:" << area.size();
         return;

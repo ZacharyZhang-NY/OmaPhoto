@@ -320,6 +320,7 @@ void EffectsPreviewCacheTests::aReducedPreviewScalesEveryLength()
     effects.colorOverlay = ColorOverlayEffect{.red = 0, .green = 1, .blue = 0, .opacity = 0.5};
     effects.innerShadow = InnerShadowEffect{.angle = 120, .distance = 30, .blur = 12, .red = 0, .green = 0, .blue = 0, .opacity = 0.7};
     effects.outerGlow = OuterGlowEffect{.size = 5, .red = 0, .green = 0, .blue = 1, .opacity = 0.6};
+    effects.innerGlow = InnerGlowEffect{.size = 40, .red = 1, .green = 0, .blue = 1, .opacity = 0.8};
     const QImage image = noise(6000, 100, 7);
     const ImageLayer layer = layerOf(image, effects);
     const Landings landings;
@@ -335,6 +336,7 @@ void EffectsPreviewCacheTests::aReducedPreviewScalesEveryLength()
     effects.innerShadow->distance *= factor;
     effects.innerShadow->blur *= factor;
     effects.outerGlow->size *= factor;
+    effects.innerGlow->size *= factor;
     QVERIFY(result.image == LayerEffectsRenderer::render(reduced, std::nullopt, effects).image);
 }
 

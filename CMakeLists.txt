@@ -69,6 +69,7 @@ add_library(compositor_core STATIC
     src/Document/LevelsAutomatic.cpp
     src/Document/Curves.cpp
     src/Document/ImageAdjustments.cpp
+    src/Document/ImageTrim.cpp
     src/Document/HueSaturation.cpp
     src/Document/HueSaturation+Filter.cpp
     src/Document/HueSaturation+Session.cpp
@@ -93,6 +94,7 @@ add_library(compositor_core STATIC
     src/UI/CanvasRulers.cpp
     src/UI/CanvasSizeSheet.cpp
     src/UI/ImageSizeSheet.cpp
+    src/UI/TrimSheet.cpp
     src/UI/JPEGExportSheet.cpp
     src/UI/ByteCounts.cpp
     src/UI/SliderSnap.cpp

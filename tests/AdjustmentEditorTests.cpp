@@ -27,16 +27,6 @@ bool opened(EditorSession &session, QUuid id)
 {
     return awaited([&](std::function<void()> done) { session.beginAdjustmentEditing(id, std::move(done)); });
 }
-
-// The pixels the open editor reads, premultiplied RGBA.
-std::vector<int> input(const EditorSession &session)
-{
-    const QImage image = session.levels().value().original.image().convertToFormat(QImage::Format_RGBA8888_Premultiplied);
-    std::vector<int> result;
-    for (int y = 0; y < image.height(); ++y)
-        result.insert(result.end(), image.constScanLine(y), image.constScanLine(y) + image.width() * 4);
-    return result;
-}
 }
 
 class AdjustmentEditorTests : public QObject {
@@ -104,6 +94,9 @@ void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
     case AdjustmentKind::exposure:
     case AdjustmentKind::gradientMap:
     case AdjustmentKind::grain:
+    case AdjustmentKind::addNoise:
+    case AdjustmentKind::gaussianBlur:
+    case AdjustmentKind::motionBlur:
     case AdjustmentKind::blackWhite:
     case AdjustmentKind::colorBalance: {
         QVERIFY(session.filterEdit().value().kind == filterKind(kind));
@@ -116,12 +109,15 @@ void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
             settings.blackWhite.reds = 100;
         else if (kind == AdjustmentKind::colorBalance)
             settings.colorBalance.midCyanRed = 50;
+        else if (kind != AdjustmentKind::grain)
+            (kind == AdjustmentKind::gaussianBlur ? settings.radius : kind == AdjustmentKind::motionBlur ? settings.distance : settings.amount) = 40;
         else
             settings.grain.amount = 70;
         session.updateFilter(settings, true);
         const LayerAdjustment live = session.activeLayer().value().adjustment.value();
         QVERIFY(live.exposure() == settings.exposure && live.gradientMap() == settings.gradientMap && live.grain() == settings.grain
-                && live.blackWhite() == settings.blackWhite && live.colorBalance() == settings.colorBalance);
+                && live.blackWhite() == settings.blackWhite && live.colorBalance() == settings.colorBalance && live.gaussianRadius() == settings.radius
+                && live.resolvedMotionDistance() == settings.distance && live.resolvedNoiseAmount() == settings.amount);
         QVERIFY(awaited([&](std::function<void()> done) { session.commitFilter(std::move(done)); }));
         break;
     }
@@ -156,11 +152,15 @@ void AdjustmentEditorTests::sharedEditorsKeepPixelsDynamicAndSupportCancel()
     case AdjustmentKind::exposure:
     case AdjustmentKind::gradientMap:
     case AdjustmentKind::grain:
+    case AdjustmentKind::addNoise:
+    case AdjustmentKind::gaussianBlur:
+    case AdjustmentKind::motionBlur:
     case AdjustmentKind::blackWhite:
     case AdjustmentKind::colorBalance: {
         const FilterSettings reopened = session.filterEdit().value().settings;
         QVERIFY(reopened.curves == saved.curves && reopened.exposure == saved.exposure() && reopened.gradientMap == saved.gradientMap()
-                && reopened.grain == saved.grain() && reopened.blackWhite == saved.blackWhite() && reopened.colorBalance == saved.colorBalance());
+                && reopened.grain == saved.grain() && reopened.blackWhite == saved.blackWhite() && reopened.colorBalance == saved.colorBalance()
+                && reopened.radius == saved.gaussianRadius() && reopened.distance == saved.resolvedMotionDistance() && reopened.amount == saved.resolvedNoiseAmount());
         session.updateFilter(FilterSettings(), true);
         session.cancelFilter();
         break;
@@ -202,7 +202,8 @@ void AdjustmentEditorTests::theEditorReadsOnlyWhatLiesBeneath()
     QCOMPARE(layerWith(session, id).parentID, layerWith(session, green).parentID);
     session.setAdjustmentEditingID(id);
     QVERIFY(opened(session, id));
-    QVERIFY((input(session) == std::vector<int>{0, 255, 0, 255, 255, 0, 0, 255}));
+    const QImage read = session.levels().value().original.image();
+    QVERIFY(read.size() == QSize(2, 1) && read.pixel(0, 0) == qRgb(0, 255, 0) && read.pixel(1, 0) == qRgb(255, 0, 0));
     // The editors preview nothing: the layer's settings are the preview.
     LevelsSettings settings;
     settings.ranges[0].outputWhite = 100;

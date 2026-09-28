@@ -1,6 +1,8 @@
 #include "UI/LayerIcons.h"
 #include "UI/ToolIcons.h"
 #include <QPainterPath>
+#include <cmath>
+#include <numbers>
 
 namespace {
 void eye(QPainter &painter, bool slashed)
@@ -209,6 +211,47 @@ void sparkles(QPainter &painter)
     star(QPointF(14.5, 14), 2);
 }
 
+// Swift's drop.fill: a filled teardrop, point up.
+void drop(QPainter &painter)
+{
+    QPainterPath path;
+    path.moveTo(9, 1.5);
+    path.cubicTo(11, 5, 14.5, 8.5, 14.5, 11.3);
+    path.cubicTo(14.5, 14.4, 12, 16.5, 9, 16.5);
+    path.cubicTo(6, 16.5, 3.5, 14.4, 3.5, 11.3);
+    path.cubicTo(3.5, 8.5, 7, 5, 9, 1.5);
+    painter.fillPath(path, painter.pen().color());
+}
+
+// Swift's wind: three strokes, the outer two curling back.
+void wind(QPainter &painter)
+{
+    QPainterPath top;
+    top.moveTo(1.5, 6);
+    top.lineTo(12, 6);
+    top.cubicTo(14.5, 6, 15, 2.5, 12.5, 2.5);
+    QPainterPath middle;
+    middle.moveTo(1.5, 9.5);
+    middle.lineTo(15, 9.5);
+    QPainterPath bottom;
+    bottom.moveTo(1.5, 13);
+    bottom.lineTo(10, 13);
+    bottom.cubicTo(12.5, 13, 13, 16.5, 10.5, 16.5);
+    for (const QPainterPath &path : {top, middle, bottom})
+        painter.drawPath(path);
+}
+
+// Swift's circle.dotted: twelve dots round a ring.
+void dottedCircle(QPainter &painter)
+{
+    painter.setBrush(painter.pen().color());
+    painter.setPen(Qt::NoPen);
+    for (int index = 0; index < 12; ++index) {
+        const double angle = index * std::numbers::pi / 6;
+        painter.drawEllipse(QPointF(9 + 6.8 * std::cos(angle), 9 + 6.8 * std::sin(angle)), 1.1, 1.1);
+    }
+}
+
 // Swift's scope: a ring with four ticks toward its middle.
 void scope(QPainter &painter)
 {
@@ -255,6 +298,9 @@ void LayerIcons::paint(QPainter &painter, LayerIcon icon, QPointF origin, double
     case LayerIcon::axes: axes(painter); break;
     case LayerIcon::scope: scope(painter); break;
     case LayerIcon::lineDiagonal: painter.drawLine(QPointF(3, 15), QPointF(15, 3)); break;
+    case LayerIcon::drop: drop(painter); break;
+    case LayerIcon::wind: wind(painter); break;
+    case LayerIcon::dottedCircle: dottedCircle(painter); break;
     }
     painter.restore();
 }
@@ -278,6 +324,9 @@ LayerIcon LayerIcons::symbol(AdjustmentKind kind)
     case AdjustmentKind::exposure: return LayerIcon::plusMinusCircle;
     case AdjustmentKind::gradientMap: return LayerIcon::paintPalette;
     case AdjustmentKind::grain: return LayerIcon::circleGrid;
+    case AdjustmentKind::addNoise: return LayerIcon::dottedCircle;
+    case AdjustmentKind::gaussianBlur: return LayerIcon::drop;
+    case AdjustmentKind::motionBlur: return LayerIcon::wind;
     case AdjustmentKind::invert: return LayerIcon::rightHalfCircle;
     case AdjustmentKind::blackWhite: return LayerIcon::hatchedCircle;
     case AdjustmentKind::colorBalance: return LayerIcon::axes;

@@ -28,6 +28,8 @@ public:
     std::function<std::optional<LayerAdjustment>(QUuid)> adjustment = [](QUuid) { return std::optional<LayerAdjustment>(); };
     std::function<double(QUuid)> adjustmentOpacity = [](QUuid) { return 1.0; };
     std::function<void(QUuid, const QPainter &, QImage &coverage)> adjustmentClip = [](QUuid, const QPainter &, QImage &) {};
+    // Painter units a document pixel: the canvas's zoom.
+    double adjustmentScale = 1;
 
 private:
     // The pixels beneath, adjusted and mixed back through coverage.

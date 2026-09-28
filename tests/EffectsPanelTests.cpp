@@ -119,7 +119,7 @@ void EffectsPanelTests::theFooterAddsEachEffectAndOpensItsPanel()
     QStringList names;
     for (const QAction *entry : button.menu()->actions())
         names << entry->text();
-    QCOMPARE(names, QStringList({"Stroke…", "Drop Shadow…", "Color Overlay…", "Inner Shadow…", "Outer Glow…"}));
+    QCOMPARE(names, QStringList({"Stroke…", "Drop Shadow…", "Color Overlay…", "Inner Shadow…", "Outer Glow…", "Inner Glow…"}));
     QVERIFY(button.isEnabled());
     button.menu()->actions()[0]->trigger();
     QVERIFY((editor.session.effectsEditing() == LayerEffectSelection{editor.layer, LayerEffectKind::stroke}));
@@ -292,6 +292,7 @@ void EffectsPanelTests::eachKindHasSwiftsControls_data()
     QTest::newRow("inner shadow") << LayerEffectKind::innerShadow << QString("Inner Shadow")
                                   << QStringList{"Opacity:0:100:100", "Angle:-180:180:180", "Distance:0:5000:50", "Blur:0:500:100"};
     QTest::newRow("outer glow") << LayerEffectKind::outerGlow << QString("Outer Glow") << QStringList{"Size:0:500:100", "Opacity:0:100:100"};
+    QTest::newRow("inner glow") << LayerEffectKind::innerGlow << QString("Inner Glow") << QStringList{"Size:0:500:100", "Opacity:0:100:100"};
 }
 
 void EffectsPanelTests::eachKindHasSwiftsControls()

@@ -310,10 +310,10 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions_data()
     QTest::addColumn<std::optional<ProjectError::Kind>>("refused");
     const auto invalid = std::optional(ProjectError::Kind::invalid), tooLarge = std::optional(ProjectError::Kind::tooLarge);
     const std::optional<ProjectError::Kind> fine;
-    for (int version = 1; version <= 8; ++version)
+    for (int version = 1; version <= 9; ++version)
         QTest::addRow("plain at version %d", version) << "" << version << fine;
     QTest::newRow("version 0") << "" << 0 << std::optional(ProjectError::Kind::version);
-    QTest::newRow("version 9") << "" << 9 << std::optional(ProjectError::Kind::version);
+    QTest::newRow("version 10") << "" << 10 << std::optional(ProjectError::Kind::version);
     QTest::newRow("another format") << "format" << 7 << invalid;
     QTest::newRow("another colour space") << "colorSpace" << 7 << invalid;
     QTest::newRow("resolution 0.5") << "resolution=0.5" << 7 << invalid;

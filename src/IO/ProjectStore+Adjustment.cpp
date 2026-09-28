@@ -118,15 +118,20 @@ GradientMapSettings gradientMap(const QJsonValue &value)
     return {colour(object.value("shadows")), colour(object.value("highlights")), boolean(object.value("reversed"))};
 }
 
+// Swift's UInt32 refuses what it cannot hold.
+quint32 unsigned32(const QJsonValue &value)
+{
+    const qint64 seed = integer(value);
+    if (seed < 0 || seed > std::numeric_limits<quint32>::max())
+        refuse();
+    return quint32(seed);
+}
+
 GrainSettings grain(const QJsonValue &value)
 {
     const QJsonObject object = value.toObject();
-    // Swift's UInt32 refuses what it cannot hold.
-    const qint64 seed = integer(object.value("seed"));
-    if (seed < 0 || seed > std::numeric_limits<quint32>::max())
-        refuse();
     return {.amount = number(object.value("amount")), .size = number(object.value("size")), .roughness = number(object.value("roughness")),
-            .seed = quint32(seed)};
+            .seed = unsigned32(object.value("seed"))};
 }
 
 BlackWhiteSettings blackWhite(const QJsonValue &value)
@@ -205,7 +210,14 @@ LayerAdjustment ManifestJson::adjustment(const QJsonValue &value)
             .gradientMapSettings = optional(object, "gradientMapSettings", gradientMap),
             .grainSettings = optional(object, "grainSettings", grain),
             .blackWhiteSettings = optional(object, "blackWhiteSettings", blackWhite),
-            .colorBalanceSettings = optional(object, "colorBalanceSettings", colorBalance)};
+            .colorBalanceSettings = optional(object, "colorBalanceSettings", colorBalance),
+            .blurRadius = optional(object, "blurRadius", number),
+            .motionAngle = optional(object, "motionAngle", number),
+            .motionDistance = optional(object, "motionDistance", number),
+            .noiseAmount = optional(object, "noiseAmount", number),
+            .noiseGaussian = optional(object, "noiseGaussian", boolean),
+            .noiseMonochromatic = optional(object, "noiseMonochromatic", boolean),
+            .noiseSeed = optional(object, "noiseSeed", unsigned32)};
 }
 
 QJsonObject ManifestJson::encoded(const LayerAdjustment &adjustment)
@@ -248,5 +260,16 @@ QJsonObject ManifestJson::encoded(const LayerAdjustment &adjustment)
                                   {"highlightCyanRed", balance.highlightCyanRed}, {"highlightMagentaGreen", balance.highlightMagentaGreen},
                                   {"highlightYellowBlue", balance.highlightYellowBlue}, {"preserveLuminosity", balance.preserveLuminosity}});
     }
+    const auto put = [&object](const char *key, const auto &value) {
+        if (value)
+            object.insert(QLatin1String(key), *value);
+    };
+    put("blurRadius", adjustment.blurRadius);
+    put("motionAngle", adjustment.motionAngle);
+    put("motionDistance", adjustment.motionDistance);
+    put("noiseAmount", adjustment.noiseAmount);
+    put("noiseGaussian", adjustment.noiseGaussian);
+    put("noiseMonochromatic", adjustment.noiseMonochromatic);
+    put("noiseSeed", adjustment.noiseSeed ? std::optional(qint64(*adjustment.noiseSeed)) : std::nullopt);
     return object;
 }

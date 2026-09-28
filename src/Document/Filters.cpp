@@ -134,8 +134,8 @@ QImage PixelFilter::run(const FilterJob &job)
         break;
     case FilterKind::addNoise:
         image = drawn(job.image);
-        noise_add(image.bits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), float(settings.amount), settings.gaussian ? 1 : 0,
-                  settings.monochromatic ? 1 : 0, job.seed);
+        noise_add_at(image.bits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), float(settings.amount), settings.gaussian ? 1 : 0,
+                     settings.monochromatic ? 1 : 0, job.seed, int64_t(std::floor(job.noiseOrigin.x())), int64_t(std::floor(job.noiseOrigin.y())));
         break;
     case FilterKind::lensCorrection: {
         // Relative to the image's size, so previews bend alike.

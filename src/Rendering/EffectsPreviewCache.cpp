@@ -150,13 +150,15 @@ std::optional<EffectsPreviewCache::Result> EffectsPreviewCache::render(const Req
             effects.shadow->distance *= factor;
             effects.shadow->blur *= factor;
         }
-        // Swift forgets the inner shadow and glow: too wide.
+        // Swift forgets the inner shadow and glows: too wide.
         if (effects.innerShadow) {
             effects.innerShadow->distance *= factor;
             effects.innerShadow->blur *= factor;
         }
         if (effects.outerGlow)
             effects.outerGlow->size *= factor;
+        if (effects.innerGlow)
+            effects.innerGlow->size *= factor;
         const LayerEffectsRenderer::Rendered rendered = LayerEffectsRenderer::render(pixels, mask, effects);
         return Result{rendered.image, rendered.inset, std::nullopt};
     } catch (const ExportError &error) {

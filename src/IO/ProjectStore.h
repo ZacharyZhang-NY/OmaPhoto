@@ -52,7 +52,7 @@ QString uuidString(const QUuid &id);
 struct ProjectManifest {
     QString format = QStringLiteral("com.compositor.project");
     // Swift's Int: a wild number must reach validation whole.
-    qint64 version = 8;
+    qint64 version = 9;
     QString colorSpace = QStringLiteral("sRGB");
     // Version-1 projects carry none: 72 pixels per inch.
     std::optional<double> resolution = std::nullopt;

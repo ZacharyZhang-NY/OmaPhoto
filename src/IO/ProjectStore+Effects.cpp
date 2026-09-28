@@ -46,6 +46,13 @@ OuterGlowEffect outerGlow(const QJsonValue &value)
             number(keys.value("blue")), number(keys.value("opacity"))};
 }
 
+InnerGlowEffect innerGlow(const QJsonValue &value)
+{
+    const QJsonObject keys = object(value);
+    return {optional(keys, "enabled", boolean), number(keys.value("size")), number(keys.value("red")), number(keys.value("green")),
+            number(keys.value("blue")), number(keys.value("opacity"))};
+}
+
 void colour(QJsonObject &keys, double red, double green, double blue)
 {
     keys.insert("red", red);
@@ -58,7 +65,7 @@ LayerEffects ManifestJson::effects(const QJsonValue &value)
 {
     const QJsonObject keys = object(value);
     return {optional(keys, "stroke", stroke), optional(keys, "shadow", shadow), optional(keys, "colorOverlay", colorOverlay),
-            optional(keys, "innerShadow", innerShadow), optional(keys, "outerGlow", outerGlow)};
+            optional(keys, "innerShadow", innerShadow), optional(keys, "outerGlow", outerGlow), optional(keys, "innerGlow", innerGlow)};
 }
 
 QJsonObject ManifestJson::encoded(const LayerEffects &effects)
@@ -103,6 +110,14 @@ QJsonObject ManifestJson::encoded(const LayerEffects &effects)
         if (glow.enabled)
             object.insert("enabled", *glow.enabled);
         keys.insert("outerGlow", object);
+    }
+    if (effects.innerGlow) {
+        const InnerGlowEffect &glow = *effects.innerGlow;
+        QJsonObject object{{"size", glow.size}, {"opacity", glow.opacity}};
+        colour(object, glow.red, glow.green, glow.blue);
+        if (glow.enabled)
+            object.insert("enabled", *glow.enabled);
+        keys.insert("innerGlow", object);
     }
     return keys;
 }

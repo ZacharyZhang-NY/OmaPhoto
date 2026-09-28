@@ -111,7 +111,7 @@ void AdjustmentSurfaceTests::pastItsPixelBudgetNothingIsDrawn()
     painter.scale(2, 2);
     bool called = false;
     QTest::ignoreMessage(QtWarningMsg, "an adjustment surface passes its pixel budget: QSize(8, 8)");
-    AdjustmentSurface::draw(painter, [&](QPainter &) { called = true; }, 63);
+    AdjustmentSurface::draw(painter, [&](QPainter &) { called = true; }, 0, 63);
     QVERIFY(!called);
     AdjustmentSurface::draw(painter, [&](QPainter &target) {
         called = true;

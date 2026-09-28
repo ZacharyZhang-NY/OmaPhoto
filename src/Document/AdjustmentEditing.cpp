@@ -81,6 +81,9 @@ void EditorSession::openAdjustmentEditor(QUuid id, const LayerAdjustment &origin
             case AdjustmentKind::exposure:
             case AdjustmentKind::gradientMap:
             case AdjustmentKind::grain:
+            case AdjustmentKind::addNoise:
+            case AdjustmentKind::gaussianBlur:
+            case AdjustmentKind::motionBlur:
             case AdjustmentKind::blackWhite:
             case AdjustmentKind::colorBalance: {
                 FilterSettings settings;
@@ -90,6 +93,12 @@ void EditorSession::openAdjustmentEditor(QUuid id, const LayerAdjustment &origin
                 settings.grain = original.grain();
                 settings.blackWhite = original.blackWhite();
                 settings.colorBalance = original.colorBalance();
+                settings.radius = original.gaussianRadius();
+                settings.angle = original.resolvedMotionAngle();
+                settings.distance = original.resolvedMotionDistance();
+                settings.amount = original.resolvedNoiseAmount();
+                settings.gaussian = original.resolvedNoiseGaussian();
+                settings.monochromatic = original.resolvedNoiseMonochromatic();
                 m_filterEdit.emplace(filterKind(original.kind).value(), layer, std::nullopt, settings, std::nullopt);
                 break;
             }
@@ -121,6 +130,16 @@ LayerAdjustment EditorSession::editedAdjustment() const
     case AdjustmentKind::grain: value.setGrain(m_filterEdit.value().settings.grain); break;
     case AdjustmentKind::blackWhite: value.setBlackWhite(m_filterEdit.value().settings.blackWhite); break;
     case AdjustmentKind::colorBalance: value.setColorBalance(m_filterEdit.value().settings.colorBalance); break;
+    case AdjustmentKind::gaussianBlur: value.setGaussianRadius(m_filterEdit.value().settings.radius); break;
+    case AdjustmentKind::motionBlur:
+        value.setResolvedMotionAngle(m_filterEdit.value().settings.angle);
+        value.setResolvedMotionDistance(m_filterEdit.value().settings.distance);
+        break;
+    case AdjustmentKind::addNoise:
+        value.setResolvedNoiseAmount(m_filterEdit.value().settings.amount);
+        value.setResolvedNoiseGaussian(m_filterEdit.value().settings.gaussian);
+        value.setResolvedNoiseMonochromatic(m_filterEdit.value().settings.monochromatic);
+        break;
     case AdjustmentKind::invert: throw std::logic_error("Invert has no editor to read");
     }
     return value;

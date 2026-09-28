@@ -54,6 +54,8 @@ double LayerEffectsSurface::reach() const
         reach = std::max(reach, m_effects.innerShadow->distance + m_effects.innerShadow->blur * 3 + 2);
     if (m_effects.outerGlow)
         reach = std::max(reach, m_effects.outerGlow->size * 3 + 2);
+    if (m_effects.innerGlow)
+        reach = std::max(reach, m_effects.innerGlow->size * 3 + 2);
     return reach;
 }
 

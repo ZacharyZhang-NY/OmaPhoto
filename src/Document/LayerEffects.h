@@ -88,10 +88,24 @@ struct OuterGlowEffect {
     friend bool operator==(const OuterGlowEffect &, const OuterGlowEffect &) = default;
 };
 
+// A glow inside the layer's edges, fading inward.
+struct InnerGlowEffect {
+    std::optional<bool> enabled = std::nullopt;
+    double size = 10;
+    double red = 1;
+    double green = 1;
+    double blue = 1;
+    double opacity = 0.75;
+    bool isEnabled() const { return enabled.value_or(true); }
+    PaletteColor color() const { return {red, green, blue}; }
+    bool isValid() const;
+    friend bool operator==(const InnerGlowEffect &, const InnerGlowEffect &) = default;
+};
+
 // Swift's raw values are the panel's and the menu's words.
-enum class LayerEffectKind { stroke, shadow, colorOverlay, innerShadow, outerGlow };
-inline constexpr std::array allLayerEffectKinds{LayerEffectKind::stroke, LayerEffectKind::shadow, LayerEffectKind::colorOverlay,
-                                                LayerEffectKind::innerShadow, LayerEffectKind::outerGlow};
+enum class LayerEffectKind { stroke, shadow, colorOverlay, innerShadow, outerGlow, innerGlow };
+inline constexpr std::array allLayerEffectKinds{LayerEffectKind::stroke,      LayerEffectKind::shadow,    LayerEffectKind::colorOverlay,
+                                                LayerEffectKind::innerShadow, LayerEffectKind::outerGlow, LayerEffectKind::innerGlow};
 QString rawValue(LayerEffectKind kind);
 
 // What a layer draws round itself; its pixels stay untouched.
@@ -101,7 +115,8 @@ struct LayerEffects {
     std::optional<ColorOverlayEffect> colorOverlay = std::nullopt;
     std::optional<InnerShadowEffect> innerShadow = std::nullopt;
     std::optional<OuterGlowEffect> outerGlow = std::nullopt;
-    bool isEmpty() const { return !stroke && !shadow && !colorOverlay && !innerShadow && !outerGlow; }
+    std::optional<InnerGlowEffect> innerGlow = std::nullopt;
+    bool isEmpty() const { return !stroke && !shadow && !colorOverlay && !innerShadow && !outerGlow && !innerGlow; }
     bool isValid() const;
     std::vector<LayerEffectKind> kinds() const;
     bool contains(LayerEffectKind kind) const;

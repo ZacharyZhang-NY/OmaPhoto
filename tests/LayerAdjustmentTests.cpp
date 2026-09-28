@@ -98,6 +98,8 @@ void LayerAdjustmentTests::kindsKeepSwiftsNamesAndOrder()
     const std::pair<AdjustmentKind, const char *> kinds[] = {{AdjustmentKind::hsv, "Hue/Saturation"}, {AdjustmentKind::levels, "Levels"},
                                                              {AdjustmentKind::curves, "Curves"},      {AdjustmentKind::exposure, "Exposure"},
                                                              {AdjustmentKind::gradientMap, "Gradient Map"}, {AdjustmentKind::grain, "Grain"},
+                                                             {AdjustmentKind::addNoise, "Add Noise"}, {AdjustmentKind::gaussianBlur, "Gaussian Blur"},
+                                                             {AdjustmentKind::motionBlur, "Motion Blur"},
                                                              {AdjustmentKind::invert, "Invert"},      {AdjustmentKind::blackWhite, "Black & White"},
                                                              {AdjustmentKind::colorBalance, "Color Balance"}};
     QCOMPARE(allAdjustmentKinds.size(), std::size(kinds));
@@ -112,6 +114,8 @@ void LayerAdjustmentTests::kindsKeepSwiftsNamesAndOrder()
     QVERIFY(filterKind(AdjustmentKind::curves) == FilterKind::curves && filterKind(AdjustmentKind::exposure) == FilterKind::exposure);
     QVERIFY(filterKind(AdjustmentKind::gradientMap) == FilterKind::gradientMap && filterKind(AdjustmentKind::grain) == FilterKind::grain);
     QVERIFY(filterKind(AdjustmentKind::blackWhite) == FilterKind::blackWhite && filterKind(AdjustmentKind::colorBalance) == FilterKind::colorBalance);
+    QVERIFY(filterKind(AdjustmentKind::addNoise) == FilterKind::addNoise && filterKind(AdjustmentKind::gaussianBlur) == FilterKind::gaussianBlur);
+    QVERIFY(filterKind(AdjustmentKind::motionBlur) == FilterKind::motionBlur);
     QVERIFY(!filterKind(AdjustmentKind::levels) && !filterKind(AdjustmentKind::hsv) && !filterKind(AdjustmentKind::invert));
     // Every kind but Invert opens an editor.
     for (const AdjustmentKind kind : allAdjustmentKinds)

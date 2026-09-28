@@ -206,13 +206,24 @@ QImage LayerEffectsKernel::render(const QImage &pixels, const LayerEffects &effe
         std::copy(shape.get(), shape.get() + count, glowing.get());
         blurred(glowing.get(), buffer(count).get(), width, height, float(glow->size / 2));
     }
+    const std::optional<InnerGlowEffect> innerGlow =
+        effects.innerGlow && effects.innerGlow->isEnabled() && effects.innerGlow->size > 0 && effects.innerGlow->opacity > 0 ? effects.innerGlow : std::nullopt;
+    Buffer glowingInside;
+    if (innerGlow) {
+        // The shape softened; what it loses stays inside.
+        glowingInside = buffer(count);
+        std::copy(shape.get(), shape.get() + count, glowingInside.get());
+        blurred(glowingInside.get(), buffer(count).get(), width, height, float(innerGlow->size / 2));
+        for (qint64 index = 0; index < count; ++index)
+            glowingInside[index] = std::clamp(shape[index] * (1.f - glowingInside[index]), 0.f, 1.f);
+    }
     const std::optional<ColorOverlayEffect> overlay = effects.colorOverlay && effects.colorOverlay->isEnabled() && effects.colorOverlay->opacity > 0
         ? effects.colorOverlay : std::nullopt;
     QImage result = BrushRaster::context(width, height, false);
     // Taken once: scanLine() detaches, which workers must not race.
     uchar *const bits = result.bits();
     const qsizetype stride = result.bytesPerLine();
-    // Shadow, glow, outside stroke, pixels, overlay, inner shadow, inside stroke.
+    // Shadow, glow, outside stroke, pixels, overlay, inner glow, shadow, stroke.
     bands(height, [&](int, int y) {
         const uchar *in = source.constScanLine(y);
         uchar *out = bits + y * stride;
@@ -232,6 +243,8 @@ QImage LayerEffectsKernel::render(const QImage &pixels, const LayerEffects &effe
             alpha = sourceAlpha + alpha * (1.f - sourceAlpha);
             if (overlay)
                 over(colour, alpha, overlay->color(), std::clamp(shape[index] * float(overlay->opacity), 0.f, 1.f));
+            if (innerGlow)
+                over(colour, alpha, innerGlow->color(), std::clamp(glowingInside[index] * float(innerGlow->opacity), 0.f, 1.f));
             if (inner)
                 over(colour, alpha, inner->color(), std::clamp(inside[index] * float(inner->opacity), 0.f, 1.f));
             if (stroke && stroke->inside)

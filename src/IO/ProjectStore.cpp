@@ -62,7 +62,7 @@ void validate(const ProjectManifest &manifest)
 {
     if (manifest.format != QLatin1String("com.compositor.project"))
         throw ProjectError(ProjectError::Kind::invalid);
-    if (manifest.version < 1 || manifest.version > 8)
+    if (manifest.version < 1 || manifest.version > 9)
         throw ProjectError::unsupportedVersion(manifest.version);
     if (manifest.colorSpace != QLatin1String("sRGB"))
         throw ProjectError(ProjectError::Kind::invalid);
@@ -77,6 +77,11 @@ void validate(const ProjectManifest &manifest)
             throw ProjectError(ProjectError::Kind::invalid);
         // Version 7's adjustments hold settings, never pixels or children.
         if (layer.adjustment && (manifest.version < 7 || layer.isGroup == true || layer.imageFile || !layer.adjustment->isValid()))
+            throw ProjectError(ProjectError::Kind::invalid);
+        // Blur and noise layers came with version 9.
+        if (layer.adjustment && manifest.version < 9
+            && (layer.adjustment->kind == AdjustmentKind::gaussianBlur || layer.adjustment->kind == AdjustmentKind::motionBlur
+                || layer.adjustment->kind == AdjustmentKind::addNoise))
             throw ProjectError(ProjectError::Kind::invalid);
         const bool group = layer.isGroup == true;
         // Layer masks came with version 4, folder masks with 6.
@@ -251,7 +256,7 @@ ProjectError::ProjectError(Kind kind) : ProjectError(kind, std::nullopt, descrip
 ProjectError ProjectError::unsupportedVersion(qint64 version)
 {
     return ProjectError(Kind::version, version,
-                        QStringLiteral("This project uses format version %1. This app supports versions 1–8.").arg(version));
+                        QStringLiteral("This project uses format version %1. This app supports versions 1–9.").arg(version));
 }
 
 ProjectError::ProjectError(Kind kind, std::optional<qint64> version, const QString &description)
@@ -327,7 +332,7 @@ ProjectSnapshot ProjectStore::load(const QString &path)
     const auto [format, version] = ProjectManifest::header(metadata);
     if (format != QLatin1String("com.compositor.project"))
         throw ProjectError(ProjectError::Kind::invalid);
-    if (version < 1 || version > 8)
+    if (version < 1 || version > 9)
         throw ProjectError::unsupportedVersion(version);
     const ProjectManifest manifest = ProjectManifest::decoded(metadata);
     validate(manifest);

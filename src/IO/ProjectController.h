@@ -40,6 +40,7 @@ public:
     // Swift's sheets over the window; resizes off the UI thread.
     void canvasSize(std::function<void()> done = {});
     void imageSize(std::function<void()> done = {});
+    void trim(std::function<void()> done = {});
     void exportPNG(std::function<void()> done = {});
     void exportJPEG(std::function<void()> done = {});
 
@@ -68,8 +69,8 @@ private:
     void showError(const QString &title, const QString &message, std::function<void()> then);
     // Swift's beginSheet: window-modal over the window; Escape cancels.
     QDialog *sheet(const QString &title);
-    // Off the UI thread, then landed or explained; freed after.
-    void resizeProject(std::function<ProjectSnapshot(const ProjectSnapshot &)> resize, std::function<void(const ProjectSnapshot &)> land,
+    // Off the UI thread, then landed, skipped or explained.
+    void resizeProject(std::function<std::optional<ProjectSnapshot>(const ProjectSnapshot &)> resize, std::function<void(const ProjectSnapshot &)> land,
                        const QString &failure, std::function<void()> done);
     void exportPanel(const QString &title, const QString &filter, const QStringList &suffixes, const QString &name, const QString &failure,
                      std::function<void(std::optional<QString>)> then);

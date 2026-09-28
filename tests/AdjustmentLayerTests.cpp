@@ -311,8 +311,8 @@ void AdjustmentLayerTests::everyKindAdjustsThroughItsSettings()
     kinds[3].setExposure(ExposureSettings{.exposure = 1});
     kinds[4].setGradientMap(GradientMapSettings{{1, 0, 0}, {0, 0, 1}, false});
     kinds[5].setGrain(GrainSettings{.amount = 80, .seed = 4});
-    kinds[7].setBlackWhite(BlackWhiteSettings{.reds = 100});
-    kinds[8].setColorBalance(ColorBalanceSettings{.midCyanRed = 60});
+    kinds[10].setBlackWhite(BlackWhiteSettings{.reds = 100});
+    kinds[11].setColorBalance(ColorBalanceSettings{.midCyanRed = 60});
     for (const LayerAdjustment &adjustment : kinds) {
         EditorSession s;
         s.createDocument(2, 2);

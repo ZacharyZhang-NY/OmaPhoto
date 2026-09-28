@@ -34,6 +34,18 @@ void drawShadow(const QRectF &rect, QPainter &context)
     context.restore();
 }
 
+// Swift's halo: the widest reach of a visible adjustment.
+double samplingMargin(const CanvasDocument &document)
+{
+    const QSet<QUuid> visible = document.effectiveVisibleIDs();
+    double margin = 0;
+    for (const ImageLayer &layer : document.layers) {
+        if (layer.adjustment && visible.contains(layer.id))
+            margin = std::max(margin, layer.adjustment->samplingMargin());
+    }
+    return margin;
+}
+
 std::optional<ImageIdentity> enabledMaskID(const std::optional<LayerMask> &mask)
 {
     return mask && mask->isEnabled ? std::optional(mask->asset.identity()) : std::nullopt;
@@ -246,7 +258,7 @@ void CanvasView::draw(QPainter &context, const QRectF &dirty)
         // Its own group: blend modes never meet the checkerboard.
         AdjustmentSurface::draw(context, [&](QPainter &group) {
             drawLayers(*document, points, [&](QPointF point) { return viewport.viewPoint(point, document->size()); }, group);
-        });
+        }, samplingMargin(*document) * points);
     }
     if (m_session.showsPixelGrid() && viewport.zoom() >= pixelGridZoom && !visible.isEmpty())
         drawPixelGrid(visible, *document, context);
@@ -419,6 +431,7 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
     LiveMaskRenderer live([&](QUuid id) { return byID.contains(id) ? byID.at(id).maskSourceID : std::nullopt; }, drawOwnWithDraft);
     live.adjustment = [&](QUuid id) { return byID.contains(id) ? byID.at(id).adjustment : std::nullopt; };
     live.adjustmentOpacity = [&](QUuid id) { return byID.at(id).effectiveOpacity(byID); };
+    live.adjustmentScale = scale;
     live.adjustmentClip = [&](QUuid id, const QPainter &painter, QImage &coverage) {
         const ImageLayer &layer = byID.at(id);
         if (!layer.mask || !layer.mask->isEnabled)
@@ -468,7 +481,9 @@ void CanvasView::drawDocumentPixels(const QRectF &view, const QRectF &pixels, co
     }
     {
         QPainter painter(&raster);
-        drawLayers(document, 1, [&](QPointF point) { return QPointF(point.x() - region.left(), point.y() - region.top()); }, painter);
+        AdjustmentSurface::draw(painter, [&](QPainter &group) {
+            drawLayers(document, 1, [&](QPointF point) { return QPointF(point.x() - region.left(), point.y() - region.top()); }, group);
+        }, samplingMargin(document));
     }
     const QPointF origin = viewport.viewPoint(region.topLeft(), document.size());
     const QRectF target(origin, QSizeF(region.width() * viewport.pointsPerPixel(), region.height() * viewport.pointsPerPixel()));

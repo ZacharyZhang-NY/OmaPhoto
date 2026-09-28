@@ -61,6 +61,11 @@ bool OuterGlowEffect::isValid() const
     return within(size, 0, 500) && within(opacity, 0, 1) && colourIsValid(red, green, blue);
 }
 
+bool InnerGlowEffect::isValid() const
+{
+    return within(size, 0, 500) && within(opacity, 0, 1) && colourIsValid(red, green, blue);
+}
+
 QString rawValue(LayerEffectKind kind)
 {
     switch (kind) {
@@ -69,6 +74,7 @@ QString rawValue(LayerEffectKind kind)
     case LayerEffectKind::colorOverlay: return QStringLiteral("Color Overlay");
     case LayerEffectKind::innerShadow: return QStringLiteral("Inner Shadow");
     case LayerEffectKind::outerGlow: return QStringLiteral("Outer Glow");
+    case LayerEffectKind::innerGlow: return QStringLiteral("Inner Glow");
     }
     throw std::logic_error("unknown effect kind");
 }
@@ -76,7 +82,7 @@ QString rawValue(LayerEffectKind kind)
 bool LayerEffects::isValid() const
 {
     return (!stroke || stroke->isValid()) && (!shadow || shadow->isValid()) && (!colorOverlay || colorOverlay->isValid())
-        && (!innerShadow || innerShadow->isValid()) && (!outerGlow || outerGlow->isValid());
+        && (!innerShadow || innerShadow->isValid()) && (!outerGlow || outerGlow->isValid()) && (!innerGlow || innerGlow->isValid());
 }
 
 std::vector<LayerEffectKind> LayerEffects::kinds() const
@@ -97,6 +103,7 @@ bool LayerEffects::contains(LayerEffectKind kind) const
     case LayerEffectKind::colorOverlay: return colorOverlay.has_value();
     case LayerEffectKind::innerShadow: return innerShadow.has_value();
     case LayerEffectKind::outerGlow: return outerGlow.has_value();
+    case LayerEffectKind::innerGlow: return innerGlow.has_value();
     }
     throw std::logic_error("unknown effect kind");
 }
@@ -109,6 +116,7 @@ bool LayerEffects::isEnabled(LayerEffectKind kind) const
     case LayerEffectKind::colorOverlay: return colorOverlay && colorOverlay->isEnabled();
     case LayerEffectKind::innerShadow: return innerShadow && innerShadow->isEnabled();
     case LayerEffectKind::outerGlow: return outerGlow && outerGlow->isEnabled();
+    case LayerEffectKind::innerGlow: return innerGlow && innerGlow->isEnabled();
     }
     throw std::logic_error("unknown effect kind");
 }
@@ -121,6 +129,7 @@ std::optional<PaletteColor> LayerEffects::color(LayerEffectKind kind) const
     case LayerEffectKind::colorOverlay: return colorOverlay ? std::optional(colorOverlay->color()) : std::nullopt;
     case LayerEffectKind::innerShadow: return innerShadow ? std::optional(innerShadow->color()) : std::nullopt;
     case LayerEffectKind::outerGlow: return outerGlow ? std::optional(outerGlow->color()) : std::nullopt;
+    case LayerEffectKind::innerGlow: return innerGlow ? std::optional(innerGlow->color()) : std::nullopt;
     }
     throw std::logic_error("unknown effect kind");
 }
@@ -156,6 +165,7 @@ void LayerEffects::setColor(const PaletteColor &color, LayerEffectKind kind)
     case LayerEffectKind::colorOverlay: paint(colorOverlay, color); return;
     case LayerEffectKind::innerShadow: paint(innerShadow, color); return;
     case LayerEffectKind::outerGlow: paint(outerGlow, color); return;
+    case LayerEffectKind::innerGlow: paint(innerGlow, color); return;
     }
     throw std::logic_error("unknown effect kind");
 }
@@ -168,6 +178,7 @@ void LayerEffects::remove(LayerEffectKind kind)
     case LayerEffectKind::colorOverlay: colorOverlay.reset(); return;
     case LayerEffectKind::innerShadow: innerShadow.reset(); return;
     case LayerEffectKind::outerGlow: outerGlow.reset(); return;
+    case LayerEffectKind::innerGlow: innerGlow.reset(); return;
     }
     throw std::logic_error("unknown effect kind");
 }
@@ -180,11 +191,12 @@ void LayerEffects::setEnabled(bool enabled, LayerEffectKind kind)
     case LayerEffectKind::colorOverlay: enable(colorOverlay, enabled); return;
     case LayerEffectKind::innerShadow: enable(innerShadow, enabled); return;
     case LayerEffectKind::outerGlow: enable(outerGlow, enabled); return;
+    case LayerEffectKind::innerGlow: enable(innerGlow, enabled); return;
     }
     throw std::logic_error("unknown effect kind");
 }
 
 LayerEffects LayerEffects::visible() const
 {
-    return LayerEffects{shown(stroke), shown(shadow), shown(colorOverlay), shown(innerShadow), shown(outerGlow)};
+    return LayerEffects{shown(stroke), shown(shadow), shown(colorOverlay), shown(innerShadow), shown(outerGlow), shown(innerGlow)};
 }

@@ -70,7 +70,7 @@ void AdjustmentPanelTests::theFooterAddsEachKindAndItsEditorOpens()
     QCOMPARE(entries.size(), qsizetype(allAdjustmentKinds.size()));
     for (size_t index = 0; index < allAdjustmentKinds.size(); ++index)
         QCOMPARE(entries[qsizetype(index)]->text(), rawValue(allAdjustmentKinds[index]).replace("&", "&&"));
-    QCOMPARE(entries[7]->text(), QString("Black && White"));
+    QCOMPARE(entries[10]->text(), QString("Black && White"));
     session.createDocument(4, 4);
     session.insert(whiteImage(4, 4));
     QVERIFY(button.isEnabled());
@@ -103,11 +103,11 @@ void AdjustmentPanelTests::rowsShowTheirGlyphAndOpenOnADoubleClick()
     }
     session.addMask();
     NativeLayerList list(session);
-    list.resize(252, 500);
+    list.resize(252, 720);
     list.show();
     QVERIFY(QTest::qWaitForWindowActive(&list));
     // Top first: the last kind added heads the list.
-    QCOMPARE(list.cells().size(), size_t(10));
+    QCOMPARE(list.cells().size(), size_t(13));
     for (size_t index = 0; index < allAdjustmentKinds.size(); ++index) {
         LayerCell &row = *list.cells().at(allAdjustmentKinds.size() - 1 - index);
         const QColor ink = row.palette().color(QPalette::WindowText);
@@ -120,6 +120,8 @@ void AdjustmentPanelTests::rowsShowTheirGlyphAndOpenOnADoubleClick()
     const std::pair<AdjustmentKind, LayerIcon> symbols[] = {{AdjustmentKind::hsv, LayerIcon::halfFilledCircle}, {AdjustmentKind::levels, LayerIcon::sliders},
                                                             {AdjustmentKind::curves, LayerIcon::curvePath}, {AdjustmentKind::exposure, LayerIcon::plusMinusCircle},
                                                             {AdjustmentKind::gradientMap, LayerIcon::paintPalette}, {AdjustmentKind::grain, LayerIcon::circleGrid},
+                                                            {AdjustmentKind::addNoise, LayerIcon::dottedCircle}, {AdjustmentKind::gaussianBlur, LayerIcon::drop},
+                                                            {AdjustmentKind::motionBlur, LayerIcon::wind},
                                                             {AdjustmentKind::invert, LayerIcon::rightHalfCircle}, {AdjustmentKind::blackWhite, LayerIcon::hatchedCircle},
                                                             {AdjustmentKind::colorBalance, LayerIcon::axes}};
     QList<QImage> glyphs;
@@ -139,6 +141,12 @@ void AdjustmentPanelTests::rowsShowTheirGlyphAndOpenOnADoubleClick()
     const QImage upright = LayerIcons::pixmap(LayerIcon::curvePath, 36, Qt::black, 1).toImage();
     QVERIFY(inked(curve, 24, 11) && !inked(curve, 11, 11));
     QVERIFY(inked(upright, 7, 7) && !inked(upright, 29, 7));
+    // The drop fills; the wind strokes across; dots ring emptiness.
+    const auto glyph = [](AdjustmentKind kind) { return LayerIcons::adjustmentThumbnail(kind, Qt::black, 1).toImage(); };
+    QVERIFY(inked(glyph(AdjustmentKind::gaussianBlur), 18, 20) && !inked(glyph(AdjustmentKind::gaussianBlur), 11, 11));
+    QVERIFY(inked(glyph(AdjustmentKind::motionBlur), 11, 18) && inked(glyph(AdjustmentKind::motionBlur), 24, 18));
+    QVERIFY(!inked(glyph(AdjustmentKind::motionBlur), 16, 16));
+    QVERIFY(inked(glyph(AdjustmentKind::addNoise), 26, 18) && !inked(glyph(AdjustmentKind::addNoise), 18, 18));
     // The masks: an adjustment's shows no link, the pixels' does.
     QVERIFY(list.cells().front()->findChild<QToolButton *>("maskLink")->isHidden());
     QVERIFY(!list.cells().back()->findChild<QToolButton *>("maskLink")->isHidden());
@@ -160,11 +168,11 @@ void AdjustmentPanelTests::rowsShowTheirGlyphAndOpenOnADoubleClick()
     QTest::keyClick(levels.findChild<QLineEdit *>("layerNameEditor"), Qt::Key_Escape);
     QVERIFY(!session.renamingLayerID());
     // Invert has no editor: its glyph renames, as Swift's row.
-    LayerCell &invert = *list.cells().at(allAdjustmentKinds.size() - 7);
+    LayerCell &invert = *list.cells().at(allAdjustmentKinds.size() - 10);
     QTest::mouseDClick(&invert.thumbnail(), Qt::LeftButton);
-    QCOMPARE(session.activeLayerID(), std::optional(ids[6]));
+    QCOMPARE(session.activeLayerID(), std::optional(ids[9]));
     QVERIFY(!session.adjustmentEditingID());
-    QCOMPARE(session.renamingLayerID(), std::optional(ids[6]));
+    QCOMPARE(session.renamingLayerID(), std::optional(ids[9]));
     QCOMPARE(invert.findChild<QLabel *>("layerDimensions")->text(), QString("Adjustment · Double-click to edit"));
 }
 
@@ -178,6 +186,8 @@ void AdjustmentPanelTests::theLayerMenuAddsAndEditsAdjustments()
     const std::pair<const char *, const char *> entries[] = {{"newHueSaturationAdjustment", "Hue/Saturation…"}, {"newLevelsAdjustment", "Levels…"},
                                                              {"newCurvesAdjustment", "Curves…"}, {"newExposureAdjustment", "Exposure…"},
                                                              {"newGradientMapAdjustment", "Gradient Map…"}, {"newGrainAdjustment", "Grain…"},
+                                                             {"newAddNoiseAdjustment", "Add Noise…"}, {"newGaussianBlurAdjustment", "Gaussian Blur…"},
+                                                             {"newMotionBlurAdjustment", "Motion Blur…"},
                                                              {"newInvertAdjustment", "Invert"}, {"newBlackWhiteAdjustment", "Black && White…"},
                                                              {"newColorBalanceAdjustment", "Color Balance…"}};
     const QList<QAction *> listed = adjustments.menu()->actions();

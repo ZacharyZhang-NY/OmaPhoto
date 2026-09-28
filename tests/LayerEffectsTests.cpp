@@ -25,6 +25,7 @@ LayerEffects every()
     effects.colorOverlay = ColorOverlayEffect{.enabled = true, .red = 0.9, .green = 0.25, .blue = 0.75, .opacity = 0.35};
     effects.innerShadow = InnerShadowEffect{.angle = -30, .distance = 3, .blur = 2, .red = 0.05, .green = 0.15, .blue = 0.95, .opacity = 0.65};
     effects.outerGlow = OuterGlowEffect{.size = 33, .red = 0.2, .green = 0.4, .blue = 0.6, .opacity = 0.55};
+    effects.innerGlow = InnerGlowEffect{.enabled = false, .size = 14, .red = 0.3, .green = 0.7, .blue = 0.1, .opacity = 0.45};
     return effects;
 }
 
@@ -81,7 +82,7 @@ void LayerEffectsTests::kindsKeepSwiftsNamesAndOrder()
 {
     const std::pair<LayerEffectKind, const char *> kinds[] = {{LayerEffectKind::stroke, "Stroke"}, {LayerEffectKind::shadow, "Drop Shadow"},
                                                               {LayerEffectKind::colorOverlay, "Color Overlay"}, {LayerEffectKind::innerShadow, "Inner Shadow"},
-                                                              {LayerEffectKind::outerGlow, "Outer Glow"}};
+                                                              {LayerEffectKind::outerGlow, "Outer Glow"}, {LayerEffectKind::innerGlow, "Inner Glow"}};
     QCOMPARE(allLayerEffectKinds.size(), std::size(kinds));
     for (size_t index = 0; index < std::size(kinds); ++index) {
         QVERIFY(allLayerEffectKinds[index] == kinds[index].first);
@@ -91,6 +92,7 @@ void LayerEffectsTests::kindsKeepSwiftsNamesAndOrder()
     QVERIFY((StrokeEffect() == StrokeEffect{std::nullopt, 4, 0, 0, 0, 1, false}));
     QVERIFY((ShadowEffect() == ShadowEffect{std::nullopt, 90, 20, 20, 0, 0, 0, 0.5}));
     QVERIFY((OuterGlowEffect() == OuterGlowEffect{std::nullopt, 20, 1, 1, 1, 0.75}));
+    QVERIFY((InnerGlowEffect() == InnerGlowEffect{std::nullopt, 10, 1, 1, 1, 0.75}));
     QVERIFY((ColorOverlayEffect() == ColorOverlayEffect{std::nullopt, 0, 0, 0, 1}));
     QVERIFY((InnerShadowEffect() == InnerShadowEffect{std::nullopt, 90, 10, 10, 0, 0, 0, 0.5}));
     QCOMPARE(StrokeEffect::maxSize, 500.0);
@@ -168,7 +170,7 @@ void LayerEffectsTests::theHelpersReadAndWriteOneKind()
     for (const LayerEffectKind kind : allLayerEffectKinds) {
         LayerEffects full = every();
         full.remove(kind);
-        QVERIFY(!full.contains(kind) && full.kinds().size() == 4);
+        QVERIFY(!full.contains(kind) && full.kinds().size() == 5);
         full.setColor(PaletteColor{1, 0, 0}, kind);
         QVERIFY(!full.color(kind));
     }
@@ -193,7 +195,7 @@ void LayerEffectsTests::theHelpersReadAndWriteOneKind()
 void LayerEffectsTests::theManifestWritesSwiftsKeys()
 {
     const QJsonObject encoded = ManifestJson::encoded(every());
-    QCOMPARE(encoded.keys(), (QStringList{"colorOverlay", "innerShadow", "outerGlow", "shadow", "stroke"}));
+    QCOMPARE(encoded.keys(), (QStringList{"colorOverlay", "innerGlow", "innerShadow", "outerGlow", "shadow", "stroke"}));
     const QJsonObject stroke = encoded.value("stroke").toObject();
     QCOMPARE(stroke.keys(), (QStringList{"blue", "enabled", "green", "inside", "opacity", "red", "size"}));
     QVERIFY(stroke.value("enabled") == false && stroke.value("inside") == true && stroke.value("size") == 7);
@@ -203,6 +205,8 @@ void LayerEffectsTests::theManifestWritesSwiftsKeys()
     QCOMPARE(encoded.value("innerShadow").toObject().value("angle"), QJsonValue(-30));
     QCOMPARE(encoded.value("outerGlow").toObject().keys(), (QStringList{"blue", "green", "opacity", "red", "size"}));
     QCOMPARE(encoded.value("outerGlow").toObject().value("size"), QJsonValue(33));
+    QCOMPARE(encoded.value("innerGlow").toObject().keys(), (QStringList{"blue", "enabled", "green", "opacity", "red", "size"}));
+    QVERIFY(encoded.value("innerGlow").toObject().value("size") == 14 && encoded.value("innerGlow").toObject().value("enabled") == false);
     QVERIFY(ManifestJson::effects(encoded) == every());
     // Absent effects stay out; null reads as absent.
     LayerEffects one;

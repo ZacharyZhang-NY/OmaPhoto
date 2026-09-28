@@ -216,7 +216,8 @@ void LiveMaskRenderer::adjust(QUuid id, QPainter &context, const QImage &clip)
         if (original.isNull())
             throw ExportError(ExportError::Kind::render);
         original.setDevicePixelRatio(1);
-        QImage adjusted = adjustment(id).value().apply(original, region);
+        // Device pixels a document pixel, where Swift's surface counts points.
+        QImage adjusted = adjustment(id).value().apply(original, region, adjustmentScale * device->width() / region.width());
         const auto found = m_modes.find(id);
         const LayerBlendMode mode = found != m_modes.end() ? found->second : LayerBlendMode::normal;
         if (mode != LayerBlendMode::normal)

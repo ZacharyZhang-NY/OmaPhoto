@@ -10,10 +10,11 @@
 #include <optional>
 
 // An adjustment layer's kind, in the Layer menu's order.
-enum class AdjustmentKind { hsv, levels, curves, exposure, gradientMap, grain, invert, blackWhite, colorBalance };
-inline constexpr std::array allAdjustmentKinds{AdjustmentKind::hsv,      AdjustmentKind::levels,      AdjustmentKind::curves,
-                                               AdjustmentKind::exposure, AdjustmentKind::gradientMap, AdjustmentKind::grain,
-                                               AdjustmentKind::invert,   AdjustmentKind::blackWhite,  AdjustmentKind::colorBalance};
+enum class AdjustmentKind { hsv, levels, curves, exposure, gradientMap, grain, addNoise, gaussianBlur, motionBlur, invert, blackWhite, colorBalance };
+inline constexpr std::array allAdjustmentKinds{AdjustmentKind::hsv,          AdjustmentKind::levels,     AdjustmentKind::curves,
+                                               AdjustmentKind::exposure,     AdjustmentKind::gradientMap, AdjustmentKind::grain,
+                                               AdjustmentKind::addNoise,     AdjustmentKind::gaussianBlur, AdjustmentKind::motionBlur,
+                                               AdjustmentKind::invert,       AdjustmentKind::blackWhite, AdjustmentKind::colorBalance};
 // Swift's rawValue: the new layer's name and the manifest's word.
 QString rawValue(AdjustmentKind kind);
 // The kind a manifest names, or none.
@@ -40,6 +41,14 @@ struct LayerAdjustment {
     std::optional<GrainSettings> grainSettings = std::nullopt;
     std::optional<BlackWhiteSettings> blackWhiteSettings = std::nullopt;
     std::optional<ColorBalanceSettings> colorBalanceSettings = std::nullopt;
+    // Absent in projects from before blur and noise layers.
+    std::optional<double> blurRadius = std::nullopt;
+    std::optional<double> motionAngle = std::nullopt;
+    std::optional<double> motionDistance = std::nullopt;
+    std::optional<double> noiseAmount = std::nullopt;
+    std::optional<bool> noiseGaussian = std::nullopt;
+    std::optional<bool> noiseMonochromatic = std::nullopt;
+    std::optional<quint32> noiseSeed = std::nullopt;
     HueSaturationSettings resolvedHSV() const;
     // Swift's computed properties over the optional settings.
     ExposureSettings exposure() const;
@@ -52,8 +61,24 @@ struct LayerAdjustment {
     void setBlackWhite(const BlackWhiteSettings &value);
     ColorBalanceSettings colorBalance() const;
     void setColorBalance(const ColorBalanceSettings &value);
+    double gaussianRadius() const;
+    void setGaussianRadius(double value);
+    double resolvedMotionAngle() const;
+    void setResolvedMotionAngle(double value);
+    double resolvedMotionDistance() const;
+    void setResolvedMotionDistance(double value);
+    double resolvedNoiseAmount() const;
+    void setResolvedNoiseAmount(double value);
+    bool resolvedNoiseGaussian() const;
+    void setResolvedNoiseGaussian(bool value);
+    bool resolvedNoiseMonochromatic() const;
+    void setResolvedNoiseMonochromatic(bool value);
+    quint32 resolvedNoiseSeed() const;
+    void setResolvedNoiseSeed(quint32 value);
+    // Document pixels a partial redraw reads past its rect.
+    double samplingMargin() const;
     bool isValid() const;
-    // `region`: the document `image` covers, whole pixels by default.
-    QImage apply(const QImage &image, std::optional<QRectF> region = std::nullopt) const;
+    // Region: the document shown; scale: image pixels a document pixel.
+    QImage apply(const QImage &image, std::optional<QRectF> region = std::nullopt, double scale = 1) const;
     friend bool operator==(const LayerAdjustment &, const LayerAdjustment &) = default;
 };

@@ -209,6 +209,7 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     image->addSeparator();
     add(image, QStringLiteral("canvasSize"), QStringLiteral("Canvas Size…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_C), [this] { projects().canvasSize(); });
     add(image, QStringLiteral("imageSize"), QStringLiteral("Image Size…"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I), [this] { projects().imageSize(); });
+    add(image, QStringLiteral("trim"), QStringLiteral("Trim…"), QKeySequence(), [this] { projects().trim(); });
     image->addSeparator();
     add(image, QStringLiteral("flipCanvasHorizontal"), QStringLiteral("Flip Canvas Horizontal"), QKeySequence(), [this] { session().flipCanvas(true); });
     add(image, QStringLiteral("flipCanvasVertical"), QStringLiteral("Flip Canvas Vertical"), QKeySequence(), [this] { session().flipCanvas(false); });
@@ -365,6 +366,7 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("invert"))->setEnabled(s.canInvert());
     action(QStringLiteral("canvasSize"))->setEnabled(drawn && p.canStart());
     action(QStringLiteral("imageSize"))->setEnabled(drawn && p.canStart());
+    action(QStringLiteral("trim"))->setEnabled(drawn && p.canStart());
     action(QStringLiteral("flipCanvasHorizontal"))->setEnabled(s.canEditLayers());
     action(QStringLiteral("flipCanvasVertical"))->setEnabled(s.canEditLayers());
     action(QStringLiteral("newAdjustmentLayer"))->setEnabled(s.canEditLayers());

@@ -1,9 +1,11 @@
+#include "Document/ImageTrim.h"
 #include "IO/CanvasResizer.h"
 #include "IO/ImageExporter.h"
 #include "IO/ImageResizer.h"
 #include "IO/ProjectController.h"
 #include "UI/CanvasSizeSheet.h"
 #include "UI/ImageSizeSheet.h"
+#include "UI/TrimSheet.h"
 #include <QDialog>
 #include <QFutureWatcher>
 #include <QVBoxLayout>
@@ -37,7 +39,7 @@ void ProjectController::canvasSize(std::function<void()> done)
     connect(dialog, &QDialog::finished, this, [this, chosen, done] {
         const std::optional<CanvasSizeOptions> options = *chosen;
         resizeProject(options ? [options = *options](const ProjectSnapshot &snapshot) { return CanvasResizer::resize(snapshot, options); }
-                              : std::function<ProjectSnapshot(const ProjectSnapshot &)>(),
+                              : std::function<std::optional<ProjectSnapshot>(const ProjectSnapshot &)>(),
                       [this](const ProjectSnapshot &resized) { session.applyDocumentSize(resized, QStringLiteral("Canvas Size")); },
                       QStringLiteral("Couldn’t change canvas size"), done);
     });
@@ -60,14 +62,37 @@ void ProjectController::imageSize(std::function<void()> done)
     connect(dialog, &QDialog::finished, this, [this, chosen, done] {
         const std::optional<ImageSizeOptions> options = *chosen;
         resizeProject(options ? [options = *options](const ProjectSnapshot &snapshot) { return ImageResizer::resize(snapshot, options); }
-                              : std::function<ProjectSnapshot(const ProjectSnapshot &)>(),
+                              : std::function<std::optional<ProjectSnapshot>(const ProjectSnapshot &)>(),
                       [this](const ProjectSnapshot &resized) { session.applyImageSize(resized); }, QStringLiteral("Couldn’t resize the image"), done);
     });
     dialog->open();
 }
 
+void ProjectController::trim(std::function<void()> done)
+{
+    if (!window || !session.document() || !begin()) {
+        if (done)
+            QMetaObject::invokeMethod(this, done, Qt::QueuedConnection);
+        return;
+    }
+    QDialog *dialog = sheet(QStringLiteral("Trim"));
+    auto chosen = std::make_shared<std::optional<TrimOptions>>();
+    dialog->layout()->addWidget(new TrimSheet([dialog, chosen](std::optional<TrimOptions> options) {
+        *chosen = options;
+        dialog->done(options ? QDialog::Accepted : QDialog::Rejected);
+    }, dialog));
+    connect(dialog, &QDialog::finished, this, [this, chosen, done] {
+        const std::optional<TrimOptions> options = *chosen;
+        resizeProject(options ? [options = *options](const ProjectSnapshot &snapshot) { return ImageTrim::trim(snapshot, options); }
+                              : std::function<std::optional<ProjectSnapshot>(const ProjectSnapshot &)>(),
+                      [this](const ProjectSnapshot &trimmed) { session.applyDocumentSize(trimmed, QStringLiteral("Trim")); },
+                      QStringLiteral("Couldn’t trim image"), done);
+    });
+    dialog->open();
+}
+
 // Cancelled, nothing runs; running out of memory fails a render.
-void ProjectController::resizeProject(std::function<ProjectSnapshot(const ProjectSnapshot &)> resize, std::function<void(const ProjectSnapshot &)> land,
+void ProjectController::resizeProject(std::function<std::optional<ProjectSnapshot>(const ProjectSnapshot &)> resize, std::function<void(const ProjectSnapshot &)> land,
                                       const QString &failure, std::function<void()> done)
 {
     const auto end = [this, done] {
@@ -89,11 +114,13 @@ void ProjectController::resizeProject(std::function<ProjectSnapshot(const Projec
                 watcher->deleteLater();
                 try {
                     const Resized result = watcher->future().takeResult();
-                    if (!result.snapshot) {
+                    if (!result.failure.isEmpty()) {
                         explain(result.failure);
                         return;
                     }
-                    land(*result.snapshot);
+                    // Swift's trim with nothing left changes nothing.
+                    if (result.snapshot)
+                        land(*result.snapshot);
                 } catch (const std::bad_alloc &) {
                     explain(render);
                     return;

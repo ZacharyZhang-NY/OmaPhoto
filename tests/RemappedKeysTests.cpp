@@ -10,6 +10,7 @@
 #include "UI/LevelsSheet.h"
 #include "UI/NewCanvasSheet.h"
 #include "UI/TransformInspector.h"
+#include "UI/TrimSheet.h"
 #include <QShortcut>
 #include "UI/LassoControls.h"
 #include "UI/NativeLayerList.h"
@@ -226,6 +227,7 @@ void RemappedKeysTests::everySheetBindsSwiftsKeys()
     const CanvasDocument canvas = session.document().value();
     QCOMPARE(keys(CanvasSizeSheet(canvas, PaletteColor::black(), PaletteColor::white(), [](std::optional<CanvasSizeOptions>) {})), both);
     QCOMPARE(keys(ImageSizeSheet(canvas, [](std::optional<ImageSizeOptions>) {})), both);
+    QCOMPARE(keys(TrimSheet([](std::optional<TrimOptions>) {})), both);
     QCOMPARE(keys(JPEGExportSheet(ExportRaster{red, 72}, [](std::optional<QByteArray>) {})), both);
     QCOMPARE(keys(ColorPickerSheet(session, [](bool) {})), both);
     QCOMPARE(keys(NewCanvasSheet(session, [](int, int) {}, [] {})), QSet<QString>{"Ctrl+K"});

@@ -238,7 +238,7 @@ void FolderOpacityTests::aDimmedFolderSavesAndReopens()
     const QString path = root.filePath("Dimmed.comp");
     ProjectStore::save(session.projectSnapshot().value(), path);
     const ProjectSnapshot loaded = ProjectStore::load(path);
-    QCOMPARE(loaded.manifest.version, qint64(8));
+    QCOMPARE(loaded.manifest.version, qint64(9));
     for (const ProjectLayerRecord &record : loaded.manifest.layers) {
         if (record.isGroup == true)
             QCOMPARE(record.opacity, std::optional(0.5));

@@ -87,6 +87,8 @@ struct FilterJob {
     // The point colour shown alone, or −1 for the grade.
     int visualizesPointColor = -1;
     bool showsSharpenMask = false;
+    // A live adjustment's noise field, fixed in its region's pixels.
+    QPointF noiseOrigin{};
 };
 
 // Swift's PixelFilter.
