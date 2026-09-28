@@ -6,10 +6,10 @@
 #include "IO/ImageExporter.h"
 #include "Logging.h"
 #include "Rendering/DownsampleCache.h"
-#include <QHash>
 #include "IO/ProjectStore.h"
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <stdexcept>
 
 LayerMask::LayerMask(ImportedImage asset, bool isEnabled, std::optional<LayerTransform> placement, bool isLinked)
@@ -220,12 +220,12 @@ void FolderMaskClip::draw(const std::vector<QUuid> &ids, const std::function<std
                           const std::function<void(QUuid, const QImage &clip)> &drawLayer)
 {
     // Coverage through a folder and its ancestors; null for none.
-    QHash<QUuid, QImage> covered;
+    std::map<QUuid, QImage> covered;
     std::function<QImage(std::optional<QUuid>, int)> through = [&](std::optional<QUuid> folder, int depth) -> QImage {
         if (!folder || depth >= 64)
             return QImage();
-        if (const auto found = covered.constFind(*folder); found != covered.constEnd())
-            return *found;
+        if (const auto found = covered.find(*folder); found != covered.end())
+            return found->second;
         QImage coverage = through(parent(*folder), depth + 1);
         if (const std::optional<Applier> applier = clip(*folder)) {
             if (coverage.isNull()) {
@@ -236,7 +236,7 @@ void FolderMaskClip::draw(const std::vector<QUuid> &ids, const std::function<std
             }
             (*applier)(context, coverage);
         }
-        covered.insert(*folder, coverage);
+        covered.insert_or_assign(*folder, coverage);
         return coverage;
     };
     for (const QUuid &id : ids)

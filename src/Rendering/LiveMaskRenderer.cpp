@@ -16,7 +16,7 @@ void LiveMaskRenderer::prepareStacks(const std::vector<QUuid> &ids, const std::f
                                      const std::function<LayerBlendMode(QUuid)> &blend)
 {
     for (const QUuid &id : ids)
-        m_modes.insert(id, blend(id));
+        m_modes.insert_or_assign(id, blend(id));
     for (size_t index = 0; index < ids.size(); ++index) {
         const QUuid base = ids[index];
         if (m_source(base))
@@ -29,9 +29,9 @@ void LiveMaskRenderer::prepareStacks(const std::vector<QUuid> &ids, const std::f
         }
         if (children.empty())
             continue;
-        m_stackModes.insert(base, blend(base));
-        m_stacked.unite(QSet<QUuid>(children.begin(), children.end()));
-        m_stacks.insert(base, std::move(children));
+        m_stackModes.insert_or_assign(base, blend(base));
+        m_stacked.insert(children.begin(), children.end());
+        m_stacks.insert_or_assign(base, std::move(children));
     }
 }
 
@@ -45,10 +45,10 @@ void LiveMaskRenderer::drawComposite(QUuid id, QPainter &context, const QImage &
             adjust(id, context, clip);
         return;
     }
-    const auto children = m_stacks.constFind(id);
+    const auto children = m_stacks.find(id);
     const QSize device(context.device()->width(), context.device()->height());
     QImage group, alpha;
-    if (children != m_stacks.constEnd() && fits(context)) {
+    if (children != m_stacks.end() && fits(context)) {
         group = QImage(device, QImage::Format_RGBA8888_Premultiplied);
         alpha = QImage(device, QImage::Format_Grayscale8);
         if (group.isNull() || alpha.isNull())
@@ -56,9 +56,9 @@ void LiveMaskRenderer::drawComposite(QUuid id, QPainter &context, const QImage &
     }
     if (group.isNull() || alpha.isNull()) {
         // Without a group each child draws alone, through the base.
-        if (children != m_stacks.constEnd()) {
-            for (const QUuid &child : *children)
-                m_stacked.remove(child);
+        if (children != m_stacks.end()) {
+            for (const QUuid &child : children->second)
+                m_stacked.erase(child);
         }
         draw(id, context, clip);
         return;
@@ -76,7 +76,7 @@ void LiveMaskRenderer::drawComposite(QUuid id, QPainter &context, const QImage &
     {
         QPainter painter(&group);
         painter.setTransform(context.deviceTransform());
-        for (const QUuid &child : *children) {
+        for (const QUuid &child : children->second) {
             if (adjustment(child))
                 adjust(child, painter, QImage());
             else
@@ -87,7 +87,7 @@ void LiveMaskRenderer::drawComposite(QUuid id, QPainter &context, const QImage &
                         size_t(device.width()), size_t(device.height()));
     // Device pixels already: one to one, at the painter's opacity.
     LayerRenderer::composite(context, context.deviceTransform().inverted(), QRectF(group.rect()), LayerSampling::nearest,
-                             InterpolationQuality::none, {.opacity = context.opacity(), .blendMode = m_stackModes.value(id), .clip = clip}, QRectF(),
+                             InterpolationQuality::none, {.opacity = context.opacity(), .blendMode = m_stackModes.at(id), .clip = clip}, QRectF(),
                              [&](QPainter &aside) { aside.drawImage(QRectF(group.rect()), group); });
 }
 
@@ -127,16 +127,16 @@ bool LiveMaskRenderer::fits(const QPainter &context) const
 
 std::optional<QImage> LiveMaskRenderer::coverage(QUuid id, const QPainter &context)
 {
-    if (const auto found = m_cache.constFind(id); found != m_cache.constEnd())
-        return *found;
+    if (const auto found = m_cache.find(id); found != m_cache.end())
+        return found->second;
     if (!fits(context))
         qCWarning(lcRendering) << "clip coverage passes its pixel budget:" << context.device()->width() << "x" << context.device()->height();
     if (m_visiting.contains(id) || m_visiting.size() >= 256 || !fits(context))
         return std::nullopt;
     struct Visit {
-        QSet<QUuid> &visiting;
+        std::set<QUuid> &visiting;
         QUuid id;
-        ~Visit() { visiting.remove(id); }
+        ~Visit() { visiting.erase(id); }
     } visit{m_visiting, id};
     m_visiting.insert(id);
     const QSize device(context.device()->width(), context.device()->height());
@@ -153,7 +153,7 @@ std::optional<QImage> LiveMaskRenderer::coverage(QUuid id, const QPainter &conte
     }
     layer_extract_alpha(pixels.constBits(), size_t(pixels.bytesPerLine()), gray.bits(), size_t(gray.bytesPerLine()),
                         size_t(device.width()), size_t(device.height()));
-    m_cache.insert(id, gray);
+    m_cache.insert_or_assign(id, gray);
     return gray;
 }
 
@@ -217,7 +217,8 @@ void LiveMaskRenderer::adjust(QUuid id, QPainter &context, const QImage &clip)
             throw ExportError(ExportError::Kind::render);
         original.setDevicePixelRatio(1);
         QImage adjusted = adjustment(id).value().apply(original, region);
-        const LayerBlendMode mode = m_modes.value(id, LayerBlendMode::normal);
+        const auto found = m_modes.find(id);
+        const LayerBlendMode mode = found != m_modes.end() ? found->second : LayerBlendMode::normal;
         if (mode != LayerBlendMode::normal)
             adjusted = blended(original, adjusted, mode);
         QImage coverage(device->size(), QImage::Format_Alpha8);

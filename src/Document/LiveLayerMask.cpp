@@ -8,12 +8,12 @@
 #include "Rendering/AdjustmentSurface.h"
 #include "Rendering/LayerRenderer.h"
 #include "Rendering/LiveMaskRenderer.h"
-#include <QHash>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSet>
 #include <QtConcurrent>
 #include <map>
+#include <set>
 #include <stdexcept>
 
 void EditorSession::drawLiveComposite(const CanvasDocument &document, QPainter &context, bool onSurface) const
@@ -73,27 +73,31 @@ void EditorSession::drawLiveComposite(const CanvasDocument &document, QPainter &
 
 void LiveMaskGraph::validate(const std::vector<ProjectLayerRecord> &layers)
 {
-    QHash<QUuid, const ProjectLayerRecord *> records;
+    // Standard containers: a worker's render may run out of memory.
+    std::map<QUuid, const ProjectLayerRecord *> records;
     for (const ProjectLayerRecord &layer : layers) {
-        if (records.contains(layer.id))
+        if (!records.emplace(layer.id, &layer).second)
             throw ProjectError(ProjectError::Kind::invalid);
-        records.insert(layer.id, &layer);
     }
+    const auto record = [&records](QUuid id) -> const ProjectLayerRecord * {
+        const auto found = records.find(id);
+        return found != records.end() ? found->second : nullptr;
+    };
     for (const ProjectLayerRecord &layer : layers) {
-        QSet<QUuid> path;
+        std::set<QUuid> path;
         std::optional<QUuid> current = layer.id;
         while (current) {
-            const ProjectLayerRecord *record = records.value(*current);
-            if (path.size() >= 256 || path.contains(*current) || !record)
+            const ProjectLayerRecord *found = record(*current);
+            if (path.size() >= 256 || path.contains(*current) || !found)
                 throw ProjectError(ProjectError::Kind::invalid);
             path.insert(*current);
-            if (record->maskSourceID) {
-                const ProjectLayerRecord *source = records.value(*record->maskSourceID);
+            if (found->maskSourceID) {
+                const ProjectLayerRecord *source = record(*found->maskSourceID);
                 // Folders never clip; nothing clips to an adjustment.
-                if (record->isGroup == true || !source || source->isGroup == true || source->adjustment)
+                if (found->isGroup == true || !source || source->isGroup == true || source->adjustment)
                     throw ProjectError(ProjectError::Kind::invalid);
             }
-            current = record->maskSourceID;
+            current = found->maskSourceID;
         }
     }
 }
@@ -110,21 +114,20 @@ std::optional<ImportedImage> LiveMaskBaker::bake(const ProjectSnapshot &snapshot
     QImage surface = BrushRaster::context(width, height, false);
     const QTransform inverse = BrushRaster::pixelToDocument(layers[found].transform, width, height).inverted();
     // Swift's dictionary traps on an id that repeats.
-    QHash<QUuid, const ProjectLayerRecord *> records;
+    std::map<QUuid, const ProjectLayerRecord *> records;
     for (const ProjectLayerRecord &layer : layers) {
-        if (records.contains(layer.id))
+        if (!records.emplace(layer.id, &layer).second)
             throw std::logic_error("a snapshot to bake repeats a layer id");
-        records.insert(layer.id, &layer);
     }
     // A source dims with its folders, as exported.
     const auto folded = [&records](const ProjectLayerRecord &layer) {
         return LayerOpacity::effective(layer.opacity.value_or(1), layer.parentID, [&records](QUuid id) -> std::optional<std::pair<double, std::optional<QUuid>>> {
             if (!records.contains(id))
                 return std::nullopt;
-            return std::pair(records.value(id)->opacity.value_or(1), records.value(id)->parentID);
+            return std::pair(records.at(id)->opacity.value_or(1), records.at(id)->parentID);
         });
     };
-    LiveMaskRenderer live([&](QUuid id) { return records.contains(id) ? records.value(id)->maskSourceID : std::nullopt; },
+    LiveMaskRenderer live([&](QUuid id) { return records.contains(id) ? records.at(id)->maskSourceID : std::nullopt; },
                           [&](QUuid id, QPainter &context, const QImage &clip) {
                               // `at` is checked: end() would read wild memory.
                               if (!records.contains(id) || !snapshot.images.contains(id))
@@ -136,7 +139,7 @@ std::optional<ImportedImage> LiveMaskBaker::bake(const ProjectSnapshot &snapshot
                                                       context, {.clip = clip});
                                   return;
                               }
-                              const ProjectLayerRecord &layer = *records.value(id);
+                              const ProjectLayerRecord &layer = *records.at(id);
                               const std::optional<LayerMask> mask = snapshot.mask(layer);
                               const std::optional<QImage> shown =
                                   mask ? mask->clipImage(mask->placement, layer.transform, pixels.width(), pixels.height()) : std::nullopt;

@@ -1,13 +1,13 @@
 #pragma once
 #include "Document/LayerAdjustment.h"
 #include "Document/LayerAppearance.h"
-#include <QHash>
 #include <QImage>
 #include <QPainter>
-#include <QSet>
 #include <QUuid>
 #include <functional>
+#include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 // Per-render dependency cache: a layer shows through its source's alpha.
@@ -39,11 +39,12 @@ private:
     const Source m_source;
     const DrawOwn m_drawOwn;
     const qint64 m_pixelBudget;
-    QHash<QUuid, QImage> m_cache;
-    QSet<QUuid> m_visiting;
-    QHash<QUuid, std::vector<QUuid>> m_stacks;
-    QSet<QUuid> m_stacked;
-    QHash<QUuid, LayerBlendMode> m_stackModes;
+    // Standard containers: Qt 6.4's hash inserts terminate out of memory.
+    std::map<QUuid, QImage> m_cache;
+    std::set<QUuid> m_visiting;
+    std::map<QUuid, std::vector<QUuid>> m_stacks;
+    std::set<QUuid> m_stacked;
+    std::map<QUuid, LayerBlendMode> m_stackModes;
     // Every prepared layer's mode, as Swift's `blendMode`.
-    QHash<QUuid, LayerBlendMode> m_modes;
+    std::map<QUuid, LayerBlendMode> m_modes;
 };
