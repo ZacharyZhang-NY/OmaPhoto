@@ -35,7 +35,7 @@ void CropControlsTests::theBarShowsTheFrameAndItsRatio()
     QStringList choices;
     for (int index = 0; index < ratio.count(); ++index)
         choices << ratio.itemText(index);
-    QCOMPARE(choices, (QStringList{"Free", "Original", "1:1", "4:3", "16:9"}));
+    QCOMPARE(choices, (QStringList{"Free", "Original", "1:1", "4:3", "3:4", "16:9", "9:16"}));
     QCOMPARE(ratio.currentText(), QString("Free"));
     // Labelled as Swift's picker, the two 170 points wide.
     const QList<QLabel *> labels = bar.findChildren<QLabel *>();

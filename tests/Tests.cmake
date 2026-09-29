@@ -257,6 +257,8 @@ compositor_test(FilterControlsTests)
 compositor_test(FinishingFilterTests)
 # It checks the filters against their kernels.
 target_include_directories(FinishingFilterTests PRIVATE ${OMAPHOTO_KERNELS})
+compositor_test(VignetteCanvasTests)
+target_include_directories(VignetteCanvasTests PRIVATE ${OMAPHOTO_KERNELS})
 compositor_test(FloatingSelectionTests)
 compositor_test(CropTests)
 compositor_test(GuideTests)

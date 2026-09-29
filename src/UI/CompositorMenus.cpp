@@ -366,7 +366,7 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("levels"))->setEnabled(s.canAdjustColors() && !s.hueSaturation());
     for (const FilterKind kind : allFilterKinds) {
         if (kind != FilterKind::contentAwareFill)
-            action(filterName(kind))->setEnabled(s.canAdjustColors() && !s.hueSaturation());
+            action(filterName(kind))->setEnabled((kind == FilterKind::vignette ? s.canVignette() : s.canAdjustColors()) && !s.hueSaturation());
     }
     action(QStringLiteral("hueSaturation"))->setEnabled(s.canAdjustColors());
     action(QStringLiteral("invert"))->setText(s.isMaskSelected() ? QStringLiteral("Invert Mask") : QStringLiteral("Invert"));

@@ -18,10 +18,22 @@ SessionJobs::Adjusted adjusted(const HueSaturationJob &job)
 // Swift's session extension in HueSaturation.swift.
 bool EditorSession::canAdjustColors() const
 {
+    return canAdjust(false);
+}
+
+// Vignette also paints an empty layer, without pixels yet.
+bool EditorSession::canVignette() const
+{
+    const std::optional<ImageLayer> layer = activeLayer();
+    return canAdjust(!(layer && layer->adjustment));
+}
+
+bool EditorSession::canAdjust(bool allowingEmpty) const
+{
     const std::optional<ImageLayer> layer = activeLayer();
     const std::optional<DocumentSelection> current = selection();
     return !m_levels && !m_filterEdit && m_document && layer && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_pixelMove && !m_renamingLayerID && !m_showsNewDocument
-        && !m_showsImporter && m_selectedLayerIDs.size() == 1 && !layer->isGroup && !m_isMaskSelected && layer->asset
+        && !m_showsImporter && m_selectedLayerIDs.size() == 1 && !layer->isGroup && !m_isMaskSelected && (layer->asset || allowingEmpty)
         && m_document->effectiveVisibleIDs().contains(layer->id) && !(current && current->isEmpty());
 }
 

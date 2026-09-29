@@ -195,7 +195,11 @@ void EditorSession::openColorPicker(bool background)
 {
     if (!canEditPalette() || m_isMaskSelected)
         return;
-    m_colorPicker = ColorPickerState({ColorPickerTarget::Kind::palette, background}, paletteColor(background));
+    ColorPickerState picker({ColorPickerTarget::Kind::palette, background}, paletteColor(background));
+    // Open text follows the foreground: it previews, Cancel restores.
+    if (!background && m_tool == NavigationTool::type && m_textDraft)
+        picker.editedText = ColorPickerState::EditedText{m_textDraft->id, {m_textDraft->style.red, m_textDraft->style.green, m_textDraft->style.blue}};
+    m_colorPicker = picker;
     notify();
 }
 
@@ -225,20 +229,21 @@ void EditorSession::closeColorPicker(bool commit)
     const std::optional<QUuid> draftID = m_textDraft ? std::optional(m_textDraft->id) : std::nullopt;
     if (commit && picker.target.kind == ColorPickerTarget::Kind::palette && !m_isMaskSelected) {
         setPaletteColor(color, picker.target.background);
-    } else if (commit && picker.target.kind == ColorPickerTarget::Kind::text && m_tool == NavigationTool::type && draftID == picker.target.draftID) {
+    } else if (!commit && picker.target.kind == ColorPickerTarget::Kind::palette && picker.editedText && m_tool == NavigationTool::type
+               && draftID == picker.editedText->draftID) {
+        paintText(picker.editedText->color);
+    } else if (picker.target.kind == ColorPickerTarget::Kind::text && m_tool == NavigationTool::type && draftID == picker.target.draftID) {
+        // The text previewed the working colour; Cancel puts it back.
+        const PaletteColor chosen = commit ? color : picker.original;
         if (draftID) {
-            changeTextStyle([&color](LayerTextStyle &style) {
-                style.red = color.red;
-                style.green = color.green;
-                style.blue = color.blue;
-            });
-        } else {
-            m_textDefaults.red = color.red;
-            m_textDefaults.green = color.green;
-            m_textDefaults.blue = color.blue;
+            paintText(chosen);
+        } else if (commit) {
+            m_textDefaults.red = chosen.red;
+            m_textDefaults.green = chosen.green;
+            m_textDefaults.blue = chosen.blue;
         }
         // The text colour is the foreground: the swatch follows.
-        if (!m_isMaskSelected)
+        if (commit && !m_isMaskSelected)
             setForegroundColor(color);
     } else if (picker.target.kind == ColorPickerTarget::Kind::gradientMap) {
         // The end previewed the working colour; Cancel puts it back.
@@ -278,6 +283,29 @@ void EditorSession::openEffectColorPicker(LayerEffectKind kind)
         return;
     m_colorPicker = ColorPickerState({ColorPickerTarget::Kind::effect, false, std::nullopt, false, kind}, editingEffects().color(kind).value_or(PaletteColor::black()));
     notify();
+}
+
+void EditorSession::previewTextColor()
+{
+    if (!m_colorPicker)
+        return;
+    const ColorPickerTarget &target = m_colorPicker->target;
+    const std::optional<QUuid> draftID = target.kind == ColorPickerTarget::Kind::text                          ? target.draftID
+                                         : target.kind == ColorPickerTarget::Kind::palette && m_colorPicker->editedText
+                                             ? std::optional(m_colorPicker->editedText->draftID)
+                                             : std::nullopt;
+    if (draftID && m_tool == NavigationTool::type && m_textDraft && m_textDraft->id == *draftID)
+        paintText(m_colorPicker->color());
+}
+
+// The open draft's colour.
+void EditorSession::paintText(const PaletteColor &color)
+{
+    changeTextStyle([&color](LayerTextStyle &style) {
+        style.red = color.red;
+        style.green = color.green;
+        style.blue = color.blue;
+    });
 }
 
 void EditorSession::previewEffectColor()

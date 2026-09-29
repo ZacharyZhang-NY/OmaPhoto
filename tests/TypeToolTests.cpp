@@ -14,6 +14,14 @@ std::unique_ptr<EditorSession> makeSession()
     return session;
 }
 
+// Swift writes `colorPicker.hsb` in place.
+void pick(EditorSession &session, const PaletteColor &color)
+{
+    PickerHSB hsb = session.colorPicker().value().hsb;
+    hsb.setRGB(color);
+    session.setColorPickerHSB(hsb);
+}
+
 // Swift writes `session.textDraft?.style.content` in place.
 void type(EditorSession &session, const QString &content)
 {
@@ -50,6 +58,8 @@ private slots:
     void paragraphBoxAndToolSwitchCommitEditableText();
     void emptyNewParagraphIsDiscarded();
     void invalidAndStaleDraftsDoNotChangeDocument();
+    void textColorPickerPreviewsAndRestoresDraft();
+    void theForegroundPickerPreviewsOpenTextToo();
 };
 
 void TypeToolTests::createEditCancelAndUndo()
@@ -215,6 +225,96 @@ void TypeToolTests::invalidAndStaleDraftsDoNotChangeDocument()
     session->createDocument(100, 100, true);
     QVERIFY(!session->applyText(draft));
     QCOMPARE(session->document().value().layers.size(), size_t(1));
+}
+
+void TypeToolTests::textColorPickerPreviewsAndRestoresDraft()
+{
+    const auto session = makeSession();
+    session->beginText(QPointF(30, 40));
+    const LayerTextStyle original = session->textDraft().value().style;
+    session->openTextColorPicker();
+    pick(*session, PaletteColor{1, 0, 0});
+    session->previewTextColor();
+    QCOMPARE(session->textDraft().value().style.red, 1.0);
+    QCOMPARE(session->textDraft().value().style.green, 0.0);
+    QCOMPARE(session->foregroundColor(), PaletteColor::black());
+    session->closeColorPicker(false);
+    QCOMPARE(session->textDraft().value().style, original);
+    QCOMPARE(session->foregroundColor(), PaletteColor::black());
+    session->openTextColorPicker();
+    pick(*session, PaletteColor{0, 0, 1});
+    session->previewTextColor();
+    session->closeColorPicker(true);
+    QCOMPARE(session->textDraft().value().style.blue, 1.0);
+    QCOMPARE(session->foregroundColor(), (PaletteColor{0, 0, 1}));
+    // With no text open, Cancel leaves the next text's colour.
+    session->setTextDraft(std::nullopt);
+    session->openTextColorPicker();
+    pick(*session, PaletteColor{1, 0, 0});
+    session->closeColorPicker(true);
+    session->setForegroundColor(PaletteColor{0, 1, 0});
+    session->openTextColorPicker();
+    session->closeColorPicker(false);
+    QCOMPARE(session->textDefaults().red, 1.0);
+    QCOMPARE(session->textDefaults().green, 0.0);
+}
+
+void TypeToolTests::theForegroundPickerPreviewsOpenTextToo()
+{
+    // Swift 1.2.5 (4e5f4ec): open text follows the foreground picker.
+    const auto session = makeSession();
+    session->beginText(QPointF(30, 40));
+    const auto paint = [&](const PaletteColor &color) {
+        session->changeTextStyle([&](LayerTextStyle &style) {
+            style.red = color.red;
+            style.green = color.green;
+            style.blue = color.blue;
+        });
+    };
+    const auto colour = [&] {
+        const LayerTextStyle style = session->textDraft().value().style;
+        return PaletteColor{style.red, style.green, style.blue};
+    };
+    // Blue text, a black foreground: Cancel restores the text's own.
+    paint(PaletteColor{0, 0, 1});
+    session->openColorPicker(false);
+    pick(*session, PaletteColor{0, 1, 0});
+    session->previewTextColor();
+    QCOMPARE(colour(), (PaletteColor{0, 1, 0}));
+    session->closeColorPicker(false);
+    QCOMPARE(colour(), (PaletteColor{0, 0, 1}));
+    QCOMPARE(session->foregroundColor(), PaletteColor::black());
+    // Another draft set meanwhile is neither previewed nor restored.
+    session->openColorPicker(false);
+    TextDraft other = session->textDraft().value();
+    other.id = QUuid::createUuid();
+    session->setTextDraft(other);
+    paint(PaletteColor{1, 0, 0});
+    pick(*session, PaletteColor{0, 1, 0});
+    session->previewTextColor();
+    QCOMPARE(colour(), (PaletteColor{1, 0, 0}));
+    session->closeColorPicker(false);
+    QCOMPARE(colour(), (PaletteColor{1, 0, 0}));
+    // OK keeps the colour, and the foreground with it.
+    session->openColorPicker(false);
+    pick(*session, PaletteColor{0, 1, 0});
+    session->previewTextColor();
+    session->closeColorPicker(true);
+    QCOMPARE(colour(), (PaletteColor{0, 1, 0}));
+    QCOMPARE(session->foregroundColor(), (PaletteColor{0, 1, 0}));
+    // The background picker leaves text alone.
+    session->openColorPicker(true);
+    pick(*session, PaletteColor{1, 0, 0});
+    session->previewTextColor();
+    QCOMPARE(colour(), (PaletteColor{0, 1, 0}));
+    session->closeColorPicker(false);
+    // The Type bar's picker: a later draft keeps its colour.
+    session->openTextColorPicker();
+    other.id = QUuid::createUuid();
+    session->setTextDraft(other);
+    paint(PaletteColor{1, 0, 0});
+    session->closeColorPicker(false);
+    QCOMPARE(colour(), (PaletteColor{1, 0, 0}));
 }
 
 QTEST_MAIN(TypeToolTests)

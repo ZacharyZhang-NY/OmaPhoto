@@ -20,8 +20,8 @@ void EditorSession::beginFilter(FilterKind kind)
 {
     if (kind == FilterKind::contentAwareFill && !canContentAwareFill())
         return;
-    // Swift beeps; `canAdjustColors` reads the open filter.
-    if (m_hueSaturation || !canAdjustColors()) {
+    // Swift beeps; the gates read the open filter.
+    if (m_hueSaturation || !(kind == FilterKind::vignette ? canVignette() : canAdjustColors())) {
         qCWarning(lcApp) << "a filter cannot open here";
         return;
     }
@@ -33,7 +33,7 @@ void EditorSession::beginFilter(FilterKind kind)
     commitTransform();
     cancelCrop();
     cancelLasso();
-    const ImageLayer layer = activeLayer().value();
+    ImageLayer layer = activeLayer().value();
     const QSizeF size = m_document->size();
     const std::optional<DocumentSelection> current = selection();
     FilterSettings settings = m_filterSettings;
@@ -41,14 +41,26 @@ void EditorSession::beginFilter(FilterKind kind)
     if (kind == FilterKind::gradientMap)
         settings.gradientMap = GradientMapSettings{AdjustmentColor(foregroundColor()), AdjustmentColor(m_backgroundColor)};
     try {
-        // Content-Aware Fill extends the layer over the selection's reach.
-        std::optional<QRectF> area;
+        // An empty layer has no pixels: Vignette starts them clear.
+        const bool startedEmpty = !layer.asset;
+        if (startedEmpty) {
+            const QImage clear = BrushRaster::context(std::max(1, int(std::round(layer.transform.size.width()))),
+                                                      std::max(1, int(std::round(layer.transform.size.height()))), false);
+            layer.asset = ImportedImage(clear, PixelAdjust::thumbnail(clear), layer.name);
+        }
+        // Fill reaches the selection; Vignette the canvas it frames.
+        const QRectF canvas(QPointF(0, 0), size);
+        const bool fillsCanvas = kind == FilterKind::vignette && startedEmpty;
+        std::optional<QRectF> area = fillsCanvas ? std::optional(canvas) : std::nullopt;
         if (kind == FilterKind::contentAwareFill && current) {
-            const QRectF box = current->path.boundingRect().intersected(QRectF(QPointF(0, 0), size));
+            const QRectF box = current->path.boundingRect().intersected(canvas);
             if (!box.isEmpty())
                 area = box;
         }
         m_filterEdit.emplace(kind, layer, current ? std::optional(current->clip(size)) : std::nullopt, settings, area);
+        if (fillsCanvas)
+            m_filterEdit->canvas = canvas;
+        m_filterEdit->startedEmpty = startedEmpty;
         updateFilter(m_filterEdit->settings, true);
     } catch (const ProjectError &error) {
         setBrushError(QString::fromUtf8(error.what()));
@@ -239,9 +251,11 @@ void EditorSession::commitFilter(std::function<void()> done)
     // A painted layer flattens in the worker, which catches failures.
     m_filterCommit.setFuture(QtConcurrent::run([kind = edit.kind, original = edit.original, grownImage = edit.grownImage, settings = rendered,
                                                 selection = edit.selection, mapping = edit.mapping, seed = edit.seed, cached,
-                                                grown = edit.grownTransform, spreads]() -> FilterMade {
+                                                grown = edit.grownTransform, spreads, canvas = edit.canvas]() -> FilterMade {
         try {
-            QImage image = cached ? *cached : PixelFilter::run(FilterJob{kind, grownImage ? *grownImage : original.image(), settings, 1, selection, mapping, seed});
+            FilterJob job{kind, grownImage ? *grownImage : original.image(), settings, 1, selection, mapping, seed};
+            job.canvas = canvas;
+            QImage image = cached ? *cached : PixelFilter::run(job);
             std::optional<LayerTransform> placed = grown;
             // A blur is cut back to the pixels it left.
             if (spreads && grown) {
@@ -316,7 +330,9 @@ void EditorSession::finishFilterCommit()
         return;
     }
     const ImageLayer current = m_document->layers[index];
-    if (!current.asset || current.asset->identity() != edit.original.identity() || current.transform != edit.transform) {
+    // An empty layer the filter began on stays empty.
+    const bool kept = current.asset ? current.asset->identity() == edit.original.identity() : edit.startedEmpty;
+    if (!kept || current.transform != edit.transform) {
         finish();
         return;
     }

@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/ColorPalette.h"
 #include "Document/TypeTool.h"
 #include "UI/ToolHeaderStyle.h"
 #include <QComboBox>
@@ -74,4 +75,5 @@ private:
     QPushButton *const m_cancel;
     QPushButton *const m_done;
     QPushButton *const m_edit;
+    std::optional<PaletteColor> m_pickerColour;
 };

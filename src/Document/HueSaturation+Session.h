@@ -1,6 +1,7 @@
 // Swift's HueSaturation extension.
 public:
     bool canAdjustColors() const;
+    bool canVignette() const;
     void beginHueSaturation();
     // Previews coalesce: the newest waits for the running one.
     void updateHueSaturation(const HueSaturationSettings &settings, bool preview);
@@ -21,6 +22,7 @@ public:
     void setHueTargeting(bool targeting);
 
 private:
+    bool canAdjust(bool allowingEmpty) const;
     void renderPendingHuePreview();
     void finishHueSaturationPreview();
     void finishHueSaturationCommit();

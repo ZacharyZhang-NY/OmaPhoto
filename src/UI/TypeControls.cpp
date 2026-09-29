@@ -272,6 +272,12 @@ QToolButton *TypeControls::alignment(TextAlignment value)
 
 void TypeControls::synchronize()
 {
+    // Swift's onChange: open text previews the picker's colour.
+    const std::optional<PaletteColor> picked = m_session.colorPicker() ? std::optional(m_session.colorPicker()->color()) : std::nullopt;
+    if (picked != m_pickerColour) {
+        m_pickerColour = picked;
+        m_session.previewTextColor();
+    }
     const LayerTextStyle style = m_session.currentTextStyle();
     m_font->sync(style.fontName);
     for (size_t index = 0; index < m_alignments.size(); ++index)

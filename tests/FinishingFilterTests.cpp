@@ -158,7 +158,8 @@ void FinishingFilterTests::theKernelsTakeTheSettingsAtTheScale()
     FilterSettings vignette{.vignetteAmount = 70, .vignetteColor = AdjustmentColor(0.2, 0.9, 0.4), .vignetteMidpoint = 30,
                             .vignetteRoundness = -40, .vignetteFeather = 20, .vignetteHighlights = 60};
     QImage expected = source.copy();
-    adjust_colored_vignette(expected.bits(), 40, 30, size_t(expected.bytesPerLine()), 70, 30, -40, 20, 60, 0.2, 0.9, 0.4);
+    // The layer's own pixels frame it; clear ones stay clear.
+    adjust_colored_vignette(expected.bits(), 40, 30, size_t(expected.bytesPerLine()), 0, 0, 40, 30, 0, 70, 30, -40, 20, 60, 0.2, 0.9, 0.4);
     QCOMPARE(run(FilterKind::vignette, source, vignette, 3), expected);
     // Tonal Contrast: its base blurred at radius times scale.
     const FilterSettings tonal{.tonalAmount = 80, .tonalRadius = 3, .tonalShadows = -30, .tonalMidtones = 70, .tonalHighlights = 45};
@@ -181,7 +182,7 @@ void FinishingFilterTests::settingsKeepSwiftsDefaultsAndBounds()
 {
     const FilterSettings defaults;
     QVERIFY(defaults.vignetteAmount == 35 && defaults.vignetteColor == AdjustmentColor(0, 0, 0) && defaults.vignetteMidpoint == 50);
-    QVERIFY(defaults.vignetteRoundness == 0 && defaults.vignetteFeather == 60 && defaults.vignetteHighlights == 25);
+    QVERIFY(defaults.vignetteRoundness == 100 && defaults.vignetteFeather == 60 && defaults.vignetteHighlights == 25);
     QVERIFY(defaults.bloomAmount == 40 && defaults.bloomRadius == 24);
     QVERIFY(defaults.tonalAmount == 50 && defaults.tonalRadius == 16 && defaults.tonalShadows == 40 && defaults.tonalMidtones == 60);
     QCOMPARE(defaults.tonalHighlights, 30.0);

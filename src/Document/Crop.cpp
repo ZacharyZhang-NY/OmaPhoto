@@ -188,8 +188,12 @@ std::optional<double> EditorSession::cropRatio() const
         return 1;
     if (m_cropRatioChoice == QStringLiteral("4:3"))
         return 4.0 / 3;
+    if (m_cropRatioChoice == QStringLiteral("3:4"))
+        return 3.0 / 4;
     if (m_cropRatioChoice == QStringLiteral("16:9"))
         return 16.0 / 9;
+    if (m_cropRatioChoice == QStringLiteral("9:16"))
+        return 9.0 / 16;
     return std::nullopt;
 }
 

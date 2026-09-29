@@ -19,7 +19,8 @@ CropControls::CropControls(EditorSession &session, QWidget *parent)
     pickerRow->addWidget(label);
     pickerRow->addWidget(m_ratio, 1);
     m_ratio->setObjectName(QStringLiteral("cropRatio"));
-    for (const QString &choice : {QStringLiteral("Free"), QStringLiteral("Original"), QStringLiteral("1:1"), QStringLiteral("4:3"), QStringLiteral("16:9")})
+    for (const QString &choice : {QStringLiteral("Free"), QStringLiteral("Original"), QStringLiteral("1:1"), QStringLiteral("4:3"), QStringLiteral("3:4"), QStringLiteral("16:9"),
+                                  QStringLiteral("9:16")})
         m_ratio->addItem(choice);
     // Swift's onChange: the frame takes a ratio that changed.
     connect(m_ratio, &QComboBox::activated, this, [this](int index) {

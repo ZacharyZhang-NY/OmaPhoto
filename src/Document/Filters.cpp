@@ -68,7 +68,7 @@ FilterSettings FilterSettings::normalized() const
     result.vignetteAmount = clamp(vignetteAmount, 0, 100, 35);
     result.vignetteColor = vignetteColor.clamped();
     result.vignetteMidpoint = clamp(vignetteMidpoint, 0, 100, 50);
-    result.vignetteRoundness = clamp(vignetteRoundness, -100, 100, 0);
+    result.vignetteRoundness = clamp(vignetteRoundness, -100, 100, 100);
     result.vignetteFeather = clamp(vignetteFeather, 0, 100, 60);
     result.vignetteHighlights = clamp(vignetteHighlights, 0, 100, 25);
     result.bloomAmount = clamp(bloomAmount, 0, 100, 40);
@@ -167,12 +167,16 @@ QImage PixelFilter::run(const FilterJob &job)
         noise_add_at(image.bits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), float(settings.amount), settings.gaussian ? 1 : 0,
                      settings.monochromatic ? 1 : 0, job.seed, int64_t(std::floor(job.noiseOrigin.x())), int64_t(std::floor(job.noiseOrigin.y())));
         break;
-    case FilterKind::vignette:
+    case FilterKind::vignette: {
         image = drawn(job.image);
-        adjust_colored_vignette(image.bits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), settings.vignetteAmount,
+        // The canvas in this image's pixels, else the image itself.
+        const QRectF frame = job.canvas ? job.mapping.inverted().mapRect(*job.canvas) : QRectF(0, 0, width, height);
+        adjust_colored_vignette(image.bits(), size_t(width), size_t(height), size_t(image.bytesPerLine()), frame.x(), frame.y(), frame.width(),
+                                frame.height(), job.canvas ? 1 : 0, settings.vignetteAmount,
                                 settings.vignetteMidpoint, settings.vignetteRoundness, settings.vignetteFeather, settings.vignetteHighlights,
                                 settings.vignetteColor.red, settings.vignetteColor.green, settings.vignetteColor.blue);
         break;
+    }
     case FilterKind::bloomGlow: image = bloom(drawn(job.image), settings.bloomRadius * job.scale, settings.bloomAmount / 50); break;
     case FilterKind::tonalContrast: {
         // The detail's base: the layer softened, clear past its edge.
@@ -306,7 +310,9 @@ FilterJob FilterEdit::previewJob() const
                      rawPanel.showsShadowClipping,
                      rawPanel.showsHighlightClipping,
                      rawPanel.pointColorVisualizeIndex(settings.cameraRaw),
-                     rawPanel.sharpenMask};
+                     rawPanel.sharpenMask,
+                     {},
+                     canvas};
 }
 
 FilterSettings FilterEdit::renderSettings() const

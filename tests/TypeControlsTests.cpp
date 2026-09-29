@@ -43,6 +43,7 @@ private slots:
     void theButtonsFollowTheDraft();
     void theBarRestsWithoutADocumentOrWhileBusy();
     void aTextRowShowsAndOpensItsText();
+    void thePickersColourPreviewsOnOpenText();
 };
 
 void TypeControlsTests::theBarShowsTheStyleItEdits()
@@ -453,6 +454,20 @@ void TypeControlsTests::aTextRowShowsAndOpensItsText()
     QCOMPARE(session.renamingLayerID(), std::optional(text));
     QTest::keyClick(textRow.findChild<QLineEdit *>("layerNameEditor"), Qt::Key_Escape);
     QVERIFY(!session.renamingLayerID());
+}
+
+void TypeControlsTests::thePickersColourPreviewsOnOpenText()
+{
+    // Swift's onChange: each working colour reaches the draft.
+    Bar shown;
+    shown.session.beginText(QPointF(20, 30));
+    shown.session.openTextColorPicker();
+    PickerHSB hsb = shown.session.colorPicker().value().hsb;
+    hsb.setRGB(PaletteColor{1, 0, 0});
+    shown.session.setColorPickerHSB(hsb);
+    QCOMPARE(shown.session.textDraft().value().style.red, 1.0);
+    shown.session.closeColorPicker(false);
+    QCOMPARE(shown.session.textDraft().value().style.red, 0.0);
 }
 
 QTEST_MAIN(TypeControlsTests)

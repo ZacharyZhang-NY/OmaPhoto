@@ -1,5 +1,6 @@
 #include "CanvasFixtures.h"
 #include "CropFixtures.h"
+#include "SelectionFixtures.h"
 #include "Document/Crop.h"
 #include "IO/ImageExporter.h"
 #include <QPainter>
@@ -11,6 +12,7 @@
 class CropTests : public QObject {
     Q_OBJECT
 private slots:
+    void theFrameStartsAtTheSelection();
     void dragGeometrySupportsReverseRatioMoveAndEveryHandle();
     void cropTranslatesWithoutResamplingAndUndoRestoresBounds();
     void sameSizeOffsetCropAndExpansionUseExactBounds();
@@ -279,7 +281,7 @@ void CropTests::ratiosReshapeTheFrameAboutItsMiddle()
     session.selectTool(NavigationTool::crop);
     session.setCropRect(QRectF(10, 20, 120, 60));
     const std::pair<const char *, std::optional<double>> ratios[] = {
-        {"Original", 1.5}, {"1:1", 1.0}, {"4:3", 4.0 / 3}, {"16:9", 16.0 / 9}, {"Free", std::nullopt}};
+        {"Original", 1.5}, {"1:1", 1.0}, {"4:3", 4.0 / 3}, {"3:4", 0.75}, {"16:9", 16.0 / 9}, {"9:16", 9.0 / 16}, {"Free", std::nullopt}};
     for (const auto &[choice, ratio] : ratios) {
         session.setCropRatioChoice(QString::fromLatin1(choice));
         QCOMPARE(session.cropRatio(), ratio);
@@ -314,6 +316,69 @@ void CropTests::ratiosReshapeTheFrameAboutItsMiddle()
     empty.selectTool(NavigationTool::crop);
     QCOMPARE(empty.cropRect(), std::nullopt);
     QCOMPARE(empty.visibleCropRect(), std::nullopt);
+}
+
+void CropTests::theFrameStartsAtTheSelection()
+{
+    // Swift 1.2.5 (5ece82b): C, then Return, crops to the selection.
+    EditorSession session;
+    session.createDocument(300, 200);
+    session.applySelection(rectPath(QRectF(10.3, 20.6, 50.2, 30)), SelectionMode::replace, QStringLiteral("Select"));
+    session.selectTool(NavigationTool::crop);
+    // Rounded out to whole pixels.
+    QCOMPARE(session.cropRect(), std::optional(QRectF(10, 20, 51, 31)));
+    QCOMPARE(session.cropRatioChoice(), QString("Free"));
+    // A frame already drawn stays as it is.
+    session.setCropRect(QRectF(0, 0, 40, 40));
+    session.selectTool(NavigationTool::crop);
+    QCOMPARE(session.cropRect(), std::optional(QRectF(0, 0, 40, 40)));
+    session.cancelCrop();
+    // Past the canvas, the frame keeps to it.
+    session.selectTool(NavigationTool::move);
+    session.applySelection(rectPath(QRectF(280, 190, 50, 50)), SelectionMode::replace, QStringLiteral("Select"));
+    session.selectTool(NavigationTool::crop);
+    QCOMPARE(session.cropRect(), std::optional(QRectF(280, 190, 20, 10)));
+    session.cancelCrop();
+    // Nudged partly off the canvas, the frame keeps to it.
+    session.selectTool(NavigationTool::move);
+    session.applySelection(rectPath(QRectF(270, 20, 20, 20)), SelectionMode::replace, QStringLiteral("Select"));
+    session.nudgeSelection(20, 0);
+    QCOMPARE(session.selection().value().path.controlPointRect(), QRectF(290, 20, 20, 20));
+    session.selectTool(NavigationTool::crop);
+    QCOMPARE(session.cropRect(), std::optional(QRectF(290, 20, 10, 20)));
+    session.cancelCrop();
+    // Wholly off it, the frame is the canvas.
+    session.selectTool(NavigationTool::move);
+    session.nudgeSelection(20, 0);
+    session.selectTool(NavigationTool::crop);
+    QCOMPARE(session.cropRect(), std::optional(QRectF(0, 0, 300, 200)));
+    session.cancelCrop();
+    // An empty selection starts at the whole canvas.
+    session.selectTool(NavigationTool::move);
+    session.applySelection(rectPath(QRectF(10, 10, 10, 10)), SelectionMode::replace, QStringLiteral("Select"));
+    session.applySelection(rectPath(QRectF(0, 0, 100, 40)), SelectionMode::subtract, QStringLiteral("Subtract"));
+    QVERIFY(session.selection().value().isEmpty());
+    session.selectTool(NavigationTool::crop);
+    QCOMPARE(session.cropRect(), std::optional(QRectF(0, 0, 300, 200)));
+    session.cancelCrop();
+    // An empty line between rows would round to a row.
+    session.selectTool(NavigationTool::move);
+    QPainterPath line(QPointF(10, 5.5));
+    line.lineTo(20, 5.5);
+    session.setSelection(DocumentSelection{line}, QStringLiteral("Select"));
+    QVERIFY(session.selection().value().isEmpty());
+    session.selectTool(NavigationTool::crop);
+    QCOMPARE(session.cropRect(), std::optional(QRectF(0, 0, 300, 200)));
+    session.cancelCrop();
+    // A turned ellipse: its curve, not its control points.
+    session.selectTool(NavigationTool::move);
+    QPainterPath ellipse;
+    ellipse.addEllipse(QRectF(60, 60, 120, 40));
+    const QTransform turn = QTransform::fromTranslate(120, 80).rotate(45).translate(-120, -80);
+    session.setSelection(DocumentSelection{turn.map(ellipse)}, QStringLiteral("Select"));
+    QVERIFY(session.selection().value().path.controlPointRect().width() > 95);
+    session.selectTool(NavigationTool::crop);
+    QCOMPARE(session.cropRect(), std::optional(QRectF(75, 35, 90, 90)));
 }
 
 QTEST_GUILESS_MAIN(CropTests)

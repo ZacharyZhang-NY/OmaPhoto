@@ -336,7 +336,8 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
             : gradient && gradient->raster->layer.id == id                   ? gradient->raster.get()
             : move && move->raster->layer.id == id                           ? move->raster.get()
                                                                              : nullptr;
-        if (!layer.asset && !stroke)
+        // An empty layer draws nothing, unless Vignette previews onto it.
+        if (!layer.asset && !stroke && !(m_session.filterEdit() && m_session.filterEdit()->previewImage(id)))
             return;
         // Smudge or Liquify under way: the reshaped copy, canvas-wide.
         if (const WarpStroke *warp = m_session.warpStroke(); warp && warp->layer.id == id) {

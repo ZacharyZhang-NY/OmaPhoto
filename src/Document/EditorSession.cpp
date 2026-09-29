@@ -1,4 +1,5 @@
 #include "Document/EditorSession.h"
+#include "Document/Crop.h"
 #include "Logging.h"
 #include <cmath>
 
@@ -146,10 +147,19 @@ void EditorSession::selectTool(NavigationTool value)
         m_brushSettings.opacity = parked.opacity;
     }
     m_tool = value;
-    // The Crop tool opens on the whole canvas, freely.
+    // The Crop tool opens freely: the selection, else the canvas.
     if (value == NavigationTool::crop && !m_cropRect && m_document) {
         m_cropRatioChoice = QStringLiteral("Free");
-        m_cropRect = QRectF(QPointF(0, 0), m_document->size());
+        const QRectF canvas(QPointF(0, 0), m_document->size());
+        m_cropRect = canvas;
+        if (m_document->selection && !m_document->selection->isEmpty()) {
+            // CoreGraphics' `integral`: whole pixels, rounded outwards.
+            const QRectF box = m_document->selection->path.boundingRect();
+            const QRectF whole = QRectF(QPointF(std::floor(box.left()), std::floor(box.top())), QPointF(std::ceil(box.right()), std::ceil(box.bottom())))
+                                     .intersected(canvas);
+            if (CropGeometry::valid(whole))
+                m_cropRect = whole;
+        }
     }
     notify();
 }

@@ -57,5 +57,11 @@ struct ColorPickerState {
     PickerHSB hsb;
     // Swift's object identity: a new picker opens its panel anew.
     QUuid id = QUuid::createUuid();
+    // The foreground picker over open text: that text, its colour.
+    struct EditedText {
+        QUuid draftID;
+        PaletteColor color;
+    };
+    std::optional<EditedText> editedText;
     PaletteColor color() const { return hsb.rgb().quantized(); }
 };

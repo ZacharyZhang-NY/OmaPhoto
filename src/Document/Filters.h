@@ -54,7 +54,7 @@ struct FilterSettings {
     double vignetteAmount = 35;
     AdjustmentColor vignetteColor = AdjustmentColor(0, 0, 0);
     double vignetteMidpoint = 50;
-    double vignetteRoundness = 0;
+    double vignetteRoundness = 100;
     double vignetteFeather = 60;
     double vignetteHighlights = 25;
     // Bloom / Glow: strength, and blur radius in layer pixels.
@@ -106,6 +106,8 @@ struct FilterJob {
     bool showsSharpenMask = false;
     // A live adjustment's noise field, fixed in its region's pixels.
     QPointF noiseOrigin{};
+    // Vignette on an empty layer: the canvas it fills.
+    std::optional<QRectF> canvas = std::nullopt;
 };
 
 // Swift's PixelFilter.
@@ -172,6 +174,10 @@ public:
     quint64 previewSourceVersion = 0;
     std::optional<FilterJob> pending;
     CameraRawPanel rawPanel;
+    // Vignette on an empty layer: the canvas it fills.
+    std::optional<QRectF> canvas;
+    // The layer had no pixels: the filter began clear.
+    bool startedEmpty = false;
 
 private:
     void grow(const QRectF &extent);
