@@ -120,7 +120,8 @@ void SelectionAmountSheetTests::theBarFeathersByItsAmount()
     QVERIFY(QTest::qWaitForWindowExposed(&controls));
     auto &feather = find<QPushButton>(controls, "featherSelection");
     auto &amount = find<QLineEdit>(controls, "selectionFeatherAmount");
-    QVERIFY(!feather.isEnabled() && !amount.isEnabled());
+    // Swift rests the button alone; the amount stays editable.
+    QVERIFY(!feather.isEnabled() && amount.isEnabled());
     QCOMPARE(amount.text(), QString("2"));
     lasso(*session, square(20, 20, 40));
     QVERIFY(feather.isEnabled() && amount.isEnabled());

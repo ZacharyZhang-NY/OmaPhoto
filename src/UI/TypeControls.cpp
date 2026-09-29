@@ -8,6 +8,7 @@
 #include <QComboBox>
 #include <QFocusEvent>
 #include <QHBoxLayout>
+#include "UI/NumericScrub.h"
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
@@ -59,6 +60,11 @@ void TextStyleField::sync()
 {
     if (!hasFocus() && !m_borrowed)
         setText(m_shown());
+}
+
+void TextStyleField::showValue()
+{
+    setText(m_shown());
 }
 
 void TextStyleField::keyPressEvent(QKeyEvent *event)
@@ -211,8 +217,19 @@ TypeControls::TypeControls(EditorSession &session, QWidget *parent)
     aligned->setSpacing(2);
     for (QToolButton *button : m_alignments)
         aligned->addWidget(button);
-    for (QWidget *widget : std::initializer_list<QWidget *>{m_font, m_size, new QLabel(QStringLiteral("px")), m_colour, alignments, new QLabel(QStringLiteral("Tracking")),
-                                                             m_tracking, new QLabel(QStringLiteral("Leading")), m_leading})
+    // Swift's scrubbable size unit, tracking and leading: whole numbers.
+    const auto scrub = [this](const QString &text, TextStyleField *shown, double low, double high, double LayerTextStyle::*key) {
+        auto *label = new QLabel(text);
+        new NumericScrub(label, {.sensitivity = 1, .low = low, .high = high, .step = 1,
+                                 .value = [this, key] { return m_session.currentTextStyle().*key; }, .set = [this, shown, key](double value) {
+                                     m_session.changeTextStyle([&](LayerTextStyle &style) { style.*key = value; });
+                                     shown->showValue();
+                                 }});
+        return label;
+    };
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_font, m_size, scrub(QStringLiteral("px"), m_size, 1, 2000, &LayerTextStyle::fontSize), m_colour, alignments,
+                                                             scrub(QStringLiteral("Tracking"), m_tracking, -100, 1000, &LayerTextStyle::tracking), m_tracking,
+                                                             scrub(QStringLiteral("Leading"), m_leading, 0, 5000, &LayerTextStyle::leading), m_leading})
         fields->addWidget(widget);
     // Swift's scroll content keeps its size at the leading edge.
     fields->addStretch(1);

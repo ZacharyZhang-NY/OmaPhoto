@@ -1,4 +1,5 @@
 #include "UI/NavigationToolHeader.h"
+#include "UI/NumericScrub.h"
 #include <QKeyEvent>
 #include <QRegularExpression>
 #include <cmath>
@@ -12,6 +13,9 @@ NavigationToolHeader::NavigationToolHeader(EditorSession &session, QWidget *pare
     m_zoom->setFixedWidth(72);
     m_zoom->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_zoom->installEventFilter(this);
+    // Swift's scrubbable unit: a drag sideways zooms.
+    new NumericScrub(m_unit, {.sensitivity = 1, .low = 0.1, .high = 3200, .step = std::nullopt,
+                              .value = [this] { return m_session.viewport.zoom() * 100; }, .set = [this](double percent) { step(percent); }});
     // The unit sits tight against its field: one value.
     auto *value = new QHBoxLayout;
     value->setSpacing(2);

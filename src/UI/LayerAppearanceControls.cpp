@@ -1,5 +1,6 @@
 #include "UI/LayerAppearanceControls.h"
 #include "UI/BlendModePicker.h"
+#include "UI/NumericScrub.h"
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -34,7 +35,16 @@ LayerAppearanceControls::LayerAppearanceControls(EditorSession &session, QWidget
     column->addLayout(blend);
     auto *opacity = new QHBoxLayout;
     opacity->setSpacing(6);
-    opacity->addWidget(caption(QStringLiteral("Opacity"), this));
+    QLabel *name = caption(QStringLiteral("Opacity"), this);
+    // A scrub is one opacity drag, as the slider's.
+    m_scrub = new NumericScrub(name, {.sensitivity = 1, .low = 0, .high = 100, .step = std::nullopt,
+                            .value = [this] {
+                                const std::optional<ImageLayer> active = m_session.activeLayer();
+                                return (active ? active->opacity : 1) * 100;
+                            },
+                            .set = [this](double percent) { step(percent); }, .onStart = [this] { m_session.beginOpacityEdit(); },
+                            .onEnd = [this] { m_session.finishOpacityEdit(); }});
+    opacity->addWidget(name);
     // A thousandth a step; a drag is one undo step.
     m_slider->setRange(0, 1000);
     m_slider->setObjectName(QStringLiteral("opacitySlider"));
@@ -87,6 +97,8 @@ void LayerAppearanceControls::synchronize()
     if (m_layerID != m_session.activeLayerID()) {
         // Leaving applies to the old layer only; it is gone.
         m_percentage->clearFocus();
+        // Swift's `.id` drops a scrub under way.
+        m_scrub->end();
         m_layerID = m_session.activeLayerID();
         sync();
     } else if (!m_percentage->hasFocus()) {

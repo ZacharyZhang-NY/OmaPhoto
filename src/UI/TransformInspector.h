@@ -9,15 +9,20 @@
 #include <QToolButton>
 #include <functional>
 
+class NumericScrub;
+
 // A labelled number, typed at once, stepped by arrows.
 class TransformValueField : public QWidget {
     Q_OBJECT
 public:
-    TransformValueField(const QString &label, const QString &suffix, EditorSession &session, std::function<void(double)> change,
-                        QWidget *parent = nullptr);
+    // The label scrubs within low and high, in whole steps.
+    TransformValueField(const QString &label, const QString &suffix, double low, double high, EditorSession &session,
+                        std::function<void(double)> change, QWidget *parent = nullptr);
 
     // Shown when the field is not being edited.
     void sync(double value);
+    // Swift's `.id` drops a scrub under way with its layer.
+    void endScrub();
     // No idle zeros on a whole number, two decimals otherwise.
     static QString formatted(double value);
 
@@ -29,6 +34,7 @@ protected:
 private:
     EditorSession &m_session;
     const std::function<void(double)> m_change;
+    NumericScrub *m_scrub = nullptr;
     double m_value = 0;
     // A menu or popup borrows the focus: the typing stays.
     bool m_borrowed = false;

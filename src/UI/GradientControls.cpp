@@ -1,6 +1,7 @@
 #include "UI/GradientControls.h"
 #include "Document/EditorSession.h"
 #include "UI/LassoControls.h"
+#include "UI/NumericScrub.h"
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
@@ -87,7 +88,14 @@ GradientControls::GradientControls(EditorSession &session, QWidget *parent)
     m_apply->setObjectName(QStringLiteral("gradientApply"));
     connect(m_cancel, &QPushButton::clicked, this, [this] { m_session.cancelGradient(); });
     connect(m_apply, &QPushButton::clicked, this, [this] { m_session.commitGradient(); });
-    for (QWidget *widget : std::initializer_list<QWidget *>{m_linear, m_radial, m_swatch, m_style, m_reverse, new QLabel(QStringLiteral("Opacity"), this),
+    auto *opacity = new QLabel(QStringLiteral("Opacity"), this);
+    new NumericScrub(opacity, {.sensitivity = 0.01, .low = 0.01, .high = 1, .step = std::nullopt,
+                               .value = [this] { return m_session.gradientSettings().opacity; },
+                               .set = [this](double value) {
+                                   changeGradient(m_session, [value](GradientSettings &gradient) { gradient.opacity = value; });
+                                   m_opacity->showValue();
+                               }});
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_linear, m_radial, m_swatch, m_style, m_reverse, opacity,
                                                              m_opacitySlider, m_opacity, new QLabel(QStringLiteral("%"), this)})
         row->insertWidget(row->count() - 1, widget);
     for (QWidget *widget : std::initializer_list<QWidget *>{m_mask, m_cancel, m_apply})

@@ -1,5 +1,6 @@
 #pragma once
 #include "Document/ShapeTool.h"
+#include "UI/NumericScrub.h"
 #include "UI/ToolHeaderStyle.h"
 #include <array>
 
@@ -19,7 +20,7 @@ public:
 private:
     QToolButton *kind(ShapeKind value);
     // A label, slider, field and "px", as Swift's HStack.
-    QWidget *amount(const QString &name, QSlider *slider, SelectionAmountField *field);
+    QWidget *amount(const QString &name, QSlider *slider, SelectionAmountField *field, NumericScrub::Options scrub);
     void synchronize();
 
     EditorSession &m_session;

@@ -16,10 +16,14 @@ ShapeControls::ShapeControls(EditorSession &session, QWidget *parent)
       m_widthSlider(new QSlider(Qt::Horizontal, this)),
       m_widthField(new SelectionAmountField(session, 1, 5000, [this] { return m_session.shapeLineWidth(); },
                                             [this](double width) { m_session.setShapeLineWidth(width); }, this)),
-      m_width(amount(QStringLiteral("Width"), m_widthSlider, m_widthField)), m_radiusSlider(new QSlider(Qt::Horizontal, this)),
+      m_width(amount(QStringLiteral("Width"), m_widthSlider, m_widthField,
+                     {.sensitivity = 1, .low = 1, .high = 5000, .step = std::nullopt, .value = [this] { return m_session.shapeLineWidth(); },
+                      .set = [this](double width) { m_session.setShapeLineWidth(width); }})), m_radiusSlider(new QSlider(Qt::Horizontal, this)),
       m_radiusField(new SelectionAmountField(session, 0, 5000, [this] { return m_session.shapeCornerRadius(); },
                                              [this](double radius) { m_session.setShapeCornerRadius(radius); }, this)),
-      m_radius(amount(QStringLiteral("Radius"), m_radiusSlider, m_radiusField)),
+      m_radius(amount(QStringLiteral("Radius"), m_radiusSlider, m_radiusField,
+                      {.sensitivity = 1, .low = 0, .high = 5000, .step = std::nullopt, .value = [this] { return m_session.shapeCornerRadius(); },
+                       .set = [this](double radius) { m_session.setShapeCornerRadius(radius); }})),
       m_fill(new SwatchButton([&session] { return session.foregroundColor(); }, 3, 0, 0.5, this))
 {
     m_widthSlider->setObjectName(QStringLiteral("shapeWidthSlider"));
@@ -65,7 +69,7 @@ QToolButton *ShapeControls::kind(ShapeKind value)
     return button;
 }
 
-QWidget *ShapeControls::amount(const QString &name, QSlider *slider, SelectionAmountField *field)
+QWidget *ShapeControls::amount(const QString &name, QSlider *slider, SelectionAmountField *field, NumericScrub::Options scrub)
 {
     auto *group = new QWidget(this);
     auto *layout = new QHBoxLayout(group);
@@ -73,7 +77,14 @@ QWidget *ShapeControls::amount(const QString &name, QSlider *slider, SelectionAm
     layout->setSpacing(6);
     slider->setFixedWidth(100);
     field->setFixedWidth(48);
-    for (QWidget *widget : std::initializer_list<QWidget *>{new QLabel(name, group), slider, field, new QLabel(QStringLiteral("px"), group)})
+    auto *label = new QLabel(name, group);
+    // A scrub shows its value over the field's typing.
+    scrub.set = [field, set = std::move(scrub.set)](double value) {
+        set(value);
+        field->showValue();
+    };
+    new NumericScrub(label, std::move(scrub));
+    for (QWidget *widget : std::initializer_list<QWidget *>{label, slider, field, new QLabel(QStringLiteral("px"), group)})
         layout->addWidget(widget);
     return group;
 }

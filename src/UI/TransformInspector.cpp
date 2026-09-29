@@ -1,13 +1,14 @@
 #include "UI/TransformInspector.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/LayerIcons.h"
+#include "UI/NumericScrub.h"
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <cmath>
 
-TransformValueField::TransformValueField(const QString &label, const QString &suffix, EditorSession &session, std::function<void(double)> change,
-                                         QWidget *parent)
+TransformValueField::TransformValueField(const QString &label, const QString &suffix, double low, double high, EditorSession &session,
+                                         std::function<void(double)> change, QWidget *parent)
     : QWidget(parent), field(new QLineEdit(this)), m_session(session), m_change(std::move(change))
 {
     auto *row = new QHBoxLayout(this);
@@ -16,6 +17,11 @@ TransformValueField::TransformValueField(const QString &label, const QString &su
     auto *name = new QLabel(label, this);
     name->setFont(ToolHeaderStyle::controlFont());
     name->setForegroundRole(QPalette::PlaceholderText);
+    // A scrub writes over typing; an unfocused field then follows.
+    m_scrub = new NumericScrub(name, {.sensitivity = 1, .low = low, .high = high, .step = 1, .value = [this] { return m_value; }, .set = [this](double value) {
+                                field->setText(formatted(value));
+                                m_change(value);
+                            }});
     row->addWidget(name);
     field->setObjectName(QStringLiteral("transform") + label);
     field->setAccessibleName(label);
@@ -42,6 +48,11 @@ void TransformValueField::sync(double value)
     m_value = value;
     if (!field->hasFocus() && !m_borrowed)
         field->setText(formatted(value));
+}
+
+void TransformValueField::endScrub()
+{
+    m_scrub->end();
 }
 
 QString TransformValueField::formatted(double value)
@@ -79,15 +90,15 @@ bool TransformValueField::eventFilter(QObject *watched, QEvent *event)
 TransformInspector::TransformInspector(EditorSession &session, QWidget *parent)
     : ToolHeaderBar(QStringLiteral("Transform"), parent), m_session(session), m_autoSelect(new QCheckBox(QStringLiteral("Auto Select"), this)),
       m_showControls(new QCheckBox(QStringLiteral("Show Controls"), this)), m_fields(new QScrollArea(this)),
-      m_x(new TransformValueField(QStringLiteral("X"), QString(), session, [this](double number) { change([number](LayerTransform &value) { value.origin.setX(number); }); })),
-      m_y(new TransformValueField(QStringLiteral("Y"), QString(), session, [this](double number) { change([number](LayerTransform &value) { value.origin.setY(number); }); })),
-      m_width(new TransformValueField(QStringLiteral("W"), QString(), session, [this](double number) { resizeBox(number, true); })),
-      m_height(new TransformValueField(QStringLiteral("H"), QString(), session, [this](double number) { resizeBox(number, false); })),
+      m_x(new TransformValueField(QStringLiteral("X"), QString(), -30000, 30000, session, [this](double number) { change([number](LayerTransform &value) { value.origin.setX(number); }); })),
+      m_y(new TransformValueField(QStringLiteral("Y"), QString(), -30000, 30000, session, [this](double number) { change([number](LayerTransform &value) { value.origin.setY(number); }); })),
+      m_width(new TransformValueField(QStringLiteral("W"), QString(), 1, 30000, session, [this](double number) { resizeBox(number, true); })),
+      m_height(new TransformValueField(QStringLiteral("H"), QString(), 1, 30000, session, [this](double number) { resizeBox(number, false); })),
       m_lock(new QToolButton(this)),
-      m_scale(new TransformValueField(QStringLiteral("Scale"), QStringLiteral("%"), session, [this](double number) {
+      m_scale(new TransformValueField(QStringLiteral("Scale"), QStringLiteral("%"), 0.1, 30000, session, [this](double number) {
           change([&](LayerTransform &value) { value = value.scaled(number, pixelSize()); });
       })),
-      m_rotation(new TransformValueField(QStringLiteral("°"), QString(), session, [this](double number) {
+      m_rotation(new TransformValueField(QStringLiteral("°"), QString(), -360, 360, session, [this](double number) {
           change([number](LayerTransform &value) { value.rotation = std::fmod(number, 360.0); });
       })),
       m_sampling(new QComboBox(this)), m_cancel(new QPushButton(QStringLiteral("Cancel"), this)), m_apply(new QPushButton(QStringLiteral("Apply"), this))
@@ -239,6 +250,8 @@ void TransformInspector::synchronize()
         m_layerID = m_session.activeLayerID();
         if (QWidget *focused = focusWidget(); focused && isAncestorOf(focused))
             focused->clearFocus();
+        for (TransformValueField *field : {m_x, m_y, m_width, m_height, m_scale, m_rotation})
+            field->endScrub();
     }
     title->setText(m_session.transformTargetsMask() ? QStringLiteral("Transform Mask") : QStringLiteral("Transform"));
     const auto set = [](QAbstractButton *button, bool checked) {

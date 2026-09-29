@@ -20,6 +20,8 @@ public:
                    QWidget *parent);
     // Shows the session's number unless being edited.
     void sync();
+    // The session's number, over any typing: a scrub.
+    void showValue();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;

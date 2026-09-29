@@ -2,6 +2,7 @@
 #include "UI/KeyboardShortcuts.h"
 #include <QBoxLayout>
 #include <QFrame>
+#include "UI/NumericScrub.h"
 #include <QLabel>
 #include <QSignalBlocker>
 #include <QRegularExpressionValidator>
@@ -36,7 +37,7 @@ void SelectionAmountField::sync(int amount)
         setText(QString::number(amount));
 }
 
-void SelectionAmountField::apply()
+void SelectionAmountField::showValue()
 {
     setText(QString::number(m_amount));
 }
@@ -45,7 +46,7 @@ void SelectionAmountField::keyPressEvent(QKeyEvent *event)
 {
     // Return and Escape hand the canvas the keys.
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter || event->key() == Qt::Key_Escape) {
-        apply();
+        showValue();
         clearFocus();
         m_session.requestCanvasFocus();
         return;
@@ -64,7 +65,7 @@ void SelectionAmountField::focusOutEvent(QFocusEvent *event)
 {
     m_borrowed = event->reason() == Qt::MenuBarFocusReason || event->reason() == Qt::PopupFocusReason;
     if (!m_borrowed)
-        apply();
+        showValue();
     QLineEdit::focusOutEvent(event);
 }
 
@@ -115,12 +116,15 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
       m_antialias(new QCheckBox(QStringLiteral("Anti-alias"), this)), m_expand(new QPushButton(QStringLiteral("Expand"), this)),
       m_expandAmount(new SelectionAmountField(session, 1, 500, [this] { return double(m_session.selectionExpandAmount()); },
                                               [this](double amount) { m_session.setSelectionExpandAmount(int(std::lround(amount))); }, this)),
+      m_expandUnit(new QLabel(QStringLiteral("px"), this)),
       m_contract(new QPushButton(QStringLiteral("Contract"), this)),
       m_contractAmount(new SelectionAmountField(session, 1, 500, [this] { return double(m_session.selectionContractAmount()); },
                                                 [this](double amount) { m_session.setSelectionContractAmount(int(std::lround(amount))); }, this)),
+      m_contractUnit(new QLabel(QStringLiteral("px"), this)),
       m_feather(new QPushButton(QStringLiteral("Feather"), this)),
       m_featherAmount(new SelectionAmountField(session, 1, 250, [this] { return double(m_session.selectionFeatherAmount()); },
                                                [this](double amount) { m_session.setSelectionFeatherAmount(int(std::lround(amount))); }, this)),
+      m_featherUnit(new QLabel(QStringLiteral("px"), this)),
       m_empty(new QLabel(QStringLiteral("Empty selection"), this)), m_deselect(new QPushButton(QStringLiteral("Deselect"), this))
 {
     m_toleranceLabel->setFont(ToolHeaderStyle::controlFont());
@@ -169,13 +173,31 @@ LassoControls::LassoControls(EditorSession &session, QWidget *parent)
     m_empty->setForegroundRole(QPalette::PlaceholderText);
     m_deselect->setObjectName(QStringLiteral("deselect"));
     connect(m_deselect, &QPushButton::clicked, this, [this] { m_session.deselect(); });
+    // Swift's Int scrub rounds: a step of one.
+    const auto scrub = [](QWidget *label, SelectionAmountField *shown, double low, double high, std::function<double()> value,
+                          std::function<void(double)> set) {
+        new NumericScrub(label, {.sensitivity = 1, .low = low, .high = high, .step = 1, .value = std::move(value),
+                                 .set = [shown, set = std::move(set)](double amount) {
+                                     set(amount);
+                                     shown->showValue();
+                                 }});
+    };
+    scrub(m_toleranceLabel, m_tolerance, 0, 255, [this] { return double(m_session.wandSettings().tolerance); },
+          [this](double tolerance) { changeWand([tolerance](WandSettings &wand) { wand.tolerance = int(tolerance); }); });
+    scrub(m_edgeLabel, m_edge, -10, 10, [this] { return double(m_session.objectSelectionSettings().edgeOffset); },
+          [this](double edge) { changeObject([edge](ObjectSelectionSettings &object) { object.edgeOffset = int(edge); }); });
+    scrub(m_expandUnit, m_expandAmount, 1, 500, [this] { return double(m_session.selectionExpandAmount()); },
+          [this](double amount) { m_session.setSelectionExpandAmount(int(amount)); });
+    scrub(m_contractUnit, m_contractAmount, 1, 500, [this] { return double(m_session.selectionContractAmount()); },
+          [this](double amount) { m_session.setSelectionContractAmount(int(amount)); });
+    scrub(m_featherUnit, m_featherAmount, 1, 250, [this] { return double(m_session.selectionFeatherAmount()); },
+          [this](double amount) { m_session.setSelectionFeatherAmount(int(amount)); });
     // Swift's `unitSuffix`: a unit sits by each field.
     for (QWidget *widget : std::initializer_list<QWidget *>{m_rectangle, m_ellipse, m_wandMode, m_objectMode, m_freehand, m_polygonal, m_replace, m_add,
                                                              m_subtract, m_toleranceLabel, m_tolerance, m_sampleSize, m_thisLayer, m_allLayers, m_contiguous,
                                                              m_objectThisLayer, m_objectAllLayers, m_edgeLabel, m_edge, m_edgeUnit, m_antialias,
-                                                             divider, m_expand, m_expandAmount, new QLabel(QStringLiteral("px"), this), m_contract, m_contractAmount,
-                                                             new QLabel(QStringLiteral("px"), this), m_feather, m_featherAmount,
-                                                             new QLabel(QStringLiteral("px"), this)})
+                                                             divider, m_expand, m_expandAmount, m_expandUnit, m_contract, m_contractAmount,
+                                                             m_contractUnit, m_feather, m_featherAmount, m_featherUnit})
         row->insertWidget(row->count() - 1, widget);
     row->addWidget(m_empty);
     row->addWidget(m_deselect);
@@ -257,7 +279,7 @@ void LassoControls::synchronize()
     if (m_antialias->isChecked() != m_session.selectionAntialiased())
         m_antialias->setChecked(m_session.selectionAntialiased());
     const bool modifies = m_session.canModifySelection();
-    for (QWidget *widget : std::initializer_list<QWidget *>{m_expand, m_expandAmount, m_contract, m_contractAmount, m_feather, m_featherAmount})
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_expand, m_expandAmount, m_expandUnit, m_contract, m_contractAmount, m_contractUnit, m_feather})
         widget->setEnabled(modifies);
     m_expandAmount->sync(m_session.selectionExpandAmount());
     m_contractAmount->sync(m_session.selectionContractAmount());
@@ -286,6 +308,8 @@ SelectionAmountSheet::SelectionAmountSheet(EditorSession &session, SelectionAmou
     auto *title = new QLabel(QStringLiteral("Amount"), this);
     title->setMinimumWidth(60);
     title->setBuddy(m_slider);
+    new NumericScrub(title, {.sensitivity = 1, .low = 1, .high = double(m_maximum), .step = 1, .value = [this] { return double(amount().value_or(1)); },
+                             .set = [this](double value) { m_input->setText(QString::number(int(value))); }});
     m_slider->setObjectName(QStringLiteral("amountSlider"));
     m_slider->setRange(1, m_maximum);
     m_input->setObjectName(QStringLiteral("amountField"));

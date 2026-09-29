@@ -2,6 +2,7 @@
 #include "Document/EditorSession.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/LassoControls.h"
+#include "UI/NumericScrub.h"
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
@@ -95,13 +96,27 @@ BrushControls::BrushControls(EditorSession &session, QWidget *parent)
     m_colour->setToolTip(QStringLiteral("Foreground color"));
     m_colour->setAccessibleName(QStringLiteral("Foreground color"));
     connect(m_colour, &QAbstractButton::clicked, this, [this] { m_session.openColorPicker(false); });
+    // Swift's scrubbable labels: a drag sideways sets the value.
+    QLabel *size = label(QStringLiteral("Size"), this);
+    QLabel *hardness = label(QStringLiteral("Hardness"), this);
+    const auto scrub = [this](QLabel *name, SelectionAmountField *shown, double sensitivity, double low, double high, double BrushSettings::*key) {
+        new NumericScrub(name, {.sensitivity = sensitivity, .low = low, .high = high, .step = std::nullopt,
+                                .value = [this, key] { return m_session.brushSettings().*key; }, .set = [this, shown, key](double value) {
+                                    changeBrush(m_session, [&](BrushSettings &brush) { brush.*key = value; });
+                                    shown->showValue();
+                                }});
+    };
+    scrub(size, m_size, 1, 1, 2000, &BrushSettings::diameter);
+    scrub(hardness, m_hardness, 0.01, 0, 1, &BrushSettings::hardness);
+    scrub(m_opacityLabel, m_opacity, 0.01, 0.01, 1, &BrushSettings::opacity);
+    scrub(m_smoothingLabel, m_smoothing, 1, 0, 100, &BrushSettings::smoothing);
     std::vector<QWidget *> widgets{m_paint, m_erase};
     for (QAbstractButton *mode : m_blurModes->buttons())
         widgets.push_back(mode);
     for (QAbstractButton *type : m_healingTypes->buttons())
         widgets.push_back(type);
     widgets.insert(widgets.end(), {m_aligned, m_thisLayer, m_allLayers});
-    widgets.insert(widgets.end(), {label(QStringLiteral("Size"), this), m_size, label(QStringLiteral("px"), this), label(QStringLiteral("Hardness"), this),
+    widgets.insert(widgets.end(), {size, m_size, label(QStringLiteral("px"), this), hardness,
                                    m_hardnessSlider, m_hardness, label(QStringLiteral("%"), this), m_opacityLabel, m_opacitySlider, m_opacity,
                                    label(QStringLiteral("%"), this), m_smoothingLabel, m_smoothingSlider, m_smoothing, m_paintLabel, m_maskPaint, m_colourLabel, m_colour});
     for (QWidget *widget : widgets)

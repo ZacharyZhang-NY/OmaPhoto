@@ -18,14 +18,14 @@ public:
     SelectionAmountField(EditorSession &session, int low, int high, std::function<double()> value, std::function<void(double)> change,
                          QWidget *parent = nullptr);
     void sync(int amount);
+    // The session's number, over any typing: a step or scrub.
+    void showValue();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
 
 private:
-    void apply();
-
     EditorSession &m_session;
     const int m_low;
     const int m_high;
@@ -80,10 +80,14 @@ private:
     QCheckBox *const m_antialias;
     QPushButton *const m_expand;
     SelectionAmountField *const m_expandAmount;
+    // The units scrub their amounts, Swift's `unitSuffix`.
+    QLabel *const m_expandUnit;
     QPushButton *const m_contract;
     SelectionAmountField *const m_contractAmount;
+    QLabel *const m_contractUnit;
     QPushButton *const m_feather;
     SelectionAmountField *const m_featherAmount;
+    QLabel *const m_featherUnit;
     QLabel *const m_empty;
     QPushButton *const m_deselect;
 };
