@@ -220,6 +220,13 @@ std::optional<QRectF> TextLines::caret(int position) const
     return QRectF(x, *line * m_lineHeight, 1, m_lineHeight);
 }
 
+double TextLines::baseline(int line) const
+{
+    const Line &laid = m_lineList[size_t(line)];
+    const QTextLine text = m_paragraphs[laid.paragraph]->lineAt(laid.index);
+    return text.position().y() + text.ascent();
+}
+
 int TextLines::lineStart(int line) const
 {
     const Line &laid = m_lineList[size_t(line)];

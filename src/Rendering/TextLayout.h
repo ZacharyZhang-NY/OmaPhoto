@@ -43,6 +43,8 @@ public:
     std::optional<int> lineOf(int position) const;
     // The caret before a position: a unit wide.
     std::optional<QRectF> caret(int position) const;
+    // A laid line's baseline from the container's top.
+    double baseline(int line) const;
     // A line's first position; its last before any wrap.
     int lineStart(int line) const;
     int lineEnd(int line) const;

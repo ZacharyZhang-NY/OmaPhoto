@@ -161,6 +161,9 @@ add_library(compositor_core STATIC
     src/IO/PSD/PSDReader.cpp
     src/IO/PSD/PSDReader+Records.cpp
     src/IO/PSD/PSDReader+Adjustments.cpp
+    src/IO/PSD/PSDText.cpp
+    src/IO/PSD/PSDText+Descriptor.cpp
+    src/IO/PSD/PSDText+Engine.cpp
     src/IO/PSD/PSDTypes.cpp
     src/IO/PSD/PSDVector.cpp
     src/IO/ProjectStore.cpp

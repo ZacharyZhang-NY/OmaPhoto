@@ -61,7 +61,9 @@ std::vector<PSDRecord> assemble(const std::vector<RawLayer> &raw, QSizeF canvas,
         record.opacity = hasEffects && layer.fill != 255 ? layer.opacity / 255.0 : (layer.opacity / 255.0) * (layer.fill / 255.0);
         record.bounds = isGroup ? QRectF(QPointF(0, 0), canvas) : QRectF(layer.left, layer.top, std::max<qint64>(0, layer.right - layer.left), std::max<qint64>(0, layer.bottom - layer.top));
         record.image = isGroup ? std::nullopt : layer.image;
-        std::optional<PSDVector::Live> live = isGroup ? std::nullopt : PSDVector::live(layer.extra, canvas, remaining);
+        if (record.kind == PSDLayerKind::text)
+            record.text = PSDText::parse(layer.extra);
+        std::optional<PSDVector::Live> live = isGroup || record.text ? std::nullopt : PSDVector::live(layer.extra, canvas, remaining);
         if (live) {
             record.image = live->image;
             record.bounds = live->bounds;
@@ -69,7 +71,7 @@ std::vector<PSDRecord> assemble(const std::vector<RawLayer> &raw, QSizeF canvas,
             record.shapeNotes = live->notes;
             record.kind = PSDLayerKind::vector;
             remaining = std::max<qint64>(0, remaining - qint64(live->image.width()) * live->image.height());
-        } else if (!record.image && !isGroup) {
+        } else if (!record.text && !record.image && !isGroup) {
             if (const std::optional<PSDVector::Raster> raster = PSDVector::raster(layer.extra, canvas, remaining)) {
                 record.image = raster->image;
                 record.bounds = raster->bounds;

@@ -203,7 +203,7 @@ inline QByteArray luni(const QString &name)
     return data.data;
 }
 
-inline QByteArray extraData(const Prepared &item, bool large, const std::optional<AdditionalLayerInfo> &info)
+inline QByteArray extraData(const Prepared &item, bool large, const std::vector<AdditionalLayerInfo> &info)
 {
     Buffer extra;
     if (item.record.mask && item.maskRight > item.maskLeft && item.maskBottom > item.maskTop) {
@@ -223,8 +223,8 @@ inline QByteArray extraData(const Prepared &item, bool large, const std::optiona
     extra.u8(uchar(pascal.size()));
     extra.bytes(pascal);
     extra.bytes(QByteArray((4 - ((1 + pascal.size()) % 4)) % 4, '\0'));
-    if (info)
-        additional(extra, info->key, info->payload, large);
+    for (const AdditionalLayerInfo &block : info)
+        additional(extra, block.key, block.payload, large);
     additional(extra, "luni", luni(item.record.name), large);
     if (item.record.isGroup || item.isDivider) {
         Buffer payload;
@@ -236,7 +236,7 @@ inline QByteArray extraData(const Prepared &item, bool large, const std::optiona
     return extra.data;
 }
 
-inline void writeRecord(Buffer &buffer, const Prepared &item, bool large, const std::optional<AdditionalLayerInfo> &info)
+inline void writeRecord(Buffer &buffer, const Prepared &item, bool large, const std::vector<AdditionalLayerInfo> &info)
 {
     buffer.i32(item.top);
     buffer.i32(item.left);
@@ -274,7 +274,7 @@ inline void emitLayers(const PSDDocument &document, std::optional<QUuid> parent,
     }
 }
 
-inline QByteArray layerSection(const PSDDocument &document, bool large, const std::optional<AdditionalLayerInfo> &info)
+inline QByteArray layerSection(const PSDDocument &document, bool large, const std::vector<AdditionalLayerInfo> &info)
 {
     std::vector<Prepared> prepared;
     emitLayers(document, std::nullopt, prepared, large);
@@ -316,7 +316,7 @@ inline QByteArray resolutionResource(double resolution)
     return resource.data;
 }
 
-inline QByteArray data(const PSDDocument &document, const QImage &composite, bool large = false, const std::optional<AdditionalLayerInfo> &info = std::nullopt)
+inline QByteArray data(const PSDDocument &document, const QImage &composite, bool large = false, const std::vector<AdditionalLayerInfo> &info = {})
 {
     Buffer file;
     file.string("8BPS");

@@ -8,11 +8,30 @@ ImportedImage imported(const QImage &image, const QString &name)
     return ImportedImage(image, PixelAdjust::thumbnail(image), name);
 }
 
-std::vector<QString> notes(const PSDRecord &record)
+// Swift's `try?`: text that cannot be drawn stays pixels.
+std::optional<PSDText::Rendered> rendered(const PSDRecord &record)
+{
+    if (!record.text)
+        return std::nullopt;
+    try {
+        return PSDText::render(*record.text);
+    } catch (const std::runtime_error &) {
+        return std::nullopt;
+    }
+}
+
+std::vector<QString> notes(const PSDRecord &record, bool typed)
 {
     std::vector<QString> result;
-    if (record.kind == PSDLayerKind::text)
-        result.push_back(QStringLiteral("Editable Photoshop text becomes pixels and can’t be retyped."));
+    if (record.kind == PSDLayerKind::text) {
+        if (typed) {
+            result.insert(result.end(), record.text->notes.begin(), record.text->notes.end());
+            if (const std::optional<QString> missing = PSDText::missingFontNote(record.text->style.fontName))
+                result.push_back(*missing);
+        } else {
+            result.push_back(PSDText::rasterizedNote);
+        }
+    }
     if (record.kind == PSDLayerKind::smartObject)
         result.push_back(QStringLiteral("The smart object was rasterized. Linked contents can’t be edited."));
     if (record.kind == PSDLayerKind::effects)
@@ -41,10 +60,14 @@ std::vector<QString> notes(const PSDRecord &record)
     return result;
 }
 
-ImageLayer layerFor(const PSDRecord &record, QSizeF canvas, const std::map<QUuid, ImportedImage> &assets)
+ImageLayer layerFor(const PSDRecord &record, QSizeF canvas, const std::map<QUuid, ImportedImage> &assets, const std::optional<PSDText::Rendered> &typed)
 {
     ImageLayer layer(record.name, canvas);
-    if (record.image && !record.isGroup && !record.adjustment) {
+    if (typed && !record.adjustment) {
+        layer = ImageLayer(imported(typed->image, record.name), QPointF());
+        layer.transform = typed->transform;
+        layer.text = LayerText{record.text->style, layer.asset->identity()};
+    } else if (record.image && !record.isGroup && !record.adjustment) {
         const ImportedImage asset = assets.contains(record.id) ? assets.at(record.id) : imported(*record.image, record.name);
         const QSizeF size = record.bounds.width() > 0 && record.bounds.height() > 0 ? record.bounds.size() : QSizeF(record.image->size());
         layer = ImageLayer(asset, record.bounds.topLeft());
@@ -83,11 +106,12 @@ PSDImport PSDDocumentBuilder::makeImport(const PSDDocument &document, const std:
         if (record.croppedToCanvas)
             conversions.push_back(PSDConversion{.layerName = record.name,
                                                 .message = QStringLiteral("Cropped to the canvas so the file fits in memory. Pixels outside the canvas weren't imported.")});
-        for (const QString &note : notes(record))
+        const std::optional<PSDText::Rendered> typed = rendered(record);
+        for (const QString &note : notes(record, typed.has_value()))
             conversions.push_back(PSDConversion{.layerName = record.name, .message = note});
         if (record.kind == PSDLayerKind::adjustment && !record.adjustment)
             continue;
-        ImageLayer layer = layerFor(record, canvas, assets);
+        ImageLayer layer = layerFor(record, canvas, assets, typed);
         if (record.mask) {
             try {
                 layer.mask = LayerMask(LayerMask::assetFrom(*record.mask), record.maskEnabled, std::nullopt, record.maskLinked);

@@ -91,7 +91,7 @@ void PSBImportTests::PSBLargeAdditionalInfoBlockDoesNotHideUnicodeName()
     const QImage image = PSDFixture::colorImage(2, 2, 1, 0, 0);
     const PSDRecord layer = PSDFixture::record(QStringLiteral("Café layer"), image, QRectF(0, 0, 2, 2));
     const QByteArray data =
-        PSDFixture::data(PSDDocument{2, 2, 72, {layer}}, image, true, PSDFixture::AdditionalLayerInfo{"LMsk", QByteArray("\1\2\3", 3)});
+        PSDFixture::data(PSDDocument{2, 2, 72, {layer}}, image, true, {PSDFixture::AdditionalLayerInfo{"LMsk", QByteArray("\1\2\3", 3)}});
     QCOMPARE(PSDReader::read(data).layers.at(0).name, QStringLiteral("Café layer"));
 }
 
