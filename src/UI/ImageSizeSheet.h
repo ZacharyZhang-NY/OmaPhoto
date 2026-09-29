@@ -2,8 +2,10 @@
 #include "Document/EditorSession+Model.h"
 #include "IO/ImageResizer.h"
 #include <QWidget>
+#include <array>
 #include <functional>
 
+class NumericScrub;
 class PickerField;
 class QCheckBox;
 class QComboBox;
@@ -21,6 +23,13 @@ private:
     double display(double pixels, qint64 original) const;
     PickerField *dimension(bool isWidth);
     void setDimension(double value, bool isWidth);
+    // Swift's onChange: a physical size keeps, its pixels scale.
+    void setResolution(double value);
+    // Swift's scrubbable Width or Height title and its limits.
+    NumericScrub *scrub(QLabel *title, bool isWidth);
+    bool canScrubDimensions() const;
+    std::pair<double, double> scrubRange(bool isWidth) const;
+    double scrubSensitivity(bool isWidth) const;
     void setResample(bool enabled);
     void synchronize();
 
@@ -37,6 +46,8 @@ private:
     QComboBox *const m_units;
     PickerField *const m_widthField;
     PickerField *const m_heightField;
+    std::array<QLabel *, 2> m_titles{};
+    std::array<NumericScrub *, 2> m_scrubs{};
     QCheckBox *const m_lock;
     PickerField *const m_resolutionField;
     QWidget *const m_samplingRow;

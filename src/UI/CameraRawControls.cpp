@@ -268,7 +268,7 @@ void CameraRawControls::slider(QVBoxLayout *column, const QString &name, const Q
 {
     const double step = std::pow(10.0, decimals);
     auto *row = new CameraRawRow(
-        {.name = name, .title = title, .help = help, .low = low, .high = high, .decimals = decimals, .track = track, .titleResets = true},
+        {.name = name, .title = title, .help = help, .low = low, .high = high, .decimals = decimals, .track = track, .titleResets = true, .scrub = 1 / step},
         [this, key] {
             CameraRawSettings settings = raw();
             return key(settings);

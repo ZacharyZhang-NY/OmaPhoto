@@ -2,6 +2,7 @@
 #include "Document/DocumentLimits.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/ColorPickerSheet.h"
+#include "UI/NumericScrub.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QGridLayout>
@@ -53,14 +54,8 @@ ImageSizeSheet::ImageSizeSheet(const CanvasDocument &document, std::function<voi
       m_resolutionField(new PickerField([this] {
           bool number = false;
           const double typed = m_resolutionField->locale().toDouble(m_resolutionField->text(), &number);
-          if (m_resolutionField->isModified() && number) {
-              // Swift's onChange: a physical size keeps, its pixels scale.
-              const double old = std::exchange(m_resolution, typed);
-              if (m_resample && physical(m_unit) && old > 0 && typed > 0 && std::isfinite(typed)) {
-                  m_width *= typed / old;
-                  m_height *= typed / old;
-              }
-          }
+          if (m_resolutionField->isModified() && number)
+              setResolution(typed);
           m_resolutionField->setModified(false);
           synchronize();
       }, nullptr, this)),
@@ -91,9 +86,11 @@ ImageSizeSheet::ImageSizeSheet(const CanvasDocument &document, std::function<voi
     });
     fields->addWidget(units, 0, 0);
     fields->addWidget(m_units, 0, 1);
-    fields->addWidget(new QLabel(QStringLiteral("Width"), this), 1, 0);
+    m_titles = {new QLabel(QStringLiteral("Width"), this), new QLabel(QStringLiteral("Height"), this)};
+    m_scrubs = {scrub(m_titles[0], true), scrub(m_titles[1], false)};
+    fields->addWidget(m_titles[0], 1, 0);
     fields->addWidget(m_widthField, 1, 1);
-    fields->addWidget(new QLabel(QStringLiteral("Height"), this), 2, 0);
+    fields->addWidget(m_titles[1], 2, 0);
     fields->addWidget(m_heightField, 2, 1);
     column->addLayout(fields);
 
@@ -104,7 +101,15 @@ ImageSizeSheet::ImageSizeSheet(const CanvasDocument &document, std::function<voi
     });
     column->addWidget(m_lock);
     auto *resolution = new QHBoxLayout;
-    resolution->addWidget(new QLabel(QStringLiteral("Resolution"), this));
+    auto *resolutionTitle = new QLabel(QStringLiteral("Resolution"), this);
+    // Swift's scrubbable Resolution: whole pixels per inch.
+    new NumericScrub(resolutionTitle, {.sensitivity = 1, .low = 1, .high = 9600, .step = 1, .value = [this] { return m_resolution; },
+                                       .set = [this](double value) {
+                                           setResolution(value);
+                                           m_resolutionField->setModified(false);
+                                           synchronize();
+                                       }});
+    resolution->addWidget(resolutionTitle);
     m_resolutionField->setObjectName(QStringLiteral("imageResolution"));
     m_resolutionField->setPlaceholderText(QStringLiteral("Resolution"));
     m_resolutionField->setAccessibleName(QStringLiteral("Resolution"));
@@ -223,6 +228,61 @@ void ImageSizeSheet::setDimension(double value, bool isWidth)
     }
 }
 
+void ImageSizeSheet::setResolution(double value)
+{
+    const double old = std::exchange(m_resolution, value);
+    if (m_resample && physical(m_unit) && old > 0 && value > 0 && std::isfinite(value)) {
+        m_width *= value / old;
+        m_height *= value / old;
+    }
+}
+
+NumericScrub *ImageSizeSheet::scrub(QLabel *title, bool isWidth)
+{
+    // Whole units; synchronize sets the limits and the gate.
+    return new NumericScrub(title, {.sensitivity = 0, .low = 0, .high = 0, .step = 1,
+                                    .value = [this, isWidth] { return display(isWidth ? m_width : m_height, isWidth ? m_originalWidth : m_originalHeight); },
+                                    .set = [this, isWidth](double value) {
+                                        setDimension(value, isWidth);
+                                        (isWidth ? m_widthField : m_heightField)->setModified(false);
+                                        synchronize();
+                                    }});
+}
+
+bool ImageSizeSheet::canScrubDimensions() const
+{
+    return !physical(m_unit) || (std::isfinite(m_resolution) && m_resolution > 0);
+}
+
+// Swift's scrubRange: pixel limits, or print sizes without resampling.
+std::pair<double, double> ImageSizeSheet::scrubRange(bool isWidth) const
+{
+    const double pixels = isWidth ? m_width : m_height, other = isWidth ? m_height : m_width;
+    if (!m_resample) {
+        const double multiplier = m_unit == QLatin1String("Centimeters") ? 2.54 : 1;
+        return {pixels * multiplier / 9600, pixels * multiplier};
+    }
+    const double minimum = m_locked ? std::max(1.0, pixels / other) : 1.0;
+    const double dimensionLimit = m_locked ? std::min(30000.0, 30000 * pixels / other) : 30000.0;
+    const double areaLimit = m_locked ? std::sqrt(100'000'000 * pixels / other) : 100'000'000 / other;
+    const double maximum = std::max(minimum, std::min(dimensionLimit, areaLimit));
+    const qint64 original = isWidth ? m_originalWidth : m_originalHeight;
+    return {display(minimum, original), display(maximum, original)};
+}
+
+double ImageSizeSheet::scrubSensitivity(bool isWidth) const
+{
+    if (!m_resample)
+        return m_unit == QLatin1String("Centimeters") ? 0.0254 : 0.01;
+    if (m_unit == QLatin1String("Percent"))
+        return 100 / double(isWidth ? m_originalWidth : m_originalHeight);
+    if (m_unit == QLatin1String("Inches"))
+        return 1 / m_resolution;
+    if (m_unit == QLatin1String("Centimeters"))
+        return 2.54 / m_resolution;
+    return 1;
+}
+
 // Swift's onChange: without resampling the pixels stay the document's.
 void ImageSizeSheet::setResample(bool enabled)
 {
@@ -252,6 +312,12 @@ void ImageSizeSheet::synchronize()
     }
     m_units->setCurrentText(m_unit);
     for (const auto &[field, isWidth] : {std::pair(m_widthField, true), std::pair(m_heightField, false)}) {
+        const bool scrubs = canScrubDimensions();
+        m_titles[isWidth ? 0 : 1]->setEnabled(scrubs);
+        if (scrubs) {
+            const auto [low, high] = scrubRange(isWidth);
+            m_scrubs[isWidth ? 0 : 1]->reshape(scrubSensitivity(isWidth), low, high);
+        }
         // A field being typed in keeps its typing.
         const QString number = shown(display(isWidth ? m_width : m_height, isWidth ? m_originalWidth : m_originalHeight), field->locale());
         if (!field->isModified() && field->text() != number)

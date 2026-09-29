@@ -4,6 +4,7 @@
 #include "UI/ColorPickerSheet.h"
 #include <QButtonGroup>
 #include <QHBoxLayout>
+#include "UI/NumericScrub.h"
 #include <QLabel>
 #include <QLocale>
 #include <QPushButton>
@@ -195,6 +196,15 @@ void EffectsSheet::slider(const QString &title, std::function<std::optional<doub
     slider->setRange(0, travel);
     slider->setFixedWidth(130);
     label->setBuddy(slider);
+    // Swift's scrubbable title, over the range typing reaches.
+    new NumericScrub(label, {.sensitivity = 1, .low = low, .high = typedHigh.value_or(high), .step = std::nullopt,
+                             .value = [this, index] { return m_sliders[index].value(m_session.editingEffects()).value_or(m_sliders[index].low); },
+                             .set = [this, index](double amount) {
+                                 const Slider &at = m_sliders[index];
+                                 apply(at, amount);
+                                 at.field->setModified(false);
+                                 synchronize();
+                             }});
     connect(slider, &QSlider::valueChanged, this, [this, index](int position) {
         const Slider &at = m_sliders[index];
         apply(at, at.low + (at.high - at.low) * position / travel);

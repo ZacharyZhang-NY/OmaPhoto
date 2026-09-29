@@ -5,6 +5,7 @@
 #include <functional>
 #include <optional>
 
+class NumericScrub;
 class PickerField;
 class QCheckBox;
 class QComboBox;
@@ -55,6 +56,8 @@ private:
     // Hue, Saturation, Lightness; the rows make them.
     std::array<QSlider *, 3> m_sliders{};
     std::array<PickerField *, 3> m_fields{};
+    // Each title's scrub; Colorize changes its range.
+    std::array<NumericScrub *, 3> m_scrubs{};
     const std::array<QWidget *, 3> m_rows;
     SpectrumEditor *const m_spectrum;
     QCheckBox *const m_invert;

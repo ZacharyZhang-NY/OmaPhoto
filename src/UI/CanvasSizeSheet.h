@@ -6,6 +6,7 @@
 #include <array>
 #include <functional>
 
+class NumericScrub;
 class PickerField;
 class QButtonGroup;
 class QComboBox;
@@ -22,6 +23,8 @@ public:
 
 private:
     PickerField *dimension(bool widthAxis);
+    // Swift's scrubbable Width or Height title.
+    NumericScrub *scrub(QLabel *title, bool widthAxis);
     std::optional<CanvasExtensionColor> fill() const;
     void pickCustomColor();
     void synchronize();
@@ -34,6 +37,8 @@ private:
     PaletteColor m_custom = PaletteColor::white();
     PickerField *const m_width;
     PickerField *const m_height;
+    // Their limits follow the unit, Relative and Lock.
+    std::array<NumericScrub *, 2> m_scrubs{};
     QLabel *const m_note;
     QButtonGroup *const m_anchors;
     QLabel *const m_anchorName;

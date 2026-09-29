@@ -219,7 +219,7 @@ CameraRawCurveControls::CameraRawCurveControls(EditorSession &session, QWidget *
     amounts->setContentsMargins(0, 0, 0, 0);
     amounts->setSpacing(8);
     const auto amount = [this, amounts](const QString &name, const QString &title, double CameraRawCurveSettings::*key, const QString &help) {
-        auto *row = new CameraRawRow({.name = name, .title = title, .help = help, .titleWidth = 88, .fixedTitle = true, .fieldWidth = 48},
+        auto *row = new CameraRawRow({.name = name, .title = title, .help = help, .titleWidth = 88, .fixedTitle = true, .fieldWidth = 48, .scrub = 1},
                                      [this, key] { return raw().curve.*key; },
                                      [this, key](double value) { update([key, value](CameraRawSettings &settings) { settings.curve.*key = value; }); },
                                      [this, key](double value) { update([key, value](CameraRawSettings &settings) { settings.curve.*key = value; }); },
@@ -258,7 +258,7 @@ CameraRawCurveControls::CameraRawCurveControls(EditorSession &session, QWidget *
     });
     m_refine = new CameraRawRow({.name = QStringLiteral("refineSaturation"), .title = QStringLiteral("Refine Saturation"),
                                  .help = QStringLiteral("How much the RGB curve also changes color strength. Zero keeps it to brightness."), .titleWidth = 88,
-                                 .fixedTitle = true, .fieldWidth = 48},
+                                 .fixedTitle = true, .fieldWidth = 48, .scrub = 1},
                                 [this] { return raw().curve.refineSaturation; },
                                 [this](double value) { update([value](CameraRawSettings &settings) { settings.curve.refineSaturation = value; }); },
                                 [this](double value) { update([value](CameraRawSettings &settings) { settings.curve.refineSaturation = value; }); },

@@ -25,13 +25,15 @@ public:
     NumericScrub(QWidget *label, Options options);
     // Ends a drag as a release would.
     void end();
+    // New limits, as SwiftUI's next render hands the modifier.
+    void reshape(double sensitivity, double low, double high);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     QWidget *const m_label;
-    const Options m_options;
+    Options m_options;
     // The press, until the release; Swift's gesture begins there.
     std::optional<QPointF> m_press;
     // Swift's startValue: set once the drag moves a point.

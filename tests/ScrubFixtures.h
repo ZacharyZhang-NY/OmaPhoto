@@ -35,7 +35,7 @@ inline void drag(QWidget &label, double dx, bool release = true)
         send(label, QEvent::MouseButtonRelease, QPointF(2 + dx, 2), Qt::LeftButton, Qt::NoButton);
 }
 
-// Types 7, which applies, then scrubs, holding the press.
+// Types 7, then scrubs, holding the press.
 inline QString scrubOverTyping(QLineEdit &field, QWidget &label, double dx)
 {
     field.setFocus();
@@ -48,6 +48,8 @@ inline QString scrubOverTyping(QLineEdit &field, QWidget &label, double dx)
     send(label, QEvent::MouseButtonRelease, QPointF(2 + dx, 2), Qt::LeftButton, Qt::NoButton);
     if (field.text() != during || !field.hasFocus())
         throw std::runtime_error("the release changed the field");
+    // Leaves while its sheet lives, as a closing panel does.
+    field.clearFocus();
     return during;
 }
 

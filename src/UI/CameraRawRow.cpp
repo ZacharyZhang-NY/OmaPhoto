@@ -1,5 +1,6 @@
 #include "UI/CameraRawRow.h"
 #include "UI/ColorPickerSheet.h"
+#include "UI/NumericScrub.h"
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QLocale>
@@ -38,6 +39,16 @@ CameraRawRow::CameraRawRow(Spec spec, std::function<double()> value, std::functi
     row->setSpacing(10);
     row->addWidget(m_title);
     row->addWidget(m_slider, 1);
+    // Before the reset's filter, which runs first and passes on.
+    if (m_spec.scrub) {
+        new NumericScrub(m_title, {.sensitivity = *m_spec.scrub, .low = m_spec.low, .high = m_spec.high, .step = std::nullopt, .value = m_value,
+                                   .set = [this, type](double value) {
+                                       type(value);
+                                       if (m_field)
+                                           m_field->setModified(false);
+                                       synchronize();
+                                   }});
+    }
     if (m_spec.fieldWidth > 0) {
         m_field = new PickerField([this, type = std::move(type)] {
             bool number = false;
@@ -73,7 +84,8 @@ bool CameraRawRow::eventFilter(QObject *watched, QEvent *event)
 {
     if (watched == m_title && event->type() == QEvent::MouseButtonDblClick) {
         m_reset();
-        return true;
+        // A scrub still takes the second press, as Swift's drag.
+        return !m_spec.scrub;
     }
     return QWidget::eventFilter(watched, event);
 }

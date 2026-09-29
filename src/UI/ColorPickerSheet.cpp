@@ -1,4 +1,5 @@
 #include "UI/ColorPickerSheet.h"
+#include "UI/NumericScrub.h"
 #include "UI/KeyboardShortcuts.h"
 #include <QFontDatabase>
 #include <QGridLayout>
@@ -205,7 +206,19 @@ ColorPickerSheet::ColorPickerSheet(EditorSession &session, std::function<void(bo
     fields->setHorizontalSpacing(8);
     fields->setVerticalSpacing(6);
     for (int index = 0; index < 3; ++index) {
-        fields->addWidget(label(QString(QStringLiteral("RGB").at(index)), this), index, 0);
+        QLabel *name = label(QString(QStringLiteral("RGB").at(index)), this);
+        // Swift's scrubbable channel: whole levels, replacing typing.
+        new NumericScrub(name, {.sensitivity = 1, .low = 0, .high = 255, .step = 1,
+                                .value = [this, index] {
+                                    const PaletteColor color = m_session.colorPicker().value().color();
+                                    return std::round((index == 0 ? color.red : index == 1 ? color.green : color.blue) * 255);
+                                },
+                                .set = [this, index](double value) {
+                                    setChannel(index, value);
+                                    m_channels[size_t(index)]->setModified(false);
+                                    synchronize();
+                                }});
+        fields->addWidget(name, index, 0);
         fields->addWidget(m_channels[size_t(index)], index, 1, Qt::AlignLeft);
     }
     m_hex->setObjectName(QStringLiteral("hex"));

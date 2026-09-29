@@ -63,6 +63,13 @@ bool NumericScrub::eventFilter(QObject *watched, QEvent *event)
     return true;
 }
 
+void NumericScrub::reshape(double sensitivity, double low, double high)
+{
+    m_options.sensitivity = sensitivity;
+    m_options.low = low;
+    m_options.high = high;
+}
+
 void NumericScrub::end()
 {
     if (!m_press)

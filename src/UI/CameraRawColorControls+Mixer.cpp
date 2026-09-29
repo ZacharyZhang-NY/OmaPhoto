@@ -162,7 +162,7 @@ void CameraRawMixerControls::rebuildFamilies(int tab)
         };
         row(m_families,
             {.name = QStringLiteral("family") + name, .title = name, .help = QStringLiteral("%1 of %2.").arg(tabs.at(size_t(tab)), name),
-             .track = familyTrack(index, tab), .titleWidth = 78, .fixedTitle = true, .fieldWidth = 48},
+             .track = familyTrack(index, tab), .titleWidth = 78, .fixedTitle = true, .fieldWidth = 48, .scrub = 1},
             [family, index](const CameraRawSettings &settings) {
                 CameraRawSettings copy = settings;
                 return family(copy).at(size_t(index));

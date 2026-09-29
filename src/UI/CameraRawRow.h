@@ -2,6 +2,7 @@
 #include "UI/CameraRawSlider.h"
 #include <QWidget>
 #include <functional>
+#include <optional>
 
 class PickerField;
 class QLabel;
@@ -25,6 +26,8 @@ public:
         int fieldWidth = 56;
         // A double click on the title resets it.
         bool titleResets = false;
+        // Swift's scrubbable title: a point's worth, through `type`.
+        std::optional<double> scrub = std::nullopt;
     };
     // `slide` takes the slider's own value, `type` a typed number.
     CameraRawRow(Spec spec, std::function<double()> value, std::function<void(double)> slide, std::function<void(double)> type,

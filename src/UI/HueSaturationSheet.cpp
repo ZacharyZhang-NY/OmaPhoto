@@ -2,6 +2,7 @@
 #include "UI/KeyboardShortcuts.h"
 #include "Rendering/EyedropperIcon.h"
 #include "UI/ColorPickerSheet.h"
+#include "UI/NumericScrub.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFrame>
@@ -373,6 +374,14 @@ QWidget *HueSaturationSheet::row(size_t index)
     layout->setSpacing(10);
     auto *label = new QLabel(title, box);
     label->setFixedWidth(76);
+    // Swift's scrubbable title; synchronize sets its range.
+    m_scrubs[index] = new NumericScrub(label, {.sensitivity = 1, .low = 0, .high = 0, .step = std::nullopt,
+                                               .value = [this, index] { return (current(m_session).*rows[index].value)(); },
+                                               .set = [this, index](double value) {
+                                                   change([&](HueSaturationSettings &settings) { (settings.*rows[index].set)(value); });
+                                                   m_fields[index]->setModified(false);
+                                                   synchronize();
+                                               }});
     auto *slider = new QSlider(Qt::Horizontal, box);
     slider->setObjectName(title.toLower() + QStringLiteral("Slider"));
     label->setBuddy(slider);
@@ -443,6 +452,7 @@ void HueSaturationSheet::synchronize()
     m_targeting->setChecked(m_session.hueTargeting());
     for (size_t index = 0; index < rows.size(); ++index) {
         const auto [low, high] = bounds(index, settings.colorize);
+        m_scrubs[index]->reshape(1, low, high);
         const double value = (settings.*rows[index].value)();
         {
             // The sliders show the session's numbers without writing back.

@@ -55,7 +55,7 @@ void write(EditorSession &session, const std::function<void(CameraRawSettings &)
 CameraRawRow *rounded(const QString &name, const QString &title, const QString &help, double low, double high, std::function<double()> value,
                       std::function<void(double)> set, QWidget *parent)
 {
-    return new CameraRawRow({.name = name, .title = title, .help = help, .low = low, .high = high, .titleWidth = CameraRawControls::labelWidth},
+    return new CameraRawRow({.name = name, .title = title, .help = help, .low = low, .high = high, .titleWidth = CameraRawControls::labelWidth, .scrub = 1},
                             std::move(value), [set](double number) { set(std::round(number)); }, set, [set] { set(0); }, parent);
 }
 }

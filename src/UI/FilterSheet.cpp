@@ -1,4 +1,5 @@
 #include "UI/FilterSheet.h"
+#include "UI/NumericScrub.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/ColorPickerSheet.h"
@@ -257,6 +258,17 @@ void FilterSheet::control(const QString &title, std::function<double &(FilterSet
     auto *label = new QLabel(title, box);
     label->setMinimumWidth(60);
     label->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+    // Swift's scrubbable title: a point is the field's last decimal.
+    new NumericScrub(label, {.sensitivity = 1 / std::pow(10.0, decimals), .low = low, .high = high, .step = std::nullopt,
+                             .value = [this, index] {
+                                 FilterSettings current = settings();
+                                 return m_controls[index].key(current);
+                             },
+                             .set = [this, index](double value) {
+                                 update([this, index, value](FilterSettings &settings) { m_controls[index].key(settings) = value; });
+                                 m_controls[index].field->setModified(false);
+                                 synchronize();
+                             }});
     auto *slider = new QSlider(Qt::Horizontal, box);
     slider->setObjectName(name + QStringLiteral("Slider"));
     slider->setRange(0, travel);

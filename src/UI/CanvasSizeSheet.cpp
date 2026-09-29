@@ -4,6 +4,7 @@
 #include "UI/ByteCounts.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/ColorPickerSheet.h"
+#include "UI/NumericScrub.h"
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QColorDialog>
@@ -21,6 +22,38 @@ namespace {
 const std::array<QString, 9> anchorNames = {QStringLiteral("Top left"),     QStringLiteral("Top center"),    QStringLiteral("Top right"),
                                             QStringLiteral("Middle left"),  QStringLiteral("Center"),        QStringLiteral("Middle right"),
                                             QStringLiteral("Bottom left"),  QStringLiteral("Bottom center"), QStringLiteral("Bottom right")};
+
+// Swift's scrubRange: the pixel limits, shown in the draft's unit.
+std::pair<double, double> scrubRange(const CanvasSizeDraft &draft, bool widthAxis)
+{
+    const double original = double(widthAxis ? draft.originalWidth : draft.originalHeight);
+    const double other = double(widthAxis ? draft.originalHeight : draft.originalWidth);
+    const double lower = draft.locked ? std::max(1.0, original / other) : 1.0;
+    const double upper = draft.locked ? std::min(30000.0, 30000 * original / other) : 30000.0;
+    const auto displayed = [&](double pixels) {
+        const double difference = pixels - (draft.relative ? original : 0);
+        switch (draft.unit) {
+        case CanvasUnit::pixels: return difference;
+        case CanvasUnit::percent: return difference / original * 100;
+        case CanvasUnit::inches: return difference / draft.resolution;
+        case CanvasUnit::centimeters: return difference / draft.resolution * 2.54;
+        }
+        throw std::logic_error("no such unit");
+    };
+    return {displayed(lower), displayed(upper)};
+}
+
+// Swift's scrubSensitivity: a point is a pixel in any unit.
+double scrubSensitivity(const CanvasSizeDraft &draft, bool widthAxis)
+{
+    switch (draft.unit) {
+    case CanvasUnit::pixels: return 1;
+    case CanvasUnit::percent: return 100 / double(widthAxis ? draft.originalWidth : draft.originalHeight);
+    case CanvasUnit::inches: return 1 / draft.resolution;
+    case CanvasUnit::centimeters: return 2.54 / draft.resolution;
+    }
+    throw std::logic_error("no such unit");
+}
 
 QLabel *text(const QString &words, int pixels, QFont::Weight weight, QPalette::ColorRole role, QWidget *parent)
 {
@@ -117,9 +150,12 @@ CanvasSizeSheet::CanvasSizeSheet(const CanvasDocument &document, PaletteColor fo
     });
     fields->addWidget(unitsLabel, 0, 0);
     fields->addWidget(units, 0, 1);
-    fields->addWidget(new QLabel(QStringLiteral("Width"), this), 1, 0);
+    auto *width = new QLabel(QStringLiteral("Width"), this);
+    auto *height = new QLabel(QStringLiteral("Height"), this);
+    m_scrubs = {scrub(width, true), scrub(height, false)};
+    fields->addWidget(width, 1, 0);
     fields->addWidget(m_width, 1, 1);
-    fields->addWidget(new QLabel(QStringLiteral("Height"), this), 2, 0);
+    fields->addWidget(height, 2, 0);
     fields->addWidget(m_height, 2, 1);
     column->addLayout(fields);
 
@@ -240,6 +276,17 @@ PickerField *CanvasSizeSheet::dimension(bool widthAxis)
     return field;
 }
 
+NumericScrub *CanvasSizeSheet::scrub(QLabel *title, bool widthAxis)
+{
+    // Dragged sizes snap to whole units; synchronize sets the limits.
+    return new NumericScrub(title, {.sensitivity = 1, .low = 0, .high = 0, .step = 1, .value = [this, widthAxis] { return m_draft.displayed(widthAxis); },
+                                    .set = [this, widthAxis](double value) {
+                                        m_draft.set(value, widthAxis);
+                                        (widthAxis ? m_width : m_height)->setModified(false);
+                                        synchronize();
+                                    }});
+}
+
 std::optional<CanvasExtensionColor> CanvasSizeSheet::fill() const
 {
     const auto colour = [](PaletteColor value) { return CanvasExtensionColor{value.red, value.green, value.blue}; };
@@ -272,6 +319,8 @@ void CanvasSizeSheet::synchronize()
 {
     for (const auto &[field, widthAxis] : {std::pair(m_width, true), std::pair(m_height, false)}) {
         // A field being typed in keeps its typing.
+        const auto [low, high] = scrubRange(m_draft, widthAxis);
+        m_scrubs[widthAxis ? 0 : 1]->reshape(scrubSensitivity(m_draft, widthAxis), low, high);
         const QString number = shown(m_draft.displayed(widthAxis), field->locale());
         if (!field->isModified() && field->text() != number)
             field->setText(number);

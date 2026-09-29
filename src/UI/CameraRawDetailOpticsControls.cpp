@@ -91,7 +91,7 @@ CameraRawDetailControls::CameraRawDetailControls(EditorSession &session, QWidget
 void CameraRawDetailControls::row(QVBoxLayout *column, const QString &name, const QString &title, double CameraRawDetailSettings::*key,
                                            double high, double reset, bool maskingPreview, const QString &help)
 {
-    auto *row = new CameraRawRow({.name = name, .title = title, .help = help, .low = 0, .high = high, .titleWidth = CameraRawControls::labelWidth},
+    auto *row = new CameraRawRow({.name = name, .title = title, .help = help, .low = 0, .high = high, .titleWidth = CameraRawControls::labelWidth, .scrub = 1},
                                  [this, key] { return raw(m_session).detail.*key; },
                                  [this, key, maskingPreview](double value) { assign(key, std::round(value), maskingPreview); },
                                  [this, key](double value) { assign(key, value, false); }, [this, key, reset] { assign(key, reset, false); });
@@ -194,7 +194,7 @@ void CameraRawOpticsControls::row(QVBoxLayout *column, const QString &name, cons
                                   double high, double reset, const QString &help)
 {
     const auto set = [this, key](double value) { update([key, value](CameraRawOpticsSettings &optics) { optics.*key = value; }); };
-    auto *row = new CameraRawRow({.name = name, .title = title, .help = help, .low = low, .high = high, .titleWidth = CameraRawControls::labelWidth},
+    auto *row = new CameraRawRow({.name = name, .title = title, .help = help, .low = low, .high = high, .titleWidth = CameraRawControls::labelWidth, .scrub = 1},
                                  [this, key] { return raw(m_session).optics.*key; },
                                  [set, low](double value) { set(low < 0 ? value : std::round(value)); }, set, [set, reset] { set(reset); });
     column->addWidget(row);

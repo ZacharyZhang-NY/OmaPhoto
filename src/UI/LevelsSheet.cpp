@@ -1,4 +1,5 @@
 #include "UI/LevelsSheet.h"
+#include "UI/NumericScrub.h"
 #include "UI/KeyboardShortcuts.h"
 #include "Rendering/EyedropperIcon.h"
 #include <QEvent>
@@ -327,7 +328,24 @@ PickerField *LevelsSheet::field(size_t index)
     auto *layout = new QVBoxLayout(box);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(5);
-    layout->addWidget(caption(name, box));
+    QLabel *title = caption(name, box);
+    layout->addWidget(title);
+    // Swift's scrubbable caption, over gamma's or a tone's range.
+    const bool gamma = entries[index].decimals > 0;
+    new NumericScrub(title, {.sensitivity = gamma ? 0.01 : 1, .low = gamma ? 0.1 : 0, .high = gamma ? 9.99 : 255, .step = std::nullopt,
+                             .value = [this, index] {
+                                 const std::optional<LevelsEdit> &edit = m_session.levels();
+                                 return edit ? edit->settings.current().*entries[index].value : 0.0;
+                             },
+                             .set = [this, index](double value) {
+                                 change([&](LevelsSettings &settings) {
+                                     LevelRange range = settings.current();
+                                     range.*entries[index].value = value;
+                                     settings.setCurrent(range);
+                                 });
+                                 m_fields[index]->setModified(false);
+                                 synchronize();
+                             }});
     // A number in the user's locale applies; other text reverts.
     auto *entry = new PickerField([this, index] {
         PickerField &edited = *m_fields[index];
