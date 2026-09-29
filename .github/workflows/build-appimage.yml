@@ -1,0 +1,511 @@
+name: Build AppImage
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-appimage-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    name: Build AppImage (x86_64)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            g++ cmake ninja-build qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev qt6-wayland \
+            fonts-dejavu-core qt6-image-formats-plugins libheif-dev libheif-plugin-libde265 \
+            libfontconfig-dev ca-certificates curl dpkg-dev file fakeroot \
+            patchelf desktop-file-utils \
+            libx11-6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 libsm6 libice6 \
+            libgl1 libegl1 libopengl0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-cursor0
+
+      - name: Install ONNX Runtime
+        run: |
+          curl -fsSL -o /tmp/ort.tgz \
+            https://github.com/microsoft/onnxruntime/releases/download/v1.21.0/onnxruntime-linux-x64-1.21.0.tgz
+          echo "7485c7e7aac6501b27e353dcbe068e45c61ab51fbaf598d13970dfae669d20bf  /tmp/ort.tgz" | sha256sum -c -
+          mkdir -p /tmp/ort
+          tar -xzf /tmp/ort.tgz -C /tmp/ort --strip-components=1
+          sudo mkdir -p /usr/local/include/onnxruntime /usr/local/lib64 /usr/local/lib/cmake /usr/local/share/doc/onnxruntime
+          sudo cp -r /tmp/ort/include/. /usr/local/include/onnxruntime/
+          sudo mv /tmp/ort/lib/cmake/onnxruntime /usr/local/lib/cmake/
+          sudo cp -a /tmp/ort/lib/. /usr/local/lib64/
+          sudo cp /tmp/ort/LICENSE /tmp/ort/ThirdPartyNotices.txt /usr/local/share/doc/onnxruntime/
+          echo /usr/local/lib64 | sudo tee /etc/ld.so.conf.d/onnxruntime.conf
+          sudo ldconfig
+          rm -rf /tmp/ort /tmp/ort.tgz
+
+      - name: Download Remove Background model
+        run: |
+          mkdir -p /tmp/omaphoto-share
+          curl -fsSL -o /tmp/omaphoto-share/u2net.onnx \
+            https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx
+          echo "8d10d2f3bb75ae3b6d527c77944fc5e7dcd94b29809d47a739a7a728a912b491  /tmp/omaphoto-share/u2net.onnx" | sha256sum -c -
+
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DOMAPHOTO_BUNDLE_ORT=ON -DOMAPHOTO_MODEL=/tmp/omaphoto-share/u2net.onnx
+          cmake --build build --target omaphoto
+
+      - name: Install into AppDir
+        run: |
+          rm -rf AppDir
+          DESTDIR="${{ github.workspace }}/AppDir" cmake --install build
+
+      - name: Deploy Qt dependencies into AppDir
+        env:
+          QMAKE: /usr/lib/qt6/bin/qmake6
+        run: |
+          wget -c https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -c https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          ./linuxdeploy-x86_64.AppImage --appimage-extract
+          mv squashfs-root squashfs-root-linuxdeploy
+          ./linuxdeploy-plugin-qt-x86_64.AppImage --appimage-extract
+          mv squashfs-root squashfs-root-linuxdeploy-qt
+          export PATH="${PWD}/squashfs-root-linuxdeploy-qt/usr/bin:${PATH}"
+
+          # This AppImage is meant to be self-standing: any library the app needs must be
+          # bundled inside it, not assumed present on the target. linuxdeploy's own
+          # auto-discovery deliberately excludes "always assume this is on the host" system
+          # libraries (X11, GLX/EGL, xcb) on the theory that any Linux desktop already has
+          # them - which held for AppRun launched from Ubuntu-based CI, but not for a stock
+          # minimal container. Explicitly bundle each one via --library so the AppImage
+          # carries its own copy instead of depending on the target providing it; resolve
+          # each soname's real path with ldconfig rather than hardcoding a directory, since
+          # that varies (lib vs lib/x86_64-linux-gnu).
+          # libGL.so.1 (GLVND's dispatcher) itself needs libGLX.so.0, libGLdispatch.so.0,
+          # and libOpenGL.so.0 as separate vendor/support libraries at runtime - Debian's
+          # test container happened to already have system copies of these (from some
+          # other package's dependency chain), which silently masked them being missing
+          # from the bundle; Alpine's minimal container has no such incidental copies, and
+          # each one that isn't bundled here surfaces as its own "error while loading
+          # shared libraries" only once the previous one is fixed - discovered one at a time.
+          RUNTIME_LIBS="libX11.so.6 libxcb.so.1 libxkbcommon.so.0 libxkbcommon-x11.so.0 \
+            libSM.so.6 libICE.so.6 libGL.so.1 libGLX.so.0 libGLdispatch.so.0 libEGL.so.1 libOpenGL.so.0 \
+            libxcb-icccm.so.4 libxcb-image.so.0 libxcb-keysyms.so.1 \
+            libxcb-render-util.so.0 libxcb-cursor.so.0 libgpg-error.so.0"
+          LIBRARY_ARGS=""
+          for lib in $RUNTIME_LIBS; do
+            path=$(ldconfig -p | awk -v l="$lib" '$1==l {print $NF; exit}')
+            if [ -z "$path" ]; then
+              echo "::error::$lib not found via ldconfig - add its package to 'Install build dependencies'" >&2
+              exit 1
+            fi
+            LIBRARY_ARGS="$LIBRARY_ARGS --library=$path"
+          done
+
+          ./squashfs-root-linuxdeploy/usr/bin/linuxdeploy \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/omaphoto \
+            --desktop-file AppDir/usr/share/applications/io.github.ZacharyZhang_NY.OmaPhoto.desktop \
+            --icon-file packaging/icons/app-icon-256.png \
+            --plugin qt \
+            $LIBRARY_ARGS
+
+      - name: Download appimagetool
+        run: |
+          wget -c "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract
+
+      - name: Bundle AppImage
+        run: |
+          export PATH="${PWD}/squashfs-root/usr/bin:${PATH}"
+          ./squashfs-root/usr/bin/appimagetool \
+            --updateinformation "gh-releases-zsync|${{ github.repository_owner }}|${{ github.event.repository.name }}|continuous|OmaPhoto-x86_64.AppImage.zsync" \
+            AppDir OmaPhoto-x86_64.AppImage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: appimage-x86_64
+          path: OmaPhoto-x86_64.AppImage*
+
+  screenshot-debian:
+    name: Launch on a minimal glibc distro and screenshot
+    needs: build
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:trixie-slim
+      # Docker's default seccomp profile blocks ptrace; needed for the gdb backtrace
+      # this job takes of a stalled AppRun before killing it.
+      options: --cap-add=SYS_PTRACE
+    steps:
+      # AppImage's actual portability promise is about glibc distros - this is the real
+      # gate (see the `upload` job below). An earlier attempt at doing this on Alpine
+      # (musl) instead hit a hard wall before the AppImage bundled its own libraries:
+      # with a real-glibc compat layer forced in for the payload, the process also had
+      # to load Alpine's musl-native xcb/mesa libraries and hung indefinitely. Now that
+      # everything the app needs is bundled (see the build job), a second, separate
+      # `screenshot-alpine` job below tries Alpine again as a stricter, optional
+      # stretch-goal test - no compat layer needed at all here on Debian either way.
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: appimage-x86_64
+
+      # This is meant to be a stock minimal system with nothing app-specific
+      # preinstalled - that's the whole point of the test. Every library the app itself
+      # needs (X11, xcb, GL/EGL, etc.) is bundled into the AppImage in the build job
+      # instead; only genuine test infrastructure (a display, a screenshot tool, a font
+      # to render, TLS roots for the earlier download) belongs here. If this job ever
+      # needs an app library added back to make AppRun start, that means the build job's
+      # bundling is incomplete - fix it there, not here.
+      - name: Install test infrastructure (display, screenshot tooling - no app libraries)
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            fonts-dejavu-core xvfb ffmpeg imagemagick ca-certificates \
+            x11-utils gdb icewm
+
+      - name: Launch OmaPhoto under Xvfb and screenshot it
+        run: |
+          chmod +x OmaPhoto-x86_64.AppImage
+          ./OmaPhoto-x86_64.AppImage --appimage-extract
+
+          Xvfb :99 -screen 0 1280x800x24 &
+          XVFB_PID=$!
+          sleep 2
+
+          export DISPLAY=:99
+          # The last run got a real window into xwininfo's tree (1180x780, not hung) but
+          # its framebuffer stayed completely flat for the full retry window - the window
+          # was created but never painted. AppImage's own catalog-testing project runs a
+          # window manager for exactly this reason ("getting the active window seems to
+          # require a window manager"): without one to map the window and answer the
+          # ICCCM/EWMH handshake around it, some toolkits never get the Expose event that
+          # triggers the first paint.
+          icewm > /dev/null 2>&1 &
+          ICEWM_PID=$!
+          sleep 2
+          export QT_QPA_PLATFORM=xcb
+          # No D-Bus/AT-SPI daemon in this container - Qt's accessibility bridge would
+          # otherwise block trying to reach it instead of failing fast.
+          export QT_ACCESSIBILITY=0
+          # The previous run's gdb backtrace showed a QDBusConnection worker thread
+          # already spawned and blocked, with xwininfo showing zero windows ever created -
+          # the app never got as far as the main window. This container has no dbus-daemon
+          # at all, but DISPLAY is set, which is exactly the condition that makes libdbus
+          # attempt its X11-property-based session-bus autolaunch handshake instead of
+          # failing immediately - and that handshake has nothing to actually talk to here.
+          # "disabled:" is libdbus's own sentinel for "no bus, do not try to autolaunch one".
+          export DBUS_SESSION_BUS_ADDRESS=disabled:
+          # Xvfb has no real GPU and no DRI driver files are bundled in the AppImage, so
+          # Qt's xcb platform plugin probing GLX/EGL for a window surface format (which it
+          # does at startup even for a plain Widgets app with no OpenGL widgets) can stall
+          # instead of failing cleanly. Skip that probing entirely rather than chase down
+          # driver files to bundle for a code path the app doesn't actually need.
+          export QT_XCB_GL_INTEGRATION=none
+          export LIBGL_ALWAYS_SOFTWARE=1
+          # Neither this env var check nor QT_DEBUG_PLUGINS fixes anything by themselves -
+          # they only make the next failure's log more informative than "nothing happened".
+          mkdir -p -m0700 /tmp/runtime-root
+          export XDG_RUNTIME_DIR=/tmp/runtime-root
+          export QT_DEBUG_PLUGINS=1
+          ./squashfs-root/AppRun &
+          APP_PID=$!
+
+          # A single fixed sleep-then-grab could catch the window before it has painted
+          # anything, passing `test -s` on a screenshot that is really just a blank/solid
+          # frame. Instead poll for up to 15s, re-grabbing every ~2s, and stop as soon as a
+          # frame's pixel stddev shows it is not flat - i.e. something was actually drawn.
+          #
+          # `%[fx:image.stdDev]` is not a real ImageMagick property (the correct one is
+          # `%[fx:standard_deviation]`), and the old check swallowed identify's stderr and
+          # silently fell back to "0" on any error - meaning every prior "still blank"
+          # verdict from this job may have been this check failing, not the app. Use the
+          # real property name and print (not swallow) identify's own error if it has one,
+          # so a tool failure is visible instead of indistinguishable from a real blank frame.
+          #
+          # A non-flat screenshot alone is not proof the app rendered: icewm's own taskbar
+          # and desktop chrome are non-flat by themselves, so a run where AppRun crashed
+          # immediately (e.g. a missing bundled library) can still "pass" on pixel stddev
+          # with nothing but the window manager's own furniture on screen. Require an actual
+          # window owned by the app (matched on its WM_CLASS, "OmaPhoto") to exist first.
+          START=$(date +%s)
+          STDDEV=0
+          WINDOW_FOUND=0
+          while [ "$(( $(date +%s) - START ))" -lt 15 ]; do
+            sleep 2
+            if xwininfo -tree -root 2>/dev/null | grep -q '"OmaPhoto")'; then
+              WINDOW_FOUND=1
+            else
+              echo "OmaPhoto window not found yet" >&2
+              continue
+            fi
+            # GitHub Actions runs this under `bash -e`, so a plain `VAR=$(cmd)` assignment
+            # would abort the whole step the instant ffmpeg or identify ever failed,
+            # skipping the diagnostics and cleanup below - guard both explicitly instead
+            # of relying on the fallback logic ever actually being reached.
+            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot.png -loglevel error || {
+              echo "ffmpeg capture failed, retrying" >&2; continue; }
+            if IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot.png 2>&1); then
+              STDDEV="$IDENTIFY_OUT"
+            else
+              echo "identify failed: $IDENTIFY_OUT" >&2
+              STDDEV=0
+            fi
+            echo "OmaPhoto window found, frame stddev: $STDDEV" >&2
+            if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+              break
+            fi
+          done
+
+          # Distinguish "still running but never painted" (a real rendering problem) from
+          # "already exited" (a crash or early return) before killing it - both look
+          # identical from the screenshot alone, but need different follow-up. If it's
+          # still running, grab a backtrace of every thread before killing it - a fixed
+          # env var is a guess, a backtrace of where it actually is is not.
+          echo "xwininfo window list:" >&2
+          timeout 10 xwininfo -tree -root >&2 2>&1 || true
+          if kill -0 "$APP_PID" 2>/dev/null; then
+            echo "AppRun (pid $APP_PID) is still running after the 15s retry window - backtracing it:" >&2
+            REAL_PID=$(pgrep -P "$APP_PID" -f omaphoto || echo "$APP_PID")
+            timeout 15 gdb -p "$REAL_PID" --batch -ex "thread apply all bt" >&2 2>&1 || true
+          else
+            echo "AppRun (pid $APP_PID) has already exited" >&2
+          fi
+
+          kill "$APP_PID" 2>/dev/null || true
+          kill "$ICEWM_PID" 2>/dev/null || true
+          kill "$XVFB_PID" 2>/dev/null || true
+
+          if [ "$WINDOW_FOUND" -ne 1 ]; then
+            echo "::error::no window owned by OmaPhoto ever appeared in 15s - it likely crashed or failed to start (see the backtrace/exit status above)" >&2
+            exit 1
+          fi
+          test -s screenshot.png
+          if ! awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+            echo "::error::OmaPhoto's window exists but screenshot.png still looks blank/flat after 15s (pixel stddev=$STDDEV)" >&2
+            exit 1
+          fi
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: screenshot
+          path: screenshot.png
+          if-no-files-found: ignore
+
+  screenshot-alpine:
+    name: Launch on a minimal musl distro (Alpine) and screenshot
+    needs: build
+    runs-on: ubuntu-24.04
+    container:
+      image: alpine:3.20
+      # Docker's default seccomp profile blocks ptrace; needed for the gdb backtrace
+      # this job takes of a stalled AppRun before killing it.
+      options: --cap-add=SYS_PTRACE
+    steps:
+      # actions/* run via a Node binary the runner injects from the host, which is
+      # glibc-linked; without a compat shim it can't even exec inside a musl container.
+      - name: Install glibc compat for the injected actions runtime
+        run: apk add --no-cache libc6-compat
+
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: appimage-x86_64
+
+      # The AppImage's payload is glibc-linked (built on Ubuntu) and now bundles every
+      # library it needs (X11, xcb, GL/EGL, etc. - see the build job), so unlike the
+      # earlier Alpine attempt, it should no longer touch any of Alpine's own musl-native
+      # system libraries at runtime - the exact thing that caused the earlier indefinite
+      # hang. It still needs a working glibc dynamic linker just to start at all, though:
+      # gcompat (Alpine's official shim) lacks GLIBC_2.38-era symbols this payload needs
+      # (__isoc23_strtol, renameat2, close_range, pthread_cond_clockwait), and
+      # sgerrand/alpine-pkg-glibc stops at glibc 2.35 - dalet-oss/alpine-glibc continues
+      # that same packaging up to date. This is a third-party apk repo and signing key,
+      # not an official Alpine package.
+      - name: Install a real glibc (gcompat is not complete enough for this payload)
+        run: |
+          GLIBC_VER=2.44
+          wget -q -O /etc/apk/keys/alpine-packaging-rsa.pub \
+            https://raw.githubusercontent.com/dalet-oss/alpine-glibc/master/alpine-packaging-rsa.pub
+          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-${GLIBC_VER}.apk"
+          wget -q "https://github.com/dalet-oss/alpine-glibc/releases/download/${GLIBC_VER}-amd64-r1/glibc-bin-${GLIBC_VER}.apk"
+          apk add --no-cache --force-overwrite "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
+          rm -f "glibc-${GLIBC_VER}.apk" "glibc-bin-${GLIBC_VER}.apk"
+
+      # Same rule as the Debian job: this container should need nothing app-specific,
+      # only genuine test infrastructure. If AppRun ever needs an app library added here,
+      # the build job's bundling is incomplete - fix it there, not here.
+      - name: Install test infrastructure (display, screenshot tooling - no app libraries)
+        run: |
+          apk add --no-cache \
+            ttf-dejavu xvfb ffmpeg imagemagick ca-certificates \
+            xwininfo gdb icewm
+
+      - name: Launch OmaPhoto under Xvfb and screenshot it
+        run: |
+          chmod +x OmaPhoto-x86_64.AppImage
+          ./OmaPhoto-x86_64.AppImage --appimage-extract
+
+          Xvfb :99 -screen 0 1280x800x24 &
+          XVFB_PID=$!
+          sleep 2
+
+          export DISPLAY=:99
+          # See the Debian job for why a window manager, DBUS_SESSION_BUS_ADDRESS=disabled:,
+          # and QT_ACCESSIBILITY=0 are all here - same reasoning, same container-vs-desktop gaps.
+          icewm > /dev/null 2>&1 &
+          ICEWM_PID=$!
+          sleep 2
+          export QT_QPA_PLATFORM=xcb
+          export QT_ACCESSIBILITY=0
+          export DBUS_SESSION_BUS_ADDRESS=disabled:
+          export QT_XCB_GL_INTEGRATION=none
+          export LIBGL_ALWAYS_SOFTWARE=1
+          mkdir -p -m0700 /tmp/runtime-root
+          export XDG_RUNTIME_DIR=/tmp/runtime-root
+          export QT_DEBUG_PLUGINS=1
+          ./squashfs-root/AppRun &
+          APP_PID=$!
+
+          # Same retry-until-real-content check as the Debian job, using the correct
+          # ImageMagick property (see that job's comment for the bug this replaced) and
+          # requiring an actual OmaPhoto-owned window first - a run where AppRun crashed
+          # immediately (e.g. a missing bundled library) can otherwise still "pass" on
+          # pixel stddev alone, since icewm's own taskbar and desktop chrome are non-flat
+          # by themselves. This exact false pass happened here once already: AppRun failed
+          # with "error while loading shared libraries: libGLX.so.0: ..." and the stddev
+          # check still measured 0.14 from icewm's desktop and reported success.
+          START=$(date +%s)
+          STDDEV=0
+          WINDOW_FOUND=0
+          while [ "$(( $(date +%s) - START ))" -lt 15 ]; do
+            sleep 2
+            if xwininfo -tree -root 2>/dev/null | grep -q '"OmaPhoto")'; then
+              WINDOW_FOUND=1
+            else
+              echo "OmaPhoto window not found yet" >&2
+              continue
+            fi
+            # Same errexit guard as the Debian job - see its comment for why.
+            ffmpeg -y -f x11grab -video_size 1280x800 -i "$DISPLAY" -frames:v 1 screenshot-alpine.png -loglevel error || {
+              echo "ffmpeg capture failed, retrying" >&2; continue; }
+            if IDENTIFY_OUT=$(identify -format "%[fx:standard_deviation]" screenshot-alpine.png 2>&1); then
+              STDDEV="$IDENTIFY_OUT"
+            else
+              echo "identify failed: $IDENTIFY_OUT" >&2
+              STDDEV=0
+            fi
+            echo "OmaPhoto window found, frame stddev: $STDDEV" >&2
+            if awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+              break
+            fi
+          done
+
+          echo "xwininfo window list:" >&2
+          timeout 10 xwininfo -tree -root >&2 2>&1 || true
+          if kill -0 "$APP_PID" 2>/dev/null; then
+            echo "AppRun (pid $APP_PID) is still running after the 15s retry window - backtracing it:" >&2
+            timeout 15 gdb -p "$APP_PID" --batch -ex "thread apply all bt" >&2 2>&1 || true
+          else
+            echo "AppRun (pid $APP_PID) has already exited" >&2
+          fi
+
+          kill "$APP_PID" 2>/dev/null || true
+          kill "$ICEWM_PID" 2>/dev/null || true
+          kill "$XVFB_PID" 2>/dev/null || true
+
+          if [ "$WINDOW_FOUND" -ne 1 ]; then
+            echo "::error::no window owned by OmaPhoto ever appeared in 15s - it likely crashed or failed to start (see the backtrace/exit status above)" >&2
+            exit 1
+          fi
+          test -s screenshot-alpine.png
+          if ! awk -v v="$STDDEV" 'BEGIN { exit !(v > 0.02) }'; then
+            echo "::error::OmaPhoto's window exists but screenshot-alpine.png still looks blank/flat after 15s (pixel stddev=$STDDEV)" >&2
+            exit 1
+          fi
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: screenshot-alpine
+          path: screenshot-alpine.png
+          if-no-files-found: ignore
+
+  upload:
+    name: Create release
+    needs: [build, screenshot-debian, screenshot-alpine]
+    # Debian is the real gate (AppImage's actual portability promise); Alpine is a
+    # stricter, more fragile stretch goal - its screenshot gets included when it
+    # succeeds, but a release still ships without it if it fails.
+    if: |
+      always() && github.event_name == 'push' &&
+      needs.build.result == 'success' && needs.screenshot-debian.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Download artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+
+      - name: Create release and upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep -oP 'project\(omaphoto VERSION \K[0-9.]+' CMakeLists.txt)
+          wget -q https://github.com/TheAssassin/pyuploadtool/releases/download/continuous/pyuploadtool-x86_64.AppImage
+          chmod +x pyuploadtool-x86_64.AppImage
+          FILES="screenshot/screenshot.png"
+          [ -f screenshot-alpine/screenshot-alpine.png ] && FILES="$FILES screenshot-alpine/screenshot-alpine.png"
+          # A rolling build should never show as the repo's "Latest" stable release.
+          GITHUB_RELEASE_NAME="$VERSION" GITHUB_CONTINUOUS_RELEASE_TYPE=prerelease \
+            ./pyuploadtool-x86_64.AppImage **/OmaPhoto*.AppImage* $FILES
+
+      - name: Add the screenshot(s) to the release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Derive the tag from the actual event instead of trusting "most recently
+          # created release" ordering, which a concurrent run or another release
+          # stream could make point at the wrong release.
+          case "$GITHUB_REF" in
+            refs/tags/*) TAG="${GITHUB_REF#refs/tags/}" ;;
+            *) TAG="continuous" ;;
+          esac
+          gh release view "$TAG" --repo "${{ github.repository }}" --json body --jq .body > notes.md
+          {
+            echo ""
+            echo ""
+            echo "## Running on a stock minimal Debian"
+            echo ""
+            echo "![OmaPhoto running on a stock minimal Debian](https://github.com/${{ github.repository }}/releases/download/$TAG/screenshot.png)"
+          } >> notes.md
+          if [ -f screenshot-alpine/screenshot-alpine.png ]; then
+            {
+              echo ""
+              echo "## Running on a stock minimal Alpine"
+              echo ""
+              echo "![OmaPhoto running on a stock minimal Alpine](https://github.com/${{ github.repository }}/releases/download/$TAG/screenshot-alpine.png)"
+            } >> notes.md
+          fi
+          gh release edit "$TAG" --repo "${{ github.repository }}" --notes-file notes.md
