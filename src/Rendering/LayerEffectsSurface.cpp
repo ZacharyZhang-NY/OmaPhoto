@@ -59,15 +59,20 @@ double LayerEffectsSurface::reach() const
     return reach;
 }
 
-void LayerEffectsSurface::update(const std::optional<ImportedImage> &base, const std::vector<BrushPatch> &patches, const std::optional<QImage> &mask)
+void LayerEffectsSurface::update(const std::optional<ImportedImage> &base, const std::vector<BrushPatch> &patches, const std::optional<QImage> &mask,
+                                 std::optional<MaskStroke> maskStroke)
 {
+    m_maskStroke = std::move(maskStroke);
     std::optional<QRectF> dirty;
     std::map<std::pair<qint64, qint64>, qint64> seen;
-    for (const BrushPatch &patch : patches) {
+    for (const BrushPatch &patch : m_maskStroke ? m_maskStroke->patches : patches) {
         const std::pair<qint64, qint64> key(qint64(patch.rect.left()), qint64(patch.rect.top()));
         seen.insert_or_assign(key, patch.image.cacheKey());
-        if (!m_taken.contains(key) || m_taken.at(key) != patch.image.cacheKey())
-            dirty = dirty ? dirty->united(patch.rect) : patch.rect;
+        if (m_taken.contains(key) && m_taken.at(key) == patch.image.cacheKey())
+            continue;
+        // A placed mask paints its grid; mapped into the layer's.
+        const QRectF rect = m_maskStroke ? m_maskStroke->toGrid.mapRect(patch.rect).adjusted(-1, -1, 1, 1) : patch.rect;
+        dirty = dirty ? dirty->united(rect) : rect;
     }
     const bool first = !m_image;
     const std::optional<QRectF> region = first ? std::optional(QRectF(QPointF(0, 0), grid).adjusted(-margin, -margin, margin, margin)) : dirty;
@@ -112,6 +117,17 @@ QImage LayerEffectsSurface::window(const QRectF &region, const std::optional<Imp
     QImage window = BrushRaster::context(int(region.width()), int(region.height()), false);
     QPainter painter(&window);
     painter.translate(-region.left(), -region.top());
+    if (m_maskStroke) {
+        // The pixels through the mask as the stroke leaves it.
+        const QImage live = m_maskStroke->coverage(region);
+        if (base && base->raster)
+            base->raster->draw(sourceRect, painter);
+        else if (base)
+            BrushRaster::draw(base->image(), sourceRect, painter);
+        painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+        painter.drawImage(region, BrushRaster::alphaView(live));
+        return window;
+    }
     if (base && base->raster)
         base->raster->draw(sourceRect, painter);
     else if (base)

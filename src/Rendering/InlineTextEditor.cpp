@@ -143,18 +143,25 @@ void InlineTextEditor::draw(QPainter &painter) const
     const double padding = LayerTextStyle::padding;
     painter.setTransform(textTransform());
     const QColor ink = QColor::fromRgbF(float(style().red), float(style().green), float(style().blue));
-    painter.setPen(ink);
-    const QColor highlight = palette.color(m_focused ? QPalette::Active : QPalette::Inactive, QPalette::Highlight);
+    // Clear glyphs: the canvas draws the text's own pixels beneath.
+    painter.setPen(Qt::transparent);
+    // The selection shows through to those pixels.
+    QColor highlight = palette.color(m_focused ? QPalette::Active : QPalette::Inactive, QPalette::Highlight);
+    highlight.setAlphaF(0.45f);
     // The input method's formats, else NSTextView's underline.
     QList<QTextLayout::FormatRange> formats;
     if (m_composing) {
         for (QTextLayout::FormatRange format : m_composing->formats) {
             format.start += m_composing->marked.start;
+            // Clear glyphs: an underline keeps the text's colour.
+            if (!format.format.underlineColor().isValid())
+                format.format.setUnderlineColor(ink);
             formats << format;
         }
         if (formats.isEmpty()) {
             QTextCharFormat underline;
             underline.setFontUnderline(true);
+            underline.setUnderlineColor(ink);
             formats << QTextLayout::FormatRange{m_composing->marked.start, m_composing->marked.end - m_composing->marked.start, underline};
         }
     }

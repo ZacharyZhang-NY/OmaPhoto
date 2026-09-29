@@ -29,18 +29,32 @@ void CanvasView::drawStroke(const BrushStroke &stroke, const ImageLayer &layer, 
                                        target, options);
         return;
     }
+    // With effects on, a surface redoes them per mask change.
+    const auto drawSurface = [&](LayerEffectsSurface *surface) {
+        if (!surface || !surface->image())
+            return false;
+        const LayerTransform grown = LayerEffectsRenderer::placed(transform, *surface->image(), surface->margin);
+        surface->placement = grown;
+        LayerRenderer::draw(*surface->image(), grown, center(grown.center()), target, bare);
+        return true;
+    };
     if (stroke.layer.mask && stroke.layer.mask->placement) {
         // A placed mask: the layer draws through its own grid.
         if (!layer.asset)
             return;
+        const std::optional<QImage> preview = stroke.placedMaskPreview(*stroke.layer.mask->placement);
+        if (preview && drawSurface(placedMaskSurface(layer, stroke, *stroke.layer.mask->placement, *preview)))
+            return;
         LayerRenderer::Options through = options;
-        through.mask = stroke.placedMaskPreview(*stroke.layer.mask->placement).value_or(QImage());
+        through.mask = preview.value_or(QImage());
         if (layer.asset->raster)
             TiledLayerRenderer::drawRaster(layer.asset->raster, transform, center(transform.center()), target, through);
         else
             LayerRenderer::draw(layer.asset->image(), transform, center(transform.center()), target, through);
         return;
     }
+    if (drawSurface(strokeSurface(layer, stroke, std::nullopt)))
+        return;
     TiledLayerRenderer::drawMaskStroke(stroke.width, stroke.height, stroke.sourceRect, stroke.patches(),
                                        stroke.layer.mask ? std::optional(stroke.layer.mask->asset) : std::nullopt, image, raster, transform,
                                        center(transform.center()), target, bare);
@@ -57,7 +71,51 @@ LayerEffectsSurface *CanvasView::strokeSurface(const ImageLayer &layer, const Br
         m_strokeSurface = LayerEffectsSurface::make(layer.id, effects, grid, stroke.sourceRect);
     if (!m_strokeSurface)
         return nullptr;
-    m_strokeSurface->update(stroke.layer.asset, stroke.patches(), mask);
+    if (!stroke.isMask) {
+        m_strokeSurface->update(stroke.layer.asset, stroke.patches(), mask);
+        return m_strokeSurface.get();
+    }
+    // The old mask, then the stroke's tiles over it.
+    const std::optional<QImage> old = stroke.layer.mask ? std::optional(stroke.layer.mask->asset.image()) : std::nullopt;
+    const std::vector<BrushPatch> patches = stroke.patches();
+    const QRectF sourceRect = stroke.sourceRect;
+    m_strokeSurface->update(stroke.layer.asset, {}, std::nullopt, LayerEffectsSurface::MaskStroke{patches, QTransform(), [old, patches, sourceRect](const QRectF &region) {
+        QImage coverage = BrushRaster::context(int(region.width()), int(region.height()), true);
+        QPainter painter(&coverage);
+        painter.translate(-region.left(), -region.top());
+        if (old)
+            BrushRaster::draw(*old, sourceRect, painter);
+        for (const BrushPatch &patch : patches) {
+            if (patch.rect.intersects(region))
+                BrushRaster::draw(patch.image, patch.rect, painter);
+        }
+        return coverage;
+    }});
+    return m_strokeSurface.get();
+}
+
+// A placed mask paints its grid; the surface, the layer's.
+LayerEffectsSurface *CanvasView::placedMaskSurface(const ImageLayer &layer, const BrushStroke &stroke, const LayerTransform &placement, const QImage &preview)
+{
+    const LayerEffects effects = layer.effects.value_or(LayerEffects()).visible();
+    if (effects.isEmpty() || !effects.isValid() || !stroke.layer.asset)
+        return nullptr;
+    const QSize base = stroke.layer.asset->size();
+    const QRectF full(QPointF(0, 0), QSizeF(base));
+    if (!m_strokeSurface || !m_strokeSurface->matches(layer.id, effects, full.size(), full))
+        m_strokeSurface = LayerEffectsSurface::make(layer.id, effects, full.size(), full);
+    if (!m_strokeSurface)
+        return nullptr;
+    const QTransform toGrid = BrushRaster::pixelToDocument(placement, stroke.width, stroke.height)
+        * BrushRaster::pixelToDocument(stroke.layer.transform, base.width(), base.height()).inverted();
+    m_strokeSurface->update(stroke.layer.asset, {}, std::nullopt, LayerEffectsSurface::MaskStroke{stroke.patches(), toGrid, [preview, full](const QRectF &region) {
+        QImage coverage = BrushRaster::context(int(region.width()), int(region.height()), true);
+        QPainter painter(&coverage);
+        painter.translate(-region.left(), -region.top());
+        painter.setRenderHint(QPainter::SmoothPixmapTransform);
+        painter.drawImage(full, preview);
+        return coverage;
+    }});
     return m_strokeSurface.get();
 }
 

@@ -229,3 +229,16 @@ bool CanvasView::brushBracket(const QString &text)
         m_session.changeBrushHardness(text == u"}");
     return true;
 }
+
+// The stroke's dirty rect in view points, two points out.
+std::optional<QRectF> CanvasView::strokeDirtyRect() const
+{
+    const BrushStroke *stroke = m_session.brushStroke();
+    const std::optional<CanvasDocument> &document = m_session.document();
+    if (!stroke || !document || !stroke->dirtyDocumentRect())
+        return std::nullopt;
+    const QRectF &dirty = *stroke->dirtyDocumentRect();
+    const QPointF origin = m_session.viewport.viewPoint(dirty.topLeft(), document->size());
+    const double scale = m_session.viewport.pointsPerPixel();
+    return QRectF(origin, QSizeF(dirty.width() * scale, dirty.height() * scale)).adjusted(-2, -2, 2, 2);
+}

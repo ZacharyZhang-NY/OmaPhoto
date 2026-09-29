@@ -22,6 +22,18 @@ void InlineTextPreeditTests::markedTextIsUnderlined()
     const QRect band = shown.editor().textTransform().mapRect(
         QRectF(LayerTextStyle::padding, baseline + 1, metrics.horizontalAdvance(QStringLiteral("nn")) - 4, metrics.descent() - 2)).toAlignedRect();
     QVERIFY(where(shown.grab().copy(band), reddish).isValid());
+    // The input method's own underline, uncoloured, takes the text's.
+    QTextCharFormat underlined;
+    underlined.setFontUnderline(true);
+    QInputMethodEvent styled(QStringLiteral("nn"), {QInputMethodEvent::Attribute(QInputMethodEvent::TextFormat, 0, 2, underlined)});
+    QApplication::sendEvent(shown.canvas, &styled);
+    QVERIFY(where(shown.grab().copy(band), reddish).isValid());
+    // Its own colour stands.
+    underlined.setUnderlineColor(Qt::blue);
+    QInputMethodEvent blue(QStringLiteral("nn"), {QInputMethodEvent::Attribute(QInputMethodEvent::TextFormat, 0, 2, underlined)});
+    QApplication::sendEvent(shown.canvas, &blue);
+    QVERIFY(!where(shown.grab().copy(band), reddish).isValid());
+    QVERIFY(where(shown.grab().copy(band), [](QColor colour) { return colour.blue() > 128 && colour.red() < 90 && colour.green() < 90; }).isValid());
     // A format that is none keeps the underline, as Qt's.
     QInputMethodEvent formless(QStringLiteral("nn"), {QInputMethodEvent::Attribute(QInputMethodEvent::TextFormat, 0, 2, QVariant())});
     QApplication::sendEvent(shown.canvas, &formless);
@@ -87,12 +99,13 @@ void InlineTextPreeditTests::theInputMethodStylesItsPreedit()
     shown.session.cancelText();
     beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("xx"));
+    const QImage plain = shown.grab();
     QInputMethodEvent selecting(QStringLiteral("nn"), {QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 0, 2, QVariant())});
     QApplication::sendEvent(shown.canvas, &selecting);
     QCOMPARE(shown.session.textDraft().value().style.content, QString("xxnn"));
     const QPalette::ColorGroup group = shown.canvas->hasFocus() ? QPalette::Active : QPalette::Inactive;
     const QPoint first = shown.editor().textTransform().map(QPointF(padding + 3, padding + 3)).toPoint();
-    QCOMPARE(shown.grab().pixelColor(first), shown.canvas->palette().color(group, QPalette::Highlight));
+    QVERIFY(highlightedOver(plain.pixelColor(first), shown.grab().pixelColor(first), shown.canvas->palette().color(group, QPalette::Highlight)));
     // Past the preedit, it sits after the preedit's letters.
     shown.session.cancelText();
     beginTextAt(shown.session, QPointF(20, 30));
@@ -102,8 +115,8 @@ void InlineTextPreeditTests::theInputMethodStylesItsPreedit()
     QCOMPARE(shown.session.textDraft().value().style.content, QString("nnxx"));
     const double nn = metrics.horizontalAdvance(QStringLiteral("nn"));
     const QPoint x = shown.editor().textTransform().map(QPointF(padding + nn + 3, padding + 3)).toPoint();
-    QCOMPARE(shown.grab().pixelColor(x), shown.canvas->palette().color(group, QPalette::Highlight));
-    QVERIFY(shown.grab().pixelColor(first) != shown.canvas->palette().color(group, QPalette::Highlight));
+    QVERIFY(highlightedOver(plain.pixelColor(x), shown.grab().pixelColor(x), shown.canvas->palette().color(group, QPalette::Highlight)));
+    QCOMPARE(shown.grab().pixelColor(first), plain.pixelColor(first));
 }
 
 QTEST_MAIN(InlineTextPreeditTests)

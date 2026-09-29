@@ -2,7 +2,9 @@
 #include "Document/BrushStroke.h"
 #include "Document/LayerEffects.h"
 #include <QImage>
+#include <QTransform>
 #include <QUuid>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -14,8 +16,16 @@ public:
     static std::unique_ptr<LayerEffectsSurface> make(QUuid layerID, const LayerEffects &effects, QSizeF grid, QRectF sourceRect);
     // Whether it still fits the stroke and settings.
     bool matches(QUuid layerID, const LayerEffects &effects, QSizeF grid, QRectF sourceRect) const;
+    // A mask painted: tiles, their map into the grid, coverage.
+    struct MaskStroke {
+        std::vector<BrushPatch> patches;
+        QTransform toGrid;
+        // The mask over a grid region, gray, white showing; throws.
+        std::function<QImage(const QRectF &)> coverage;
+    };
     // Everything at first, then only where the paint changed.
-    void update(const std::optional<ImportedImage> &base, const std::vector<BrushPatch> &patches, const std::optional<QImage> &mask);
+    void update(const std::optional<ImportedImage> &base, const std::vector<BrushPatch> &patches, const std::optional<QImage> &mask,
+                std::optional<MaskStroke> maskStroke = std::nullopt);
     const std::optional<QImage> &image() const { return m_image; }
 
     const QUuid layerID;
@@ -40,4 +50,5 @@ private:
     // Each tile's origin and the pixels last taken from it.
     std::map<std::pair<qint64, qint64>, qint64> m_taken;
     std::optional<QImage> m_image;
+    std::optional<MaskStroke> m_maskStroke;
 };

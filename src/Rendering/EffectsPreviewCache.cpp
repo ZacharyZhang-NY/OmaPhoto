@@ -57,6 +57,7 @@ void EffectsPreviewCache::prepare(const std::vector<ImageLayer> &layers)
         entry = m_entries.erase(entry);
     }
     std::erase_if(m_seeds, [&](const auto &seed) { return !ids.contains(seed.first); });
+    std::erase_if(m_recent, [&](const auto &recent) { return !ids.contains(recent.first); });
     // About 64 MiB of output shared by every effect layer.
     m_sideLimit = std::min(1536, std::max(32, int(std::sqrt(16'777'216.0 / double(std::max<size_t>(1, ids.size()))))));
 }
@@ -80,9 +81,21 @@ std::optional<EffectsPreviewCache::Result> EffectsPreviewCache::preview(const Im
     if (m_entries.contains(layer.id)) {
         const Entry &old = m_entries.at(layer.id);
         old.request.cancelled->store(true);
-        // Kept on the same pixels, an effect hidden or not.
-        if (old.request.image.identity() == request.image.identity() && old.request.maskSource == maskSource)
+        // Kept on the same pixels, an effect or mask changed.
+        if (old.request.image.identity() == request.image.identity())
             previous = old.result;
+    }
+    // Pixels an undo put back: their effects are known.
+    if (m_recent.contains(layer.id)) {
+        const std::vector<Entry> &recent = m_recent.at(layer.id);
+        for (size_t index = recent.size(); index-- > 0;) {
+            if (!recent[index].request.matches(request))
+                continue;
+            const Entry found = recent[index];
+            m_entries.insert_or_assign(layer.id, found);
+            m_seeds.erase(layer.id);
+            return found.result;
+        }
     }
     if (!previous && m_seeds.contains(layer.id))
         previous = m_seeds.at(layer.id);
@@ -107,8 +120,14 @@ void EffectsPreviewCache::land(QUuid layerID, QUuid requestID, const std::option
     if (!m_entries.contains(layerID) || m_entries.at(layerID).request.id != requestID)
         return;
     m_entries.at(layerID).result = result;
-    if (result)
+    if (result) {
         m_seeds.erase(layerID);
+        // A match returns before rendering: none repeats here.
+        std::vector<Entry> &recent = m_recent[layerID];
+        recent.push_back(m_entries.at(layerID));
+        if (recent.size() > 3)
+            recent.erase(recent.begin());
+    }
     completion();
 }
 
@@ -124,45 +143,60 @@ std::optional<EffectsPreviewCache::Result> EffectsPreviewCache::render(const Req
 {
     try {
         // A painted layer flattens here, off the UI thread.
-        const QImage image = request.image.image();
-        const double margin = LayerEffectsRenderer::margin(request.effects);
-        // The margins count too; even a 500px stroke stays bounded.
-        const double factor = std::min(1.0, double(request.sideLimit - 8) / (double(std::max(image.width(), image.height())) + 2 * margin));
-        const int width = std::max(1, int(std::round(image.width() * factor)));
-        const int height = std::max(1, int(std::round(image.height() * factor)));
-        // Swift's high quality: each axis filtered by its own measure.
-        const auto resized = [&](const QImage &source, bool mask) {
-            // A mask travels as alpha, so its values pass exactly.
-            const QImage scaled = (mask ? BrushRaster::alphaView(source) : source)
-                                      .scaled(width, height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
-                                      .convertToFormat(mask ? QImage::Format_Alpha8 : QImage::Format_RGBA8888_Premultiplied);
-            const QImage result = mask ? QImage(scaled.constBits(), width, height, scaled.bytesPerLine(), QImage::Format_Grayscale8).copy() : scaled;
-            if (result.isNull())
-                throw ExportError(ExportError::Kind::render);
-            return result;
-        };
-        const QImage pixels = factor == 1 ? image : resized(image, false);
-        const std::optional<QImage> mask = request.mask ? std::optional(factor == 1 ? *request.mask : resized(*request.mask, true)) : std::nullopt;
-        LayerEffects effects = request.effects;
-        if (effects.stroke)
-            effects.stroke->size *= factor;
-        if (effects.shadow) {
-            effects.shadow->distance *= factor;
-            effects.shadow->blur *= factor;
-        }
-        // Swift forgets the inner shadow and glows: too wide.
-        if (effects.innerShadow) {
-            effects.innerShadow->distance *= factor;
-            effects.innerShadow->blur *= factor;
-        }
-        if (effects.outerGlow)
-            effects.outerGlow->size *= factor;
-        if (effects.innerGlow)
-            effects.innerGlow->size *= factor;
-        const LayerEffectsRenderer::Rendered rendered = LayerEffectsRenderer::render(pixels, mask, effects);
-        return Result{rendered.image, rendered.inset, std::nullopt};
+        return scaled(request.image.image(), request.mask, request.effects, request.sideLimit);
     } catch (const ExportError &error) {
         qCWarning(lcRendering) << "an effects preview could not be made:" << error.what();
     }
     return std::nullopt;
+}
+
+std::optional<EffectsPreviewCache::Result> EffectsPreviewCache::renderNow(const QImage &image, const std::optional<QImage> &mask,
+                                                                           const LayerEffects &effects) const
+{
+    try {
+        return scaled(image, mask, effects, m_sideLimit);
+    } catch (const ExportError &error) {
+        qCWarning(lcRendering) << "typed text's effects could not be made:" << error.what();
+    }
+    return std::nullopt;
+}
+
+// Scaled to the side limit, rendered, its settings scaled alike.
+EffectsPreviewCache::Result EffectsPreviewCache::scaled(const QImage &image, const std::optional<QImage> &requestMask, LayerEffects effects, int sideLimit)
+{
+    const double margin = LayerEffectsRenderer::margin(effects);
+    // The margins count too; even a 500px stroke stays bounded.
+    const double factor = std::min(1.0, double(sideLimit - 8) / (double(std::max(image.width(), image.height())) + 2 * margin));
+    const int width = std::max(1, int(std::round(image.width() * factor)));
+    const int height = std::max(1, int(std::round(image.height() * factor)));
+    // Swift's high quality: each axis filtered by its own measure.
+    const auto resized = [&](const QImage &source, bool mask) {
+        // A mask travels as alpha, so its values pass exactly.
+        const QImage scaled = (mask ? BrushRaster::alphaView(source) : source)
+                                  .scaled(width, height, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                                  .convertToFormat(mask ? QImage::Format_Alpha8 : QImage::Format_RGBA8888_Premultiplied);
+        const QImage result = mask ? QImage(scaled.constBits(), width, height, scaled.bytesPerLine(), QImage::Format_Grayscale8).copy() : scaled;
+        if (result.isNull())
+            throw ExportError(ExportError::Kind::render);
+        return result;
+    };
+    const QImage pixels = factor == 1 ? image : resized(image, false);
+    const std::optional<QImage> mask = requestMask ? std::optional(factor == 1 ? *requestMask : resized(*requestMask, true)) : std::nullopt;
+    if (effects.stroke)
+        effects.stroke->size *= factor;
+    if (effects.shadow) {
+        effects.shadow->distance *= factor;
+        effects.shadow->blur *= factor;
+    }
+    // Swift forgets the inner shadow and glows: too wide.
+    if (effects.innerShadow) {
+        effects.innerShadow->distance *= factor;
+        effects.innerShadow->blur *= factor;
+    }
+    if (effects.outerGlow)
+        effects.outerGlow->size *= factor;
+    if (effects.innerGlow)
+        effects.innerGlow->size *= factor;
+    const LayerEffectsRenderer::Rendered rendered = LayerEffectsRenderer::render(pixels, mask, effects);
+    return Result{rendered.image, rendered.inset, std::nullopt};
 }

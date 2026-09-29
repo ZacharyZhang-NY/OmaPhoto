@@ -178,6 +178,7 @@ add_library(compositor_core STATIC
     src/Rendering/EditorCanvas+CameraRaw.cpp
     src/Rendering/EditorCanvas+Brush.cpp
     src/Rendering/EditorCanvas+Crop.cpp
+    src/Rendering/EditorCanvas+DraftText.cpp
     src/Rendering/EditorCanvas+Effects.cpp
     src/Rendering/EditorCanvas+Grid.cpp
     src/Rendering/EditorCanvas+Guides.cpp

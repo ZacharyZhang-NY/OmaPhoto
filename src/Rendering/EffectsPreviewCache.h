@@ -28,6 +28,8 @@ public:
     // The last result; `completion` runs once a new one lands.
     std::optional<Result> preview(const ImageLayer &layer, const std::optional<QImage> &mask, const LayerTransform &transform,
                                   const std::optional<LayerTransform> &maskPlacement, const std::function<void()> &completion);
+    // Rendered at once, at the preview size: typed text's.
+    std::optional<Result> renderNow(const QImage &image, const std::optional<QImage> &mask, const LayerEffects &effects) const;
 
 private:
     struct Request {
@@ -48,12 +50,15 @@ private:
         std::optional<Result> result;
     };
     static std::optional<Result> render(const Request &request);
+    static Result scaled(const QImage &image, const std::optional<QImage> &mask, LayerEffects effects, int sideLimit);
     void cancel(QUuid id);
     void land(QUuid layerID, QUuid requestID, const std::optional<Result> &result, const std::function<void()> &completion);
 
     std::map<QUuid, Entry> m_entries;
     // Warped effects handed in, shown until the worker catches up.
     std::map<QUuid, Result> m_seeds;
+    // Three finished previews a layer, newest last, for undo.
+    std::map<QUuid, std::vector<Entry>> m_recent;
     int m_sideLimit = 1536;
     // Swift's serial queue: one render at a time.
     QThreadPool m_worker;

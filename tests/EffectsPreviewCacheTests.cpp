@@ -68,6 +68,8 @@ private slots:
     void aMaskHidesPixelsInTheReducedPreview();
     void aReducedPreviewScalesEveryLength();
     void aClosedCacheLandsNothing();
+    void undoneStepsReuseTheirEffects();
+    void renderNowRendersAtThePreviewSize();
 };
 
 void EffectsPreviewCacheTests::aPreviewLandsAfterItsDelayAsTheRendererDrawsIt()
@@ -150,17 +152,82 @@ void EffectsPreviewCacheTests::settingsKeepTheLastPreviewButNewPixelsDropIt()
     layer.effects->colorOverlay = ColorOverlayEffect();
     QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), second.image.cacheKey());
     landed(cache, layer, landings, 3);
-    // New pixels, or a mask switched on, drop it too.
+    // New pixels drop it.
     layer.asset = ImportedImage(filled(20, 10, QColor(255, 0, 0)), QImage(), QStringLiteral("Red"));
     QVERIFY(!ask(cache, layer, landings));
-    landed(cache, layer, landings, 4);
+    const qint64 red = landed(cache, layer, landings, 4).image.cacheKey();
+    // A mask added or removed on those pixels keeps it.
     layer.mask = LayerMask(LayerMask::assetFrom(gray(20, 10, 255)));
-    QVERIFY(!ask(cache, layer, landings, layer.mask->enabledImage()));
-    landed(cache, layer, landings, 5);
-    // A mask switched off is no source.
+    QCOMPARE(ask(cache, layer, landings, layer.mask->enabledImage()).value().image.cacheKey(), red);
+    QVERIFY(landed(cache, layer, landings, 5).image.cacheKey() != red);
+    // Switched off again, the unmasked effects are known: no render.
     layer.mask->isEnabled = false;
+    QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), red);
+    QTest::qWait(200);
+    QCOMPARE(*landings.count, 5);
+}
+
+void EffectsPreviewCacheTests::undoneStepsReuseTheirEffects()
+{
+    EffectsPreviewCache cache;
+    ImageLayer layer = layerOf(filled(20, 10, QColor(0, 0, 255)), outline(3));
+    const Landings landings;
+    // Four pixels in turn, each rendered and landed.
+    std::vector<ImportedImage> images;
+    std::vector<qint64> keys;
+    for (int step = 0; step < 4; ++step) {
+        images.emplace_back(filled(20, 10, QColor(0, 0, 60 + 60 * step)), QImage(), QStringLiteral("Step"));
+        layer.asset = images.back();
+        QVERIFY(!ask(cache, layer, landings));
+        keys.push_back(landed(cache, layer, landings, step + 1).image.cacheKey());
+    }
+    // Undone and redone across draws: the three newest are known.
+    for (const int step : {2, 1, 3}) {
+        cache.prepare({layer});
+        layer.asset = images[size_t(step)];
+        QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), keys[size_t(step)]);
+    }
+    QTest::qWait(200);
+    QCOMPARE(*landings.count, 4);
+    // Undone and redone across draws: three newest are known.
+    cache.seed(layer.id, filled(4, 4, QColor(0, 255, 0)), layer.transform);
+    layer.asset = images[2];
+    QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), keys[2]);
+    layer.asset = images[0];
     QVERIFY(!ask(cache, layer, landings));
-    landed(cache, layer, landings, 6);
+    // A layer without effects forgets them.
+    cache.prepare({});
+    layer.asset = images[3];
+    QVERIFY(!ask(cache, layer, landings));
+}
+
+void EffectsPreviewCacheTests::renderNowRendersAtThePreviewSize()
+{
+    EffectsPreviewCache cache;
+    const QImage large = filled(400, 200, QColor(0, 0, 255));
+    const LayerEffectsRenderer::Rendered whole = LayerEffectsRenderer::render(large, std::nullopt, outline(3));
+    // Within the default 1536 a side: the whole render.
+    const EffectsPreviewCache::Result now = cache.renderNow(large, std::nullopt, outline(3)).value();
+    QCOMPARE(now.image, whole.image);
+    QCOMPARE(now.inset, whole.inset);
+    // Sharing the budget with a thousand, as the worker reduces.
+    const ImageLayer layer = layerOf(large, outline(3));
+    std::vector<ImageLayer> many(999, layerOf(filled(2, 2, QColor(0, 0, 255)), outline(3)));
+    for (ImageLayer &each : many)
+        each.id = QUuid::createUuid();
+    many.push_back(layer);
+    cache.prepare(many);
+    const Landings landings;
+    ask(cache, layer, landings);
+    const EffectsPreviewCache::Result worker = landed(cache, layer, landings, 1);
+    const EffectsPreviewCache::Result reduced = cache.renderNow(large, std::nullopt, outline(3)).value();
+    QCOMPARE(reduced.image, worker.image);
+    QCOMPARE(reduced.inset, worker.inset);
+    // 129 a side: sides at 121 over the margined width.
+    const double factor = 121.0 / (400 + 2 * LayerEffectsRenderer::margin(outline(3)));
+    const LayerEffects scaledOutline = outline(3 * factor);
+    QCOMPARE(reduced.image.size(), LayerEffectsRenderer::render(filled(int(std::lround(400 * factor)), int(std::lround(200 * factor)), QColor(0, 0, 255)),
+                                                                std::nullopt, scaledOutline).image.size());
 }
 
 void EffectsPreviewCacheTests::onlyTheNewestRequestLands()

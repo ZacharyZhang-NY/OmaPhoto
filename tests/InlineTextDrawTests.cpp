@@ -58,12 +58,15 @@ void InlineTextDrawTests::theFrameAndHandlesSitOnTheBox()
     QVERIFY(image.pixelColor(shown.onScreen(QPointF(size.width() / 4, 4))) != frame);
     // No plus without overflow.
     QVERIFY(image.pixelColor(shown.onScreen(QPointF(size.width(), size.height()))) == QColor(Qt::white));
-    // Text draws over the frame, a subview over its view.
+    // Tight leading lifts the H into the frame, still over.
     shown.session.changeTextStyle([](LayerTextStyle &style) {
         style.content = QStringLiteral("H");
         style.leading = 30;
     });
-    QVERIFY(reddish(shown.grab().pixelColor(shown.onScreen(QPointF(24, 0.25)))));
+    QCOMPARE(qAlpha(EditorSession::textImage(shown.session.textDraft().value().style).pixel(24, 0)), 255);
+    const QColor over = shown.grab().pixelColor(shown.onScreen(QPointF(24, 0.25)));
+    QVERIFY2(!reddish(over) && std::abs(over.red() - accent.red()) < 40 && std::abs(over.blue() - accent.blue()) < 40, qPrintable(over.name()));
+    QVERIFY(where(shown.grab(), reddish).isValid());
 }
 
 void InlineTextDrawTests::aTurnedFlippedLayerIsEditedInPlace()
@@ -151,17 +154,18 @@ void InlineTextDrawTests::aSelectionShowsBehindItsText()
     QTRY_VERIFY(shown.canvas->hasFocus());
     beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("iiii"));
+    const QImage plain = shown.grab();
     QTest::keyClick(shown.canvas, Qt::Key_A, Qt::ControlModifier);
+    const auto mixed = [&](QPoint at, QColor highlight) { return highlightedOver(plain.pixelColor(at), shown.grab().pixelColor(at), highlight); };
+    const auto highlighted = [&](QPoint at) { return mixed(at, shown.canvas->palette().color(QPalette::Active, QPalette::Highlight)); };
     // Above the letters, the line's height is highlighted.
     const QPoint above = shown.editor().textTransform().map(QPointF(LayerTextStyle::padding + 3, LayerTextStyle::padding + 3)).toPoint();
-    QCOMPARE(shown.grab().pixelColor(above), shown.canvas->palette().color(QPalette::Active, QPalette::Highlight));
+    QVERIFY(highlighted(above));
     const double line = shown.session.textDraft().value().style.lineHeight();
-    const QPoint below = shown.editor().textTransform().map(QPointF(LayerTextStyle::padding + 3, LayerTextStyle::padding + line - 3)).toPoint();
-    QCOMPARE(shown.grab().pixelColor(below), shown.canvas->palette().color(QPalette::Active, QPalette::Highlight));
+    QVERIFY(highlighted(shown.editor().textTransform().map(QPointF(LayerTextStyle::padding + 3, LayerTextStyle::padding + line - 3)).toPoint()));
     // To the last selected letter's edge.
     const double selected = QFontMetricsF(TextLayout::font(shown.session.textDraft().value().style)).horizontalAdvance(QStringLiteral("iiii"));
-    const QPoint last = shown.editor().textTransform().map(QPointF(LayerTextStyle::padding + selected - 3, LayerTextStyle::padding + 3)).toPoint();
-    QCOMPARE(shown.grab().pixelColor(last), shown.canvas->palette().color(QPalette::Active, QPalette::Highlight));
+    QVERIFY(highlighted(shown.editor().textTransform().map(QPointF(LayerTextStyle::padding + selected - 3, LayerTextStyle::padding + 3)).toPoint()));
     // No caret while something is selected.
     const QPointF mapped = shown.editor().textTransform().map(
         QPointF(LayerTextStyle::padding + QFontMetricsF(TextLayout::font(shown.session.textDraft().value().style)).horizontalAdvance(QStringLiteral("iiii")) + 0.25,
@@ -170,7 +174,7 @@ void InlineTextDrawTests::aSelectionShowsBehindItsText()
     QVERIFY(!reddish(shown.grab().pixelColor(end)));
     QTest::keyClick(shown.canvas, Qt::Key_End);
     QVERIFY(reddish(shown.grab().pixelColor(end)));
-    QVERIFY(shown.grab().pixelColor(above) != shown.canvas->palette().color(QPalette::Active, QPalette::Highlight));
+    QCOMPARE(shown.grab().pixelColor(above), plain.pixelColor(above));
     // Unfocused, a selection shows in the inactive colour.
     QPalette palette = shown.canvas->palette();
     palette.setColor(QPalette::Inactive, QPalette::Highlight, QColor(40, 200, 40));
@@ -180,7 +184,7 @@ void InlineTextDrawTests::aSelectionShowsBehindItsText()
     field->show();
     field->setFocus();
     QTRY_VERIFY(!shown.canvas->hasFocus());
-    QCOMPARE(shown.grab().pixelColor(above), QColor(40, 200, 40));
+    QVERIFY(mixed(above, QColor(40, 200, 40)));
 }
 
 void InlineTextDrawTests::textPastTheBoxShowsAPlus()

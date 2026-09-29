@@ -83,7 +83,9 @@ CanvasView::DisplayState CanvasView::displayState() const
                        .renderBounds = renderBounds(),
                        .viewport = m_session.viewport,
                        .layers = {},
-                       .folderMasks = {}};
+                       .folderMasks = {},
+                       .textStyle = m_session.textDraft() ? std::optional(m_session.textDraft()->style) : std::nullopt,
+                       .textTransform = m_session.textDraft() && m_inlineTextEditor ? std::optional(m_inlineTextEditor->shownTransform()) : std::nullopt};
     if (!document)
         return state;
     // A hidden source still clips: live masks count every layer.
@@ -109,19 +111,6 @@ CanvasView::DisplayState CanvasView::displayState() const
             state.folderMasks.push_back({.id = layer.id, .maskID = enabledMaskID(layer.mask), .transform = m_session.displayedTransform(layer)});
     }
     return state;
-}
-
-// The stroke's dirty rect in view points, two points out.
-std::optional<QRectF> CanvasView::strokeDirtyRect() const
-{
-    const BrushStroke *stroke = m_session.brushStroke();
-    const std::optional<CanvasDocument> &document = m_session.document();
-    if (!stroke || !document || !stroke->dirtyDocumentRect())
-        return std::nullopt;
-    const QRectF &dirty = *stroke->dirtyDocumentRect();
-    const QPointF origin = m_session.viewport.viewPoint(dirty.topLeft(), document->size());
-    const double scale = m_session.viewport.pointsPerPixel();
-    return QRectF(origin, QSizeF(dirty.width() * scale, dirty.height() * scale)).adjusted(-2, -2, 2, 2);
 }
 
 bool CanvasView::synchronizeDisplay()
@@ -310,6 +299,7 @@ FolderMaskClip::Applier CanvasView::liveFolderMaskClip(const BrushStroke &edit, 
 
 void CanvasView::drawLayers(const CanvasDocument &document, double scale, const Center &center, QPainter &context)
 {
+    handOnDraftEffects(document);
     m_session.effectsPreviews.prepare(document.layers);
     std::map<QUuid, ImageLayer> byID;
     for (const ImageLayer &layer : document.layers) {
@@ -322,12 +312,16 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
             canvas->update();
     };
     const auto drawOwn = [&](QUuid id, QPainter &target, const QImage &clip) {
-        // Open text shows in its editor instead.
-        if (!byID.contains(id) || (m_session.textDraft() && m_session.textDraft().value().layerID == id))
+        if (!byID.contains(id))
             return;
         const ImageLayer &layer = byID.at(id);
         // Its folders dim it with everything inside them.
         const double opacity = layer.effectiveOpacity(byID);
+        // Text being edited draws as it will be committed.
+        if (m_session.textDraft() && m_session.textDraft()->layerID == id) {
+            drawTypedText(layer, {.scale = scale, .opacity = opacity, .blendMode = m_session.displayedBlendMode(layer), .clip = clip}, center, target);
+            return;
+        }
         // A stroke or pixel move stands in for the pixels.
         const PixelMove *move = m_session.pixelMove();
         const std::optional<GradientEdit> &gradient = m_session.gradientEdit();
@@ -412,10 +406,13 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
             LayerRenderer::draw(layer.asset->image(), transform, center(transform.center()), target, options);
     };
     // Above the active layer, where the new layer will go.
+    bool drewNewText = false;
     const auto drawOwnWithDraft = [&](QUuid id, QPainter &target, const QImage &clip) {
         drawOwn(id, target, clip);
-        if (id == m_session.activeLayerID())
-            drawShapeDraft(scale, center, target, clip);
+        if (id != m_session.activeLayerID())
+            return;
+        drawShapeDraft(scale, center, target, clip);
+        drawNewText(drewNewText, scale, center, target, clip);
     };
     const auto parent = [&](QUuid id) { return byID.contains(id) ? byID.at(id).parentID : std::nullopt; };
     // A mask being painted exists as the edit's tiles alone.
@@ -460,6 +457,8 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
         const QPointF origin = center(transform.center());
         return [clip, origin, scale](const QPainter &painter, QImage &coverage) { clip.apply(origin, painter, coverage, scale); };
     }, context, [&](QUuid id, const QImage &clip) { live.drawComposite(id, context, clip); });
+    // Else on top: the active layer, a folder or hidden.
+    drawNewText(drewNewText, scale, center, context, QImage());
 }
 
 void CanvasView::drawDocumentPixels(const QRectF &view, const QRectF &pixels, const CanvasDocument &document, QPainter &context)

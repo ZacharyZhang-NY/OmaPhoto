@@ -41,6 +41,14 @@ inline bool reddish(QColor colour)
     return colour.red() > 128 && colour.green() < 90 && colour.blue() < 90;
 }
 
+// The selection's highlight at 45% over what shows beneath.
+inline bool highlightedOver(QColor under, QColor over, QColor highlight)
+{
+    const auto mixed = [](int beneath, int ink, int shown) { return std::abs(shown - (beneath * 0.55 + ink * 0.45)) <= 2; };
+    return under != over && mixed(under.red(), highlight.red(), over.red()) && mixed(under.green(), highlight.green(), over.green())
+        && mixed(under.blue(), highlight.blue(), over.blue());
+}
+
 inline bool greenish(QColor colour)
 {
     return colour.green() > 128 && colour.red() < 90 && colour.blue() < 90;

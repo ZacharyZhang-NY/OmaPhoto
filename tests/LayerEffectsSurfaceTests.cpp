@@ -96,6 +96,7 @@ private slots:
     void aSmallerMaskScalesSmoothlyAsTheRenderersDoes();
     void aSurfaceHoldsEightyMillionPixelsAtMost();
     void aSurfaceFitsTheStrokeItWasMadeFor();
+    void aMaskStrokeRedoesWhereItsTilesMap();
 };
 
 void LayerEffectsSurfaceTests::theFirstUpdateDrawsWhatTheRendererDraws()
@@ -190,6 +191,36 @@ void LayerEffectsSurfaceTests::aSurfaceFitsTheStrokeItWasMadeFor()
     QVERIFY(!surface->matches(id, LayerEffects(), QSizeF(40, 30), QRectF(5, 5, 20, 10)));
     QVERIFY(!surface->matches(id, everyKind(), QSizeF(41, 30), QRectF(5, 5, 20, 10)));
     QVERIFY(!surface->matches(id, everyKind(), QSizeF(40, 30), QRectF(6, 5, 20, 10)));
+}
+
+void LayerEffectsSurfaceTests::aMaskStrokeRedoesWhereItsTilesMap()
+{
+    LayerEffects effects;
+    effects.stroke = StrokeEffect{.size = 3, .red = 1, .green = 1, .blue = 0, .opacity = 1};
+    const ImportedImage base(solid(40, 40, qRgba(0, 0, 255, 255)), QImage(), QStringLiteral("Blue"));
+    // The mask as the stroke leaves it, over a region.
+    auto mask = std::make_shared<QImage>(BrushRaster::context(40, 40, true));
+    mask->fill(255);
+    const auto coverage = [mask](const QRectF &region) {
+        QImage live = BrushRaster::context(int(region.width()), int(region.height()), true);
+        QPainter painter(&live);
+        BrushRaster::draw(*mask, QRectF(-region.topLeft(), QSizeF(40, 40)), painter);
+        return live;
+    };
+    // A finer grid's tile, landing at 10 to 12.56.
+    const QTransform toGrid = QTransform::fromScale(0.01, 0.01);
+    const QRectF tile(1000, 1000, 256, 256);
+    const std::unique_ptr<LayerEffectsSurface> surface = LayerEffectsSurface::make(QUuid::createUuid(), effects, QSizeF(40, 40), QRectF(0, 0, 40, 40));
+    surface->update(base, {}, std::nullopt, LayerEffectsSurface::MaskStroke{{BrushPatch{tile, solid(4, 4, 0)}}, toGrid, coverage});
+    // A hole under the tile, its pixels anew: redone there.
+    QPainter hole(mask.get());
+    hole.fillRect(QRectF(10, 10, 3, 3), Qt::black);
+    hole.end();
+    surface->update(base, {}, std::nullopt, LayerEffectsSurface::MaskStroke{{BrushPatch{tile, solid(4, 4, 0)}}, toGrid, coverage});
+    const std::unique_ptr<LayerEffectsSurface> fresh = LayerEffectsSurface::make(QUuid::createUuid(), effects, QSizeF(40, 40), QRectF(0, 0, 40, 40));
+    fresh->update(base, {}, std::nullopt, LayerEffectsSurface::MaskStroke{{}, toGrid, coverage});
+    QCOMPARE(surface->image().value(), fresh->image().value());
+    QVERIFY(surface->image().value() != LayerEffectsRenderer::render(base.image(), std::nullopt, effects).image);
 }
 
 QTEST_GUILESS_MAIN(LayerEffectsSurfaceTests)

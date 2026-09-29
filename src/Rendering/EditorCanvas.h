@@ -119,6 +119,9 @@ private:
         CanvasViewport viewport;
         std::vector<Layer> layers;
         std::vector<FolderMask> folderMasks;
+        // Typed text, which the canvas draws as pixels.
+        std::optional<LayerTextStyle> textStyle;
+        std::optional<LayerTransform> textTransform;
         friend bool operator==(const DisplayState &, const DisplayState &) = default;
     };
     // A Zoom press: drags zoom about it, clicks step.
@@ -143,7 +146,17 @@ private:
     void drawStroke(const BrushStroke &stroke, const ImageLayer &layer, const LayerTransform &transform, const std::optional<QImage> &mask,
                     const LayerRenderer::Options &options, double scale, const Center &center, QPainter &target);
     void drawLayers(const CanvasDocument &document, double scale, const Center &center, QPainter &context);
+    // Typed text as pixels, where the editor shows it.
+    struct DraftText {
+        QImage image;
+        LayerTransform transform;
+    };
+    std::optional<DraftText> draftText();
+    void drawTypedText(const ImageLayer &layer, const LayerRenderer::Options &options, const Center &center, QPainter &target);
+    void drawNewText(bool &drawn, double scale, const Center &center, QPainter &target, const QImage &clip);
+    void handOnDraftEffects(const CanvasDocument &document);
     // Swift's effects surface on the canvas (EditorCanvas+Effects.cpp).
+    LayerEffectsSurface *placedMaskSurface(const ImageLayer &layer, const BrushStroke &stroke, const LayerTransform &placement, const QImage &preview);
     LayerEffectsSurface *strokeSurface(const ImageLayer &layer, const BrushStroke &stroke, const std::optional<QImage> &mask);
     // The stroke is over: its surface stands in meanwhile.
     void handOnStrokeSurface();
@@ -359,6 +372,26 @@ private:
     SampleRingOverlay m_sampleRing;
     // The painted layer's effects, made as its stroke starts.
     std::unique_ptr<LayerEffectsSurface> m_strokeSurface;
+    // Typed text rendered, remade when its style changes.
+    struct DraftTextCache {
+        LayerTextStyle style;
+        QImage image;
+    };
+    std::optional<DraftTextCache> m_draftTextCache;
+    // Its effects, what they came from, and for which text.
+    struct DraftEffects {
+        QImage image;
+        LayerEffects effects;
+        LayerTransform transform;
+        QImage rendered;
+        double inset;
+    };
+    std::optional<DraftEffects> m_draftEffects;
+    struct DraftEffectsSource {
+        QUuid layerID;
+        LayerTextStyle style;
+    };
+    std::optional<DraftEffectsSource> m_draftEffectsSource;
     // The colour a sampling press began from, for the ring.
     PaletteColor m_samplingOriginal = PaletteColor::black();
     bool m_samplingColor = false;
