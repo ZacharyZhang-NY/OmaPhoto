@@ -1,5 +1,6 @@
 #pragma once
 #include "Document/EditorSession.h"
+#include <QFutureWatcher>
 #include <QPainter>
 #include <QPalette>
 #include <array>
@@ -31,6 +32,8 @@ public:
 
     // The marching ants' dash offset, stepped by the canvas.
     double antsPhase = 0;
+    // Asked for when a traced outline lands: repaint the ants.
+    std::function<void()> repaintAnts;
 
     std::optional<TransformOverlayGeometry> geometry() const;
     // Swift's gradientLine: the pending gradient's ends in view points.
@@ -57,8 +60,22 @@ private:
     void drawGradientLine(QPainter &context, QPointF start, QPointF end) const;
     void drawCrop(QPainter &context) const;
     void drawSelection(QPainter &context) const;
+    // Swift's antsOutline: the path, or zoomed out, one traced.
+    std::optional<QPainterPath> antsOutline(const QPainterPath &path, double deviceScale) const;
+    static std::optional<QPainterPath> traceOutline(const QPainterPath &path, QRectF canvas, double step);
     void drawLassoDraft(QPainter &context) const;
     void drawSnapGuides(QPainter &context, const QPalette &palette) const;
 
     const EditorSession &m_session;
+    // Swift's level of detail, cached per power-of-two zoom step.
+    struct AntsLevel {
+        QPainterPath path;
+        double step;
+    };
+    mutable std::optional<QPainterPath> m_antsSource;
+    mutable bool m_antsSourceIsComplex = false;
+    mutable std::optional<AntsLevel> m_antsLevel;
+    mutable std::optional<double> m_antsPendingStep;
+    // A new trace replaces the watcher: the old result drops.
+    mutable std::unique_ptr<QFutureWatcher<std::optional<QPainterPath>>> m_antsTask;
 };

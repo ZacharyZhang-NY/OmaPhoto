@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "BrushFixtures.h"
 #include "SelectionFixtures.h"
 #include "SessionRecord.h"
@@ -299,7 +300,7 @@ void TypeSessionTests::aDraggedBoxIsRoundedAndBounded()
     session->cancelText();
     session->beginText(QRectF(0, 0, 30'001, 50));
     QVERIFY(!session->textDraft());
-    QCOMPARE(session->brushError().value(), QString("That text box exceeds the 30,000-pixel or 100-megapixel limit."));
+    QCOMPARE(session->brushError().value(), QStringLiteral("That text box exceeds the 30,000-pixel or %1-megapixel limit.").arg(DocumentLimits::maxSurfaceMegapixels()));
     // No number at all is refused without a word.
     session->setBrushError(std::nullopt);
     session->beginText(QRectF(0, 0, INFINITY, 50));
@@ -330,11 +331,11 @@ void TypeSessionTests::aStyleIsValidWithinSwiftsBounds()
         for (const double value : {low - 0.01, high + 0.01, double(NAN), double(INFINITY), -double(INFINITY)})
             QVERIFY(!valid([&](LayerTextStyle &style) { style.*member = value; }));
     }
-    // A box: 16 to 30,000 a side, 100 megapixels.
+    // A box: 16 to 30,000 a side, one surface's pixels.
     const auto box = [&](double width, double height) { return valid([&](LayerTextStyle &style) { style.boxSize = QSizeF(width, height); }); };
-    QVERIFY(box(16, 16) && box(30'000, 3'000) && box(10'000, 10'000) && box(3'000, 30'000));
+    QVERIFY(box(16, 16) && box(30'000, 3'000) && box(20'000, 10'000) && box(3'000, 30'000));
     QVERIFY(!box(15.99, 100) && !box(100, 15.99) && !box(30'000.5, 100) && !box(100, 30'000.5));
-    QVERIFY(!box(10'000, 10'000.01) && !box(NAN, 100) && !box(100, INFINITY));
+    QVERIFY(!box(20'000, 10'000.01) && !box(NAN, 100) && !box(100, INFINITY));
 }
 
 void TypeSessionTests::everyChangeIsAnnouncedAndRefusalsAreSilent()
@@ -461,7 +462,7 @@ void TypeSessionTests::applyingTakesWhatSwiftTakes()
     draft.style.boxSize = std::nullopt;
     session->setTextDraft(draft);
     QVERIFY(!session->finishText());
-    QCOMPARE(session->brushError().value(), QString("This project exceeds the supported canvas, layer, file-size, or 100-megapixel image limit."));
+    QCOMPARE(session->brushError().value(), QStringLiteral("This project exceeds the supported canvas, layer, file-size, or %1-megapixel document limit.").arg(DocumentLimits::documentBudgetMegapixels()));
     QCOMPARE(session->textDraft().value().style.content, QString("Kept and grown further"));
     QCOMPARE(layerWith(*session, id).liveText().value().style.content, QString("Kept and grown"));
 }

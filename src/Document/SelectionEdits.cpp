@@ -1,4 +1,5 @@
 #include "Document/BrushStroke.h"
+#include "Document/DocumentLimits.h"
 #include "Document/EditorSession.h"
 #include "Document/PixelAdjust.h"
 #include "Document/PixelInvert.h"
@@ -11,7 +12,7 @@ namespace {
 // A uniform 1×1 mask given the layer's pixel grid.
 QImage expandedUniformMask(const QImage &image, int width, int height)
 {
-    if (width <= 0 || height <= 0 || qint64(width) * height > 100'000'000)
+    if (width <= 0 || height <= 0 || qint64(width) * height > DocumentLimits::maxSurfacePixels)
         throw ProjectError(ProjectError::Kind::tooLarge);
     QImage expanded = BrushRaster::context(width, height, true);
     QPainter painter(&expanded);

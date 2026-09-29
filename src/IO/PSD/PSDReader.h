@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/DocumentLimits.h"
 #include "IO/PSD/PSDTypes.h"
 #include <QByteArray>
 #include <QString>
@@ -9,8 +10,8 @@
 namespace PSDReader {
 bool matches(const QString &path);
 bool matches(const QByteArray &data);
-PSDDocument read(const QString &path, qint64 remainingPixels = 100'000'000);
-PSDDocument read(const QByteArray &data, qint64 remainingPixels = 100'000'000);
+PSDDocument read(const QString &path, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
+PSDDocument read(const QByteArray &data, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
 extern const std::set<QString> adjustmentKeys;
 }
 

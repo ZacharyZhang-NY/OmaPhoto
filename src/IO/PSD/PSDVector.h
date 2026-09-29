@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/DocumentLimits.h"
 #include "Document/ShapeTool.h"
 #include <QByteArray>
 #include <QImage>
@@ -23,8 +24,8 @@ struct Live {
 
 using Extra = std::map<QString, QByteArray>;
 
-std::optional<Live> live(const Extra &extra, QSizeF canvas, qint64 remainingPixels = 100'000'000);
-std::optional<Raster> raster(const Extra &extra, QSizeF canvas, qint64 remainingPixels = 100'000'000);
+std::optional<Live> live(const Extra &extra, QSizeF canvas, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
+std::optional<Raster> raster(const Extra &extra, QSizeF canvas, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
 std::optional<QPainterPath> path(const QByteArray &data, QSizeF canvas);
 struct RGB {
     double r;

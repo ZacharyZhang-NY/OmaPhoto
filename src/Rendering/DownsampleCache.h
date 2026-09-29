@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/DocumentLimits.h"
 #include <QImage>
 #include <mutex>
 #include <optional>
@@ -9,7 +10,7 @@
 class DownsampleCache {
 public:
     // Pixels of halved copies kept at once.
-    static constexpr qint64 pixelBudget = 100'000'000;
+    static constexpr qint64 pixelBudget = DocumentLimits::maxSurfacePixels;
     // Most halvings ever used; QPainter does the rest.
     static constexpr int maxLevel = 6;
 

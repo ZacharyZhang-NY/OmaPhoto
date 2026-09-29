@@ -1,4 +1,5 @@
 #include "Document/Distort.h"
+#include "Document/DocumentLimits.h"
 #include "Document/LayerMask.h"
 #include "Document/PixelAdjust.h"
 #include "Document/BrushStroke.h"
@@ -280,7 +281,7 @@ void EditorSession::addMask(bool revealing)
     const int width = active->asset ? active->asset->size().width() : int(std::round(active->size().width()));
     const int height = active->asset ? active->asset->size().height() : int(std::round(active->size().height()));
     try {
-        if (width <= 0 || height <= 0 || qint64(width) * height > 100'000'000)
+        if (width <= 0 || height <= 0 || qint64(width) * height > DocumentLimits::maxSurfacePixels)
             throw ProjectError(ProjectError::Kind::tooLarge);
         // The selection's coverage, soft where it is feathered.
         QImage image = PixelAdjust::coverage(current->clip(m_document->size()), width, height,

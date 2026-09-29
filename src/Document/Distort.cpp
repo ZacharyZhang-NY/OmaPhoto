@@ -1,4 +1,5 @@
 #include "Document/Distort.h"
+#include "Document/DocumentLimits.h"
 #include "Document/BrushStroke.h"
 #include "Document/EditorSession.h"
 #include "Document/LayerEffects+Renderer.h"
@@ -174,7 +175,7 @@ DistortWarp::Warped DistortWarp::warp(const QImage &image, const LayerTransform 
     if (!isUsable(corners))
         throw ProjectError(ProjectError::Kind::invalid);
     const QRectF bounds = shapeBounds(corners);
-    if (bounds.width() < 1 || bounds.height() < 1 || bounds.width() > 30'000 || bounds.height() > 30'000 || bounds.width() * bounds.height() > 100'000'000)
+    if (bounds.width() < 1 || bounds.height() < 1 || bounds.width() > DocumentLimits::maxSide || bounds.height() > DocumentLimits::maxSide || bounds.width() * bounds.height() > DocumentLimits::maxSurfacePixels)
         throw ProjectError(ProjectError::Kind::tooLarge);
     const LayerTransform placed{.origin = bounds.topLeft(), .size = bounds.size(), .sampling = transform.sampling};
     // A uniform 1 × 1 mask already covers any shape.

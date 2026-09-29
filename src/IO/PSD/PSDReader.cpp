@@ -1,4 +1,5 @@
 #include "IO/PSD/PSDReader.h"
+#include "Document/DocumentLimits.h"
 #include "IO/PSD/PSDChannelCoder.h"
 #include "IO/PSD/PSDVector.h"
 #include "Logging.h"
@@ -222,9 +223,9 @@ void decodeChannels(Cursor &cursor, RawLayer &layer, qint64 remainingPixels)
     const qint64 width = std::max<qint64>(0, layer.right - layer.left), height = std::max<qint64>(0, layer.bottom - layer.top);
     const qint64 maskWidth = std::max<qint64>(0, layer.maskRight - layer.maskLeft), maskHeight = std::max<qint64>(0, layer.maskBottom - layer.maskTop);
     const qint64 budget = std::max<qint64>(0, remainingPixels);
-    if (width > 0 && height > 0 && (width > 30'000 || height > 30'000 || width * height > budget))
+    if (width > 0 && height > 0 && (width > DocumentLimits::maxSide || height > DocumentLimits::maxSide || width * height > budget))
         throw ImageImportError(ImageImportError::Kind::tooLarge);
-    if (layer.hasMask && maskWidth > 0 && maskHeight > 0 && (maskWidth > 30'000 || maskHeight > 30'000 || maskWidth * maskHeight > budget))
+    if (layer.hasMask && maskWidth > 0 && maskHeight > 0 && (maskWidth > DocumentLimits::maxSide || maskHeight > DocumentLimits::maxSide || maskWidth * maskHeight > budget))
         throw ImageImportError(ImageImportError::Kind::tooLarge);
     for (const Channel &channel : layer.channels) {
         const qint64 start = cursor.offset;
@@ -339,7 +340,7 @@ PSDDocument parse(const QByteArray &data, qint64 remainingPixels)
     cursor.u16();
     const qint64 canvasHeight = cursor.u32(), canvasWidth = cursor.u32();
     const int depth = cursor.u16(), mode = cursor.u16();
-    if (canvasWidth < 1 || canvasWidth > 30'000 || canvasHeight < 1 || canvasHeight > 30'000 || canvasWidth * canvasHeight > 100'000'000)
+    if (canvasWidth < 1 || canvasWidth > DocumentLimits::maxSide || canvasHeight < 1 || canvasHeight > DocumentLimits::maxSide || canvasWidth * canvasHeight > DocumentLimits::maxSurfacePixels)
         throw ImageImportError(ImageImportError::Kind::tooLarge);
     if (depth != 8)
         throw PSDError(PSDError::Kind::unsupportedDepth);

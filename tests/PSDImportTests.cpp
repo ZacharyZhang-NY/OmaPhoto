@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "ContentView.h"
 #include "PSDFixture.h"
 #include <QLabel>
@@ -300,7 +301,7 @@ void PSDImportTests::aFileTheSessionRefusesIsReported()
     session.insertPhotoshop(blanks(9'999), "Many");
     import(session, {url});
     QCOMPARE(session.importError(),
-             std::optional<QString>("Sky.psd: This import exceeds the current 100-megapixel document budget or 30,000-pixel side limit."));
+             std::optional(QStringLiteral("Sky.psd: This import exceeds the current %1-megapixel document budget or 30,000-pixel side limit.").arg(DocumentLimits::documentBudgetMegapixels())));
     QCOMPARE(session.document().value().layers.size(), size_t(9'999));
 }
 

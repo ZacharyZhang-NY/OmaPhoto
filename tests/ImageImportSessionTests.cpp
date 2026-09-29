@@ -1,3 +1,4 @@
+#include "BudgetFixtures.h"
 #include "Document/EditorSession.h"
 #include "Rendering/RasterSnapshot.h"
 #include <QSignalSpy>
@@ -8,7 +9,7 @@
 namespace {
 const QString unreadable = QStringLiteral("The image could not be read. It may be damaged or unavailable.");
 const QString unsupported = QStringLiteral("Choose a JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) file.");
-const QString tooLarge = QStringLiteral("This import exceeds the current 100-megapixel document budget or 30,000-pixel side limit.");
+const QString tooLarge = QStringLiteral("This import exceeds the current %1-megapixel document budget or 30,000-pixel side limit.").arg(DocumentLimits::documentBudgetMegapixels());
 
 // A 64 by 32 PNG, as Swift's fixture is.
 QUrl fixture(const QTemporaryDir &folder, const QString &name = QStringLiteral("fixture.png"))
@@ -52,12 +53,6 @@ public:
         return true;
     }
 };
-
-// Pixels the canvas holds without the memory for them.
-ImportedImage hollow(int width, int height)
-{
-    return ImportedImage(std::make_shared<const RasterSnapshot>(width, height, QImage(), QRectF(), std::vector<BrushPatch>()), QImage(), "Hollow");
-}
 }
 
 class ImageImportSessionTests : public QObject {
@@ -314,17 +309,19 @@ void ImageImportSessionTests::thePixelBudgetCountsWhatTheCanvasHolds()
     QTemporaryDir folder;
     const QUrl url = fixture(folder);
     EditorSession session;
-    // 100,000,000 less these leaves 2,048: the fixture exactly.
-    session.insert(hollow(10'000, 9'999));
-    session.insert(hollow(7'952, 1));
+    // The budget less these leaves 2,048: the fixture exactly.
+    const std::vector<ImportedImage> filling = claiming(DocumentLimits::documentPixelBudget() - 2'048);
+    for (const ImportedImage &layer : filling)
+        session.insert(layer);
     session.addBlankLayer();
+    const int count = int(filling.size()) + 2;
     QVERIFY(imported(session, {url}));
-    QCOMPARE(int(session.document().value().layers.size()), 4);
+    QCOMPARE(int(session.document().value().layers.size()), count);
     QCOMPARE(session.importError(), std::nullopt);
     // Full now: the next pixel is one too many.
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("^cannot import .*fixture\\.png: .*"));
     QVERIFY(imported(session, {url}));
-    QCOMPARE(int(session.document().value().layers.size()), 4);
+    QCOMPARE(int(session.document().value().layers.size()), count);
     QCOMPARE(session.importError(), std::optional("fixture.png: " + tooLarge));
     QVERIFY(!session.document().value().layers[0].asset.value().raster->hasMaterializedPixels());
 }

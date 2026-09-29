@@ -273,7 +273,10 @@ void TransformOverlay::drawSelection(QPainter &context) const
     const std::optional<DocumentSelection> selection = m_session.displayedSelection();
     if (!selection || selection->isEmpty() || !m_session.document())
         return;
-    const QPainterPath path = documentToView().map(selection->path);
+    const std::optional<QPainterPath> outline = antsOutline(selection->path, context.device()->devicePixelRatioF());
+    if (!outline)
+        return;
+    const QPainterPath path = documentToView().map(*outline);
     context.save();
     context.setRenderHint(QPainter::Antialiasing, true);
     context.setBrush(Qt::NoBrush);

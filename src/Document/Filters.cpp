@@ -1,4 +1,5 @@
 #include "Document/Filters.h"
+#include "Document/DocumentLimits.h"
 #include "Document/BrushStroke.h"
 #include "Document/ContentFill.h"
 #include "Document/EditorSession+Model.h"
@@ -244,7 +245,7 @@ void FilterEdit::grow(const QRectF &extent)
     const QRectF target = integral(bounds.united(extent));
     if (target == bounds)
         return;
-    if (target.width() > 30'000 || target.height() > 30'000 || target.width() * target.height() > 100'000'000)
+    if (target.width() > DocumentLimits::maxSide || target.height() > DocumentLimits::maxSide || target.width() * target.height() > DocumentLimits::maxSurfacePixels)
         throw ProjectError(ProjectError::Kind::tooLarge);
     QImage grown = BrushRaster::context(int(target.width()), int(target.height()), false);
     const QRectF inside = bounds.translated(-target.left(), -target.top());

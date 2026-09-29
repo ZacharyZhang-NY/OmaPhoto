@@ -1,4 +1,5 @@
 #include "Document/EditorSession.h"
+#include "Document/DocumentLimits.h"
 #include "Document/PixelAdjust.h"
 #include "IO/ImageExporter.h"
 #include "Logging.h"
@@ -167,7 +168,7 @@ void EditorSession::finishShape()
         return;
     // Swift's Int(): each side truncated before multiplying.
     if (std::trunc(rect.width()) * std::trunc(rect.height()) > double(maxShapePixels)) {
-        setBrushError(QStringLiteral("That shape is too large. A shape can cover up to 100 megapixels."));
+        setBrushError(QStringLiteral("That shape is too large. A shape can cover up to %1 megapixels.").arg(DocumentLimits::maxSurfaceMegapixels()));
         return;
     }
     // The ends as fractions of the box, for resizing.

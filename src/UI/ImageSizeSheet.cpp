@@ -1,4 +1,5 @@
 #include "UI/ImageSizeSheet.h"
+#include "Document/DocumentLimits.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/ColorPickerSheet.h"
 #include <QCheckBox>
@@ -163,8 +164,8 @@ ImageSizeSheet::ImageSizeSheet(const CanvasDocument &document, std::function<voi
 bool ImageSizeSheet::valid() const
 {
     const double width = std::round(m_width), height = std::round(m_height);
-    return m_resolution >= 1 && m_resolution <= 9600 && width >= 1 && width <= 30'000 && height >= 1 && height <= 30'000
-        && (!m_resample || width * height <= 100'000'000);
+    return m_resolution >= 1 && m_resolution <= 9600 && width >= 1 && width <= DocumentLimits::maxSide && height >= 1 && height <= DocumentLimits::maxSide
+        && (!m_resample || width * height <= DocumentLimits::maxSurfacePixels);
 }
 
 double ImageSizeSheet::display(double pixels, qint64 original) const
@@ -267,7 +268,7 @@ void ImageSizeSheet::synchronize()
                                       : QStringLiteral("Only print dimensions and resolution change. Pixels stay unchanged."));
     const bool isValid = valid();
     m_result->setText(isValid ? QStringLiteral("Result: %1 × %2 pixels").arg(grouped(qint64(std::round(m_width))), grouped(qint64(std::round(m_height))))
-                              : QStringLiteral("Use 1–30,000 pixels per side, up to 100 megapixels, and 1–9,600 pixels/inch."));
+                              : QStringLiteral("Use 1–%1 pixels per side, up to %2 megapixels, and 1–9,600 pixels/inch.").arg(DocumentLimits::maxSideText()).arg(DocumentLimits::maxSurfaceMegapixels()));
     m_result->setForegroundRole(isValid ? QPalette::PlaceholderText : QPalette::BrightText);
     m_resize->setEnabled(isValid);
 }

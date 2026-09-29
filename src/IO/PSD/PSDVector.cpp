@@ -1,4 +1,5 @@
 #include "IO/PSD/PSDVector.h"
+#include "Document/DocumentLimits.h"
 #include "Document/BrushStroke.h"
 #include "Document/EditorSession.h"
 #include <QPainter>
@@ -76,10 +77,10 @@ QRectF integral(const QRectF &box)
     return QRectF(left, top, std::ceil(box.right()) - left, std::ceil(box.bottom()) - top);
 }
 
-// Within 30,000 a side and the pixel budget, else tooLarge.
+// Within the side limit and the pixel budget, else tooLarge.
 QSize pixelSize(QSizeF size, qint64 remainingPixels)
 {
-    if (std::abs(size.width()) > 30'000 || std::abs(size.height()) > 30'000)
+    if (std::abs(size.width()) > DocumentLimits::maxSide || std::abs(size.height()) > DocumentLimits::maxSide)
         throw ImageImportError(ImageImportError::Kind::tooLarge);
     const qint64 budget = std::min(EditorSession::maxShapePixels, std::max<qint64>(0, remainingPixels));
     // Boxes are whole here, so the whole pixels decide alone.
@@ -214,7 +215,7 @@ std::optional<PSDVector::Raster> PSDVector::raster(const Extra &extra, QSizeF ca
         return std::nullopt;
     if (!std::isfinite(strokeWidth))
         return std::nullopt;
-    if (strokeEnabled && !(strokeWidth >= 0 && strokeWidth <= 30'000))
+    if (strokeEnabled && !(strokeWidth >= 0 && strokeWidth <= DocumentLimits::maxSide))
         throw ImageImportError(ImageImportError::Kind::tooLarge);
     QRectF box = outline->boundingRect();
     if (strokeEnabled) {

@@ -1,5 +1,6 @@
 #pragma once
 #include "Document/EditorSession+Model.h"
+#include "Document/DocumentLimits.h"
 #include "Document/Gradient.h"
 #include "Document/LayerTransform.h"
 #include "Document/Selection.h"
@@ -98,7 +99,7 @@ public:
     const QTransform pixelToDocument;
     const LayerTransform paintTransform;
     // Swift's Int: the budget left may run below zero.
-    qint64 pixelLimit = 100'000'000;
+    qint64 pixelLimit = DocumentLimits::documentPixelBudget();
     // Limits every edit to the document selection; nil when none.
     std::optional<SelectionClip> selectionClip;
     // Clone Stamp: a document-sized image, and each point's offset.

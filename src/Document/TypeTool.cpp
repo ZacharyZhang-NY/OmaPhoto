@@ -1,4 +1,5 @@
 #include "Document/EditorSession.h"
+#include "Document/DocumentLimits.h"
 #include "Document/PixelAdjust.h"
 #include "IO/ImageExporter.h"
 #include "Logging.h"
@@ -35,7 +36,7 @@ bool LayerTextStyle::boxIsValid() const
     if (!boxSize)
         return true;
     const double width = boxSize->width(), height = boxSize->height();
-    return width >= 16 && width <= 30'000 && height >= 16 && height <= 30'000 && width * height <= 100'000'000;
+    return width >= 16 && width <= DocumentLimits::maxSide && height >= 16 && height <= DocumentLimits::maxSide && width * height <= DocumentLimits::maxSurfacePixels;
 }
 
 bool LayerTextStyle::isValid() const
@@ -195,7 +196,7 @@ void EditorSession::beginText(const QRectF &rect)
     LayerTextStyle style = m_textDefaults;
     style.boxSize = QSizeF(std::max(16.0, std::round(rect.width())), std::max(16.0, std::round(rect.height())));
     if (!style.boxIsValid()) {
-        setBrushError(QStringLiteral("That text box exceeds the 30,000-pixel or 100-megapixel limit."));
+        setBrushError(QStringLiteral("That text box exceeds the %1-pixel or %2-megapixel limit.").arg(DocumentLimits::maxSideText()).arg(DocumentLimits::maxSurfaceMegapixels()));
         return;
     }
     beginText(rect.topLeft(), true);
@@ -297,7 +298,7 @@ QImage EditorSession::textImage(const LayerTextStyle &style)
     const QSizeF size = textBoxSize(style);
     const double width = std::ceil(size.width()), height = std::ceil(size.height());
     // A valid style measures sixteen pixels at least.
-    if (!(width <= 30'000 && height <= 30'000 && width * height <= 100'000'000))
+    if (!(width <= DocumentLimits::maxSide && height <= DocumentLimits::maxSide && width * height <= DocumentLimits::maxSurfacePixels))
         throw ProjectError(ProjectError::Kind::tooLarge);
     QImage context = BrushRaster::context(int(width), int(height), false);
     const double padding = LayerTextStyle::padding;

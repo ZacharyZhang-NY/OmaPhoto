@@ -282,8 +282,8 @@ void ImageTrimTests::nothingToTrimOrACancelChangesNothing()
 void ImageTrimTests::aTrimThatFailsIsExplained()
 {
     Desk desk;
-    // Past the render's hundred megapixels, the trim cannot look.
-    desk.session.createDocument(20'000, 10'000);
+    // Past the render's one surface, the trim cannot look.
+    desk.session.createDocument(20'001, 10'000);
     const CanvasDocument before = desk.session.document().value();
     DialogDesk alerts;
     alerts.replies = {"OK"};

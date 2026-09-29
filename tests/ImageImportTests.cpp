@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "AddressSpaceLimit.h"
 #include "IO/ImageImporter.h"
 #include <QBuffer>
@@ -461,7 +462,7 @@ void ImageImportTests::errorsCarrySwiftsDescriptions()
     QCOMPARE(QString(ImageImportError(ImageImportError::Kind::unreadable).what()), QString("The image could not be read. It may be damaged or unavailable."));
     QCOMPARE(QString(ImageImportError(ImageImportError::Kind::unsupported).what()), QString("Choose a JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) file."));
     QCOMPARE(QString(ImageImportError(ImageImportError::Kind::tooLarge).what()),
-             QString("This import exceeds the current 100-megapixel document budget or 30,000-pixel side limit."));
+             QStringLiteral("This import exceeds the current %1-megapixel document budget or 30,000-pixel side limit.").arg(DocumentLimits::documentBudgetMegapixels()));
     QCOMPARE(ImageImportError(ImageImportError::Kind::tooLarge).kind, ImageImportError::Kind::tooLarge);
 }
 

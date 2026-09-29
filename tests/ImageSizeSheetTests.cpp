@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "UI/ColorPickerSheet.h"
 #include "UI/ImageSizeSheet.h"
 #include <QCheckBox>
@@ -154,7 +155,7 @@ void ImageSizeSheetTests::aNewResolutionKeepsThePrintSize()
     // Zero changes nothing but the resolution, which is refused.
     shown.unit("Inches");
     shown.type("imageResolution", "0");
-    QCOMPARE(shown.result(), QString("Use 1–30,000 pixels per side, up to 100 megapixels, and 1–9,600 pixels/inch."));
+    QCOMPARE(shown.result(), QStringLiteral("Use 1–30,000 pixels per side, up to %1 megapixels, and 1–9,600 pixels/inch.").arg(DocumentLimits::maxSurfaceMegapixels()));
     shown.type("imageResolution", "150");
     QCOMPARE(shown.result(), QString("Result: 2,400 × 1,600 pixels"));
     // Centimetres keep the print size alike.
@@ -203,14 +204,14 @@ void ImageSizeSheetTests::anInvalidSizeRestsResize()
     QVERIFY(resize.isDefault() && resize.isEnabled());
     shown.find<QCheckBox>("imageLocked").click();
     shown.type("imageWidth", "30001");
-    QCOMPARE(shown.result(), QString("Use 1–30,000 pixels per side, up to 100 megapixels, and 1–9,600 pixels/inch."));
+    QCOMPARE(shown.result(), QStringLiteral("Use 1–30,000 pixels per side, up to %1 megapixels, and 1–9,600 pixels/inch.").arg(DocumentLimits::maxSurfaceMegapixels()));
     QCOMPARE(shown.find<QLabel>("imageResult").foregroundRole(), QPalette::BrightText);
     QVERIFY(!resize.isEnabled());
-    // Past 100 megapixels while resampling.
+    // Past one surface's 200 megapixels while resampling.
     shown.type("imageWidth", "20000");
-    shown.type("imageHeight", "5001");
+    shown.type("imageHeight", "10001");
     QVERIFY(!resize.isEnabled());
-    shown.type("imageHeight", "5000");
+    shown.type("imageHeight", "10000");
     QVERIFY(resize.isEnabled());
     QCOMPARE(shown.find<QLabel>("imageResult").foregroundRole(), QPalette::PlaceholderText);
     shown.type("imageResolution", "9601");

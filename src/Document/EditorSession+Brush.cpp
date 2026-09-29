@@ -1,4 +1,5 @@
 #include "Document/BrushStroke.h"
+#include "Document/DocumentLimits.h"
 #include "Document/EditorSession.h"
 #include "IO/ImageExporter.h"
 #include "IO/ProjectStore.h"
@@ -50,7 +51,7 @@ std::unique_ptr<BrushStroke> EditorSession::makeRasterEdit(const ImageLayer &lay
         if (image)
             used += qint64(image->size().width()) * image->size().height();
     }
-    stroke->pixelLimit = 100'000'000 - used;
+    stroke->pixelLimit = DocumentLimits::documentPixelBudget() - used;
     const std::optional<DocumentSelection> current = selection();
     if (current)
         stroke->selectionClip = current->clip(m_document->size());
@@ -60,7 +61,7 @@ std::unique_ptr<BrushStroke> EditorSession::makeRasterEdit(const ImageLayer &lay
             if (other.id != layer.id && other.mask)
                 maskPixels += qint64(other.mask->asset.size().width()) * other.mask->asset.size().height();
         }
-        stroke->pixelLimit = std::min<qint64>(stroke->pixelLimit, 100'000'000 - maskPixels);
+        stroke->pixelLimit = std::min<qint64>(stroke->pixelLimit, DocumentLimits::documentPixelBudget() - maskPixels);
     }
     return stroke;
 }

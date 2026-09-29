@@ -291,7 +291,7 @@ void PSDRoundTripTests::unsupportedHeadersAreRejected()
     QCOMPARE(refusal<PSDError>([] { PSDReader::read(header(1, 8, 8, 8, 4)); }), std::optional(PSDError::Kind::unsupportedColorMode));
     QCOMPARE(refusal<PSDError>([] { PSDReader::read(header(1, 8, 8, 16)); }), std::optional(PSDError::Kind::unsupportedDepth));
     QCOMPARE(refusal<ImageImportError>([] { PSDReader::read(header(1, 30'001, 10)); }), std::optional(ImageImportError::Kind::tooLarge));
-    QCOMPARE(refusal<ImageImportError>([] { PSDReader::read(header(1, 10'001, 10'000)); }), std::optional(ImageImportError::Kind::tooLarge));
+    QCOMPARE(refusal<ImageImportError>([] { PSDReader::read(header(1, 20'001, 10'000)); }), std::optional(ImageImportError::Kind::tooLarge));
     QCOMPARE(refusal<ImageImportError>([] { PSDReader::read(header(1, 0, 10)); }), std::optional(ImageImportError::Kind::tooLarge));
     QCOMPARE(refusal<ImageImportError>([] { PSDReader::read(QByteArray("8BPX")); }), std::optional(ImageImportError::Kind::unreadable));
     QCOMPARE(refusal<PSDError>([] { PSDReader::read(header()); }), std::optional(PSDError::Kind::truncated));

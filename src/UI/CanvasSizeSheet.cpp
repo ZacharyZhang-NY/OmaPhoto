@@ -1,4 +1,5 @@
 #include "UI/CanvasSizeSheet.h"
+#include "Document/DocumentLimits.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/ByteCounts.h"
 #include "UI/ColorPaletteControls.h"
@@ -280,7 +281,7 @@ void CanvasSizeSheet::synchronize()
         const qint64 width = qint64(std::round(m_draft.width)), height = qint64(std::round(m_draft.height));
         m_note->setText(QStringLiteral("New: %1 × %2 pixels · %3 uncompressed").arg(grouped(width), grouped(height), ByteCounts::memory(width * height * 4)));
     } else {
-        m_note->setText(QStringLiteral("Final dimensions must be 1–30,000 pixels per side."));
+        m_note->setText(QStringLiteral("Final dimensions must be 1–%1 pixels per side.").arg(DocumentLimits::maxSideText()));
     }
     m_note->setForegroundRole(valid ? QPalette::PlaceholderText : QPalette::BrightText);
     for (QAbstractButton *each : m_anchors->buttons()) {

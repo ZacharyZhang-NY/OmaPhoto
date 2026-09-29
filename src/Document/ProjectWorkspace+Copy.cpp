@@ -1,4 +1,5 @@
 #include "Document/ProjectWorkspace.h"
+#include "Document/DocumentLimits.h"
 #include "Document/LiveLayerMask.h"
 #include "IO/ImageExporter.h"
 #include "Logging.h"
@@ -80,8 +81,8 @@ void ProjectWorkspace::copyLayers(const std::vector<QUuid> &ids, std::optional<Q
             copy.layers.push_back(layer);
     }
     const qint64 used = copy.target->session.document() ? pixels(copy.target->session.document()->layers) : 0;
-    if (used + pixels(copy.layers) > 100'000'000) {
-        copy.target->session.setImportError(QStringLiteral("The copied layers exceed this project’s 100-megapixel limit."));
+    if (used + pixels(copy.layers) > DocumentLimits::documentPixelBudget()) {
+        copy.target->session.setImportError(QStringLiteral("The copied layers exceed this project’s %1-megapixel limit.").arg(DocumentLimits::documentBudgetMegapixels()));
         finish(done);
         return;
     }

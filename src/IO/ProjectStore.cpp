@@ -1,4 +1,5 @@
 #include "IO/ProjectStore.h"
+#include "Document/DocumentLimits.h"
 #include "Document/LayerGroups.h"
 #include "Document/LayerMask.h"
 #include "Document/LiveLayerMask.h"
@@ -29,7 +30,7 @@ QString description(ProjectError::Kind kind)
     case ProjectError::Kind::missingImage:
         return QStringLiteral("An image inside the project is missing or damaged. The current document has not been replaced.");
     case ProjectError::Kind::tooLarge:
-        return QStringLiteral("This project exceeds the supported canvas, layer, file-size, or 100-megapixel image limit.");
+        return QStringLiteral("This project exceeds the supported canvas, layer, file-size, or %1-megapixel document limit.").arg(DocumentLimits::documentBudgetMegapixels());
     case ProjectError::Kind::encode:
         return QStringLiteral("An image could not be saved. The previous project has not been replaced.");
     }
@@ -69,7 +70,7 @@ void validate(const ProjectManifest &manifest)
     // The range refuses NaN and infinity as well.
     if (manifest.resolution && !(*manifest.resolution >= 1 && *manifest.resolution <= 9600))
         throw ProjectError(ProjectError::Kind::invalid);
-    if (manifest.width < 1 || manifest.width > 30'000 || manifest.height < 1 || manifest.height > 30'000 || manifest.layers.size() > 10'000)
+    if (manifest.width < 1 || manifest.width > DocumentLimits::maxSide || manifest.height < 1 || manifest.height > DocumentLimits::maxSide || manifest.layers.size() > 10'000)
         throw ProjectError(ProjectError::Kind::tooLarge);
     for (const ProjectLayerRecord &layer : manifest.layers) {
         // Text needs a valid style and pixels to show it.
@@ -116,11 +117,18 @@ void validate(const ProjectManifest &manifest)
     validateGuides(manifest);
 }
 
-// Images share 100 million pixels; masks share another.
-void checkSize(QSize size, qint64 &used)
+// Images share the document budget; masks share another.
+struct Budgets {
+    qint64 images = 0;
+    qint64 masks = 0;
+};
+
+// Save and load count alike: one rule for both.
+void checkSize(QSize size, bool isMask, Budgets &budgets)
 {
+    qint64 &used = isMask ? budgets.masks : budgets.images;
     const qint64 pixels = qint64(size.width()) * size.height();
-    if (size.width() < 1 || size.width() > 30'000 || size.height() < 1 || size.height() > 30'000 || pixels > 100'000'000 - used)
+    if (size.width() < 1 || size.width() > DocumentLimits::maxSide || size.height() < 1 || size.height() > DocumentLimits::maxSide || pixels > DocumentLimits::documentPixelBudget() - used)
         throw ProjectError(ProjectError::Kind::tooLarge);
     used += pixels;
 }
@@ -225,7 +233,7 @@ void replace(const QString &staged, const QString &destination, const QString &p
 }
 
 // The pixels and a thumbnail of at most 96 pixels.
-ImportedImage asset(const QString &file, bool isMask, const QString &name, qint64 &used)
+ImportedImage asset(const QString &file, bool isMask, const QString &name, Budgets &used)
 {
     ImageImporter::liftAllocationLimit();
     QImageReader reader(file);
@@ -234,7 +242,7 @@ ImportedImage asset(const QString &file, bool isMask, const QString &name, qint6
         || stored == QImage::Format_Grayscale16;
     if (reader.format() != "png" || !reader.size().isValid() || deep)
         throw ProjectError(ProjectError::Kind::missingImage);
-    checkSize(reader.size(), used);
+    checkSize(reader.size(), isMask, used);
     QImage image = reader.read();
     if (!isMask)
         image = image.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
@@ -271,7 +279,7 @@ void ProjectStore::save(const ProjectSnapshot &snapshot, const QString &path)
 {
     validate(snapshot.manifest);
     std::vector<std::pair<QString, QByteArray>> files;
-    qint64 pixels = 0, maskPixels = 0;
+    Budgets budgets;
     for (const ProjectLayerRecord &layer : snapshot.manifest.layers) {
         for (const bool isMask : {false, true}) {
             const std::optional<QString> &filename = isMask ? layer.maskFile : layer.imageFile;
@@ -281,10 +289,11 @@ void ProjectStore::save(const ProjectSnapshot &snapshot, const QString &path)
             const auto found = assets.find(layer.id);
             if (found == assets.end())
                 throw ProjectError(ProjectError::Kind::missingImage);
+            // Swift's lazy image has its size unrendered: judged first.
+            checkSize(found->second.size(), isMask, budgets);
             const QImage image = found->second.image();
             if (isMask && !LayerMask::isValid(image))
                 throw ProjectError(ProjectError::Kind::invalid);
-            checkSize(image.size(), isMask ? maskPixels : pixels);
             files.push_back({*filename, png(image)});
         }
     }
@@ -340,7 +349,7 @@ ProjectSnapshot ProjectStore::load(const QString &path)
     const ProjectManifest manifest = ProjectManifest::decoded(metadata);
     validate(manifest);
     ProjectSnapshot snapshot{.manifest = manifest, .images = {}, .masks = {}};
-    qint64 pixels = 0, maskPixels = 0;
+    Budgets budgets;
     for (const ProjectLayerRecord &layer : manifest.layers) {
         for (const bool isMask : {false, true}) {
             const std::optional<QString> &filename = isMask ? layer.maskFile : layer.imageFile;
@@ -348,7 +357,7 @@ ProjectSnapshot ProjectStore::load(const QString &path)
                 continue;
             const QString file = path + QLatin1String("/images/") + *filename;
             checkFile(file, path, assetBytes, ProjectError::Kind::missingImage);
-            (isMask ? snapshot.masks : snapshot.images).insert({layer.id, asset(file, isMask, layer.name, isMask ? maskPixels : pixels)});
+            (isMask ? snapshot.masks : snapshot.images).insert({layer.id, asset(file, isMask, layer.name, budgets)});
         }
     }
     qCInfo(lcIO) << "loaded" << path << "with" << manifest.layers.size() << "layers and" << snapshot.images.size() + snapshot.masks.size() << "images";

@@ -1,4 +1,5 @@
 #include "Rendering/LayerEffectsKernel.h"
+#include "Document/DocumentLimits.h"
 #include "Rendering/PoolMap.h"
 #include "Document/BrushStroke.h"
 #include "IO/ImageExporter.h"
@@ -156,7 +157,7 @@ QImage LayerEffectsKernel::render(const QImage &pixels, const LayerEffects &effe
     const int width = pixels.width(), height = pixels.height();
     const qint64 count = qint64(width) * height;
     // Past Metal's 80 million Swift draws on its CPU.
-    if (count <= 0 || count > 100'000'000)
+    if (count <= 0 || count > DocumentLimits::maxSurfacePixels)
         throw ExportError(ExportError::Kind::tooLarge);
     const QImage source = pixels.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
     if (source.isNull())

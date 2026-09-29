@@ -269,9 +269,9 @@ void AdjustmentEditorTests::theEditorOpensOnlyForItsRequest()
 
 void AdjustmentEditorTests::aFailedRenderEndsTheRequest()
 {
-    // Past the export's hundred million pixels: the render refuses.
+    // Past the export's one surface: the render refuses.
     EditorSession session;
-    session.createDocument(10'001, 10'000);
+    session.createDocument(20'001, 10'000);
     session.addAdjustment(AdjustmentKind::curves);
     const int steps = session.history.undoCount();
     int ran = 0;
@@ -481,7 +481,7 @@ void AdjustmentEditorTests::everyStepIsAnnouncedAndItsLastSignalSeesIt()
     // A failed render's last signal sees the request end.
     EditorSession huge;
     connect(&huge, &EditorSession::changed, this, [&] { seen = described(huge); });
-    huge.createDocument(10'001, 10'000);
+    huge.createDocument(20'001, 10'000);
     huge.addAdjustment(AdjustmentKind::levels);
     seen.clear();
     QVERIFY(opened(huge, huge.adjustmentEditingID().value()));

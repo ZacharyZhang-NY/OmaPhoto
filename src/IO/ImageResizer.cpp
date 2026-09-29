@@ -1,4 +1,5 @@
 #include "IO/ImageResizer.h"
+#include "Document/DocumentLimits.h"
 #include "Document/EditorSession.h"
 #include "Document/LayerMask.h"
 #include "IO/ImageExporter.h"
@@ -28,7 +29,7 @@ QImage drawn(QImage::Format format, qint64 width, qint64 height, QPointF topLeft
 ProjectSnapshot resized(const ProjectSnapshot &snapshot, const ImageSizeOptions &options)
 {
     // NaN fails both tests of a range.
-    if (options.width < 1 || options.width > 30'000 || options.height < 1 || options.height > 30'000
+    if (options.width < 1 || options.width > DocumentLimits::maxSide || options.height < 1 || options.height > DocumentLimits::maxSide
         || !(options.resolution >= 1 && options.resolution <= 9600))
         throw ProjectError(ProjectError::Kind::tooLarge);
     const ProjectManifest &old = snapshot.manifest;
@@ -38,7 +39,7 @@ ProjectSnapshot resized(const ProjectSnapshot &snapshot, const ImageSizeOptions 
         manifest.layers = old.layers;
         return {.manifest = manifest, .images = snapshot.images, .masks = snapshot.masks};
     }
-    if (options.width * options.height > 100'000'000)
+    if (options.width * options.height > DocumentLimits::maxSurfacePixels)
         throw ProjectError(ProjectError::Kind::tooLarge);
     const double sx = double(options.width) / double(old.width), sy = double(options.height) / double(old.height);
     // Guides scale with the pixels.
@@ -66,7 +67,7 @@ ProjectSnapshot resized(const ProjectSnapshot &snapshot, const ImageSizeOptions 
         LayerTransform sourceTransform = layer.transform;
         sourceTransform.sampling = options.sampling;
         if (layer.imageFile) {
-            if (width > 30'000 || height > 30'000 || width * height > 100'000'000 - usedPixels)
+            if (width > DocumentLimits::maxSide || height > DocumentLimits::maxSide || width * height > DocumentLimits::documentPixelBudget() - usedPixels)
                 throw ProjectError(ProjectError::Kind::tooLarge);
             usedPixels += width * height;
             const auto source = snapshot.images.find(layer.id);
@@ -90,7 +91,7 @@ ProjectSnapshot resized(const ProjectSnapshot &snapshot, const ImageSizeOptions 
             if (source->second.size() == QSize(1, 1) || layer.maskPlacement) {
                 masks.insert({layer.id, source->second});
             } else {
-                if (width > 30'000 || height > 30'000 || width * height > 100'000'000 - usedMaskPixels)
+                if (width > DocumentLimits::maxSide || height > DocumentLimits::maxSide || width * height > DocumentLimits::documentPixelBudget() - usedMaskPixels)
                     throw ProjectError(ProjectError::Kind::tooLarge);
                 usedMaskPixels += width * height;
                 const QImage image = drawn(QImage::Format_Grayscale8, width, height, {left, top}, sx, sy, [&](QPainter &context) {

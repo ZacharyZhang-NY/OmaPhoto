@@ -288,6 +288,15 @@ void CanvasView::stopMarqueeAutoscroll()
     m_marqueeAutoscrollPoint = std::nullopt;
 }
 
+void CanvasView::stepAnts()
+{
+    if (m_antsRepaintPending)
+        return;
+    m_overlay.antsPhase = std::fmod(m_overlay.antsPhase + 1, 8.0);
+    m_antsRepaintPending = true;
+    update(m_overlay.selectionRect(rect()));
+}
+
 // Marching ants animate only while a visible selection exists.
 void CanvasView::updateAntsTimer()
 {

@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "AddressSpaceLimit.h"
 #include "Document/EditorSession.h"
 #include "Document/LayerMask.h"
@@ -170,8 +171,8 @@ void ImageSizeTests::limitsAreJudgedAtTheirEdges()
     QCOMPARE(resizeError(input, {.width = 10, .height = 0, .resolution = 72}), tooLarge);
     QCOMPARE(resizeError(input, {.width = 30'001, .height = 10, .resolution = 72}), tooLarge);
     QCOMPARE(resizeError(input, {.width = 10, .height = 30'001, .resolution = 72}), tooLarge);
-    QCOMPARE(resizeError(input, {.width = 10'000, .height = 10'000, .resolution = 72}), std::nullopt);
-    QCOMPARE(resizeError(input, {.width = 10'000, .height = 10'001, .resolution = 72}), tooLarge);
+    QCOMPARE(resizeError(input, {.width = 20'000, .height = 10'000, .resolution = 72}), std::nullopt);
+    QCOMPARE(resizeError(input, {.width = 20'000, .height = 10'001, .resolution = 72}), tooLarge);
     QCOMPARE(resizeError(input, {.width = 30'000, .height = 1, .resolution = 72}), std::nullopt);
     QCOMPARE(resizeError(input, {.width = 1, .height = 30'000, .resolution = 72}), std::nullopt);
     // The same size skips every other rule: only resolution changes.
@@ -183,39 +184,56 @@ void ImageSizeTests::limitsAreJudgedAtTheirEdges()
 
 void ImageSizeTests::budgetsCountEveryLayer()
 {
-    // Scaled a hundredfold, the small layer takes a megapixel.
+    // Widened twice: a narrow layer, the remainder; wide, rows.
+    const qint64 budget = DocumentLimits::documentPixelBudget();
+    const qint64 rows = (budget - 1) / 30'000, rest = budget - rows * 30'000;
     ProjectSnapshot input = imported();
     input.manifest.width = 100;
     input.manifest.height = 100;
-    ProjectLayerRecord small = input.manifest.layers[0];
-    small.transform = {.origin = {0, 0}, .size = {10, 10}};
-    ProjectLayerRecord whole = small;
-    whole.id = QUuid::createUuid();
-    whole.imageFile = uuidString(whole.id) + ".png";
-    whole.transform = {.origin = {0, 0}, .size = {100, 100}};
-    input.images.insert({whole.id, asset(halfRed(), "whole")});
-    input.manifest.layers = {small, whole};
+    ProjectLayerRecord narrow = input.manifest.layers[0];
+    narrow.transform = {.origin = {0, 0}, .size = {double(rest) / 2, 1}};
+    ProjectLayerRecord wide = narrow;
+    wide.id = QUuid::createUuid();
+    wide.imageFile = uuidString(wide.id) + ".png";
+    wide.transform = {.origin = {0, 0}, .size = {15'000, double(rows)}};
+    const ImageSizeOptions widened{.width = 200, .height = 100, .resolution = 72};
     const auto tooLarge = std::optional(ProjectError::Kind::tooLarge);
-    QCOMPARE(resizeError(input, {.width = 10'000, .height = 10'000, .resolution = 72}), tooLarge);
-    // A megapixel and 99 more fill the budget exactly.
-    input.manifest.layers[1].transform.size = {99, 100};
-    const ProjectSnapshot full = ImageResizer::resize(input, {.width = 10'000, .height = 10'000, .resolution = 72, .sampling = LayerSampling::nearest});
-    QCOMPARE(full.images.at(whole.id).size(), QSize(9'900, 10'000));
-    input.manifest.layers[1].transform.size = {99.01, 100};
-    QCOMPARE(resizeError(input, {.width = 10'000, .height = 10'000, .resolution = 72}), tooLarge);
+    // Exactly the budget passes: the wide layer's missing image fails.
+    input.manifest.layers = {narrow, wide};
+    QCOMPARE(resizeError(input, widened), std::optional(ProjectError::Kind::missingImage));
+    // One pixel more, counted across both layers, does not.
+    input.manifest.layers[0].transform.size = {double(rest + 1) / 2, 1};
+    QCOMPARE(resizeError(input, widened), tooLarge);
+    input.manifest.layers = {wide};
+    QCOMPARE(resizeError(input, widened), std::optional(ProjectError::Kind::missingImage));
     // Masks have their own budget, counted the same way.
-    input.manifest.layers = {small, whole};
+    input.manifest.layers = {narrow, wide};
+    input.manifest.layers[0].transform.size = {double(rest + 1) / 2, 1};
     for (ProjectLayerRecord &layer : input.manifest.layers) {
         layer.imageFile = std::nullopt;
         layer.maskFile = uuidString(layer.id) + ".mask.png";
         input.masks.insert({layer.id, LayerMask::assetFrom(gray(4, 4, 200))});
     }
-    QCOMPARE(resizeError(input, {.width = 10'000, .height = 10'000, .resolution = 72}), tooLarge);
-    input.manifest.layers[1].transform.size = {99, 100};
-    QCOMPARE(ImageResizer::resize(input, {.width = 10'000, .height = 10'000, .resolution = 72, .sampling = LayerSampling::nearest})
-                 .masks.at(whole.id).size(), QSize(9'900, 10'000));
-    input.manifest.layers[1].transform.size = {99.01, 100};
-    QCOMPARE(resizeError(input, {.width = 10'000, .height = 10'000, .resolution = 72}), tooLarge);
+    QCOMPARE(resizeError(input, widened), tooLarge);
+    // Exactly the budget passes: its surface then finds no memory.
+    input.manifest.layers[0].transform.size = {double(rest) / 2, 1};
+    std::optional<ExportError::Kind> kind;
+    {
+        const AddressSpaceLimit limit(16ll * 1024 * 1024);
+        try {
+            ImageResizer::resize(input, widened);
+        } catch (const ExportError &error) {
+            kind = error.kind;
+        }
+    }
+    QCOMPARE(kind, std::optional(ExportError::Kind::render));
+    // Past one surface, within the document's: a mask still fits.
+    if (budget > DocumentLimits::maxSurfacePixels + 30'000) {
+        const int past = int(DocumentLimits::maxSurfacePixels / 30'000) + 1;
+        input.manifest.layers = {input.manifest.layers[1]};
+        input.manifest.layers[0].transform.size = {15'000, double(past)};
+        QCOMPARE(ImageResizer::resize(input, widened).masks.at(wide.id).size(), QSize(30'000, past));
+    }
     // A side past 30,000 is refused though the pixels fit.
     ProjectSnapshot strip = imported();
     strip.manifest.layers[0].transform = {.origin = {0, 0}, .size = {64, 1}};

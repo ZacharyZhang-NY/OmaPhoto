@@ -175,8 +175,8 @@ void ShapeLayerTests::whatIsNotRedrawn()
     QCOMPARE(session->activeLayer().value().transform.size, QSizeF(30.4, 19.6));
     QCOMPARE(session->activeLayer().value().asset.value().identity(), asset.identity());
     QVERIFY(session->activeLayer().value().liveShape());
-    // Past 100 megapixels it stretches as it is.
-    resize(*session, QSizeF(20'001, 5'000));
+    // Past one surface's 200 megapixels it stretches as it is.
+    resize(*session, QSizeF(20'001, 10'000));
     session->commitTransform();
     QCOMPARE(session->activeLayer().value().asset.value().identity(), asset.identity());
     session->undo();

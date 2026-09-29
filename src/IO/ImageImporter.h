@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/DocumentLimits.h"
 #include <QImage>
 #include <QString>
 #include <QUuid>
@@ -48,7 +49,7 @@ namespace ImageImporter {
 // Qt refuses decodes over 128 MB; the app's budgets rule.
 void liftAllocationLimit();
 // JPEG, PNG, TIFF or HEIC: upright, sRGB, premultiplied.
-ImportedImage decode(const QString &path, qint64 remainingPixels = 100'000'000);
-PSDDocument loadPhotoshop(const QString &path, qint64 remainingPixels = 100'000'000);
+ImportedImage decode(const QString &path, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
+PSDDocument loadPhotoshop(const QString &path, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
 std::map<QUuid, ImportedImage> photoshopAssets(const PSDDocument &document);
 }

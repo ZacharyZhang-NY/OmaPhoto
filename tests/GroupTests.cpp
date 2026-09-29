@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "Document/EditorSession.h"
 #include <QtTest>
 
@@ -272,7 +273,7 @@ void GroupTests::projectErrorsCarryTheirMessages()
     const ProjectError tooLarge(ProjectError::Kind::tooLarge);
     QCOMPARE(tooLarge.kind, ProjectError::Kind::tooLarge);
     QCOMPARE(QString(tooLarge.what()),
-             QString("This project exceeds the supported canvas, layer, file-size, or 100-megapixel image limit."));
+             QStringLiteral("This project exceeds the supported canvas, layer, file-size, or %1-megapixel document limit.").arg(DocumentLimits::documentBudgetMegapixels()));
 
     const ProjectError encode(ProjectError::Kind::encode);
     QCOMPARE(encode.kind, ProjectError::Kind::encode);

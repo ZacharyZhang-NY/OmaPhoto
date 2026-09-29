@@ -128,7 +128,7 @@ void LayerEffectsRendererTests::renderingPadsMasksThenRunsTheKernel()
     LayerEffects shadow;
     shadow.shadow = ShadowEffect{.distance = 10};
     try {
-        LayerEffectsRenderer::render(QImage(9'990, 9'990, QImage::Format_Mono), std::nullopt, shadow);
+        LayerEffectsRenderer::render(QImage(14'140, 14'140, QImage::Format_Mono), std::nullopt, shadow);
         QFAIL("a vast layer rendered");
     } catch (const ProjectError &error) {
         QCOMPARE(error.kind, ProjectError::Kind::tooLarge);
@@ -188,7 +188,7 @@ void LayerEffectsRendererTests::theCacheKeepsEightWithinItsBudget()
     // Too large to make: the layer draws bare.
     LayerEffects shadow;
     shadow.shadow = ShadowEffect{.distance = 10};
-    QVERIFY(!LayerEffectsRenderer::cached(QImage(9'990, 9'990, QImage::Format_Mono), std::nullopt, shadow));
+    QVERIFY(!LayerEffectsRenderer::cached(QImage(14'140, 14'140, QImage::Format_Mono), std::nullopt, shadow));
 }
 
 void LayerEffectsRendererTests::theExportAndTheCompositeDrawTheEffects()

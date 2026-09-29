@@ -1,4 +1,5 @@
 #include "IO/ImageImporter.h"
+#include "Document/DocumentLimits.h"
 #include "IO/PSD/PSDDocumentBuilder.h"
 #include "IO/PSD/PSDReader.h"
 #include "Logging.h"
@@ -20,7 +21,7 @@ QString description(ImageImportError::Kind kind)
     case ImageImportError::Kind::unsupported:
         return QStringLiteral("Choose a JPEG, PNG, HEIC, TIFF, or Photoshop (PSD) file.");
     case ImageImportError::Kind::tooLarge:
-        return QStringLiteral("This import exceeds the current 100-megapixel document budget or 30,000-pixel side limit.");
+        return QStringLiteral("This import exceeds the current %1-megapixel document budget or %2-pixel side limit.").arg(DocumentLimits::documentBudgetMegapixels()).arg(DocumentLimits::maxSideText());
     case ImageImportError::Kind::whiteBalance:
         return QStringLiteral("This camera can’t record that white balance. Move Temperature or Tint back toward the shot.");
     }
@@ -37,7 +38,7 @@ void checkSize(const QSize &size, qint64 remainingPixels, const QString &path)
 {
     if (size.width() <= 0 || size.height() <= 0)
         refuse(ImageImportError::Kind::unreadable, path, QStringLiteral("it states no size"));
-    if (size.width() > 30'000 || size.height() > 30'000 || qint64(size.width()) * size.height() > remainingPixels)
+    if (size.width() > DocumentLimits::maxSide || size.height() > DocumentLimits::maxSide || qint64(size.width()) * size.height() > remainingPixels)
         refuse(ImageImportError::Kind::tooLarge, path, QStringLiteral("%1 x %2 pixels").arg(size.width()).arg(size.height()));
 }
 

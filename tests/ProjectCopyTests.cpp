@@ -1,3 +1,4 @@
+#include "BudgetFixtures.h"
 #include "Document/ProjectWorkspace.h"
 #include "Rendering/RasterSnapshot.h"
 #include "SessionFixtures.h"
@@ -45,7 +46,7 @@ class ProjectCopyTests : public QObject {
     Q_OBJECT
 private slots:
     void whatMayNotBeCopiedChangesNothing();
-    void theHundredMegapixelsCountAcrossBothProjects();
+    void theBudgetCountsAcrossBothProjects();
     void aFolderTravelsWithItsContentsAndItsLinks();
     void aMaskFromOutsideTheCopyIsBakedIn();
     void anAdjustmentLetsGoOfItsBaseUnbaked();
@@ -104,18 +105,25 @@ void ProjectCopyTests::whatMayNotBeCopiedChangesNothing()
     QCOMPARE(edits.count(), before + 6);
 }
 
-void ProjectCopyTests::theHundredMegapixelsCountAcrossBothProjects()
+void ProjectCopyTests::theBudgetCountsAcrossBothProjects()
 {
     ProjectWorkspace workspace;
     ProjectTab &from = workspace.current();
     from.session.createDocument(8, 8);
-    from.session.insert(vast(10'000, 10'000));
+    // A folder claiming the whole document budget.
+    QSet<QUuid> claims;
+    for (const ImportedImage &layer : claiming(DocumentLimits::documentPixelBudget())) {
+        from.session.insert(layer);
+        claims.insert(from.session.activeLayerID().value());
+    }
+    from.session.selectLayers(claims, from.session.activeLayerID());
+    from.session.groupSelectedLayers();
     const QUuid id = from.session.activeLayerID().value();
     ProjectTab &target = workspace.addTab();
     target.session.createDocument(8, 8);
     // Exactly the limit fits.
     QVERIFY(copied(workspace, id, target.id));
-    QCOMPARE(names(target.session), (QStringList{"Vast"}));
+    QCOMPARE(target.session.document().value().layers.size(), size_t(claims.size() + 1));
     QCOMPARE(target.session.importError(), std::nullopt);
     // One pixel more, counted across both, does not.
     target.session.undo();
@@ -123,13 +131,15 @@ void ProjectCopyTests::theHundredMegapixelsCountAcrossBothProjects()
     target.session.setRenamingLayerID(std::nullopt);
     QVERIFY(copied(workspace, id, target.id));
     QCOMPARE(names(target.session), (QStringList{"Dot"}));
-    QCOMPARE(target.session.importError(), std::optional(QString("The copied layers exceed this project’s 100-megapixel limit.")));
+    QCOMPARE(target.session.importError(),
+             std::optional(QStringLiteral("The copied layers exceed this project’s %1-megapixel limit.").arg(DocumentLimits::documentBudgetMegapixels())));
     QVERIFY(!workspace.isManaging() && !from.session.isProjectBusy() && !target.session.isProjectBusy());
     // While that error shows, the front tab lets nothing start.
     QVERIFY(!workspace.canSwitch() && copied(workspace, id, std::nullopt));
     QCOMPARE(int(workspace.tabs().size()), 2);
     target.session.setImportError(std::nullopt);
     // Refused for a new tab, that tab stays.
+    from.session.selectLayers({}, std::nullopt);
     from.session.insert(vast(1, 1));
     const QUuid extra = from.session.activeLayerID().value();
     from.session.addGroup();

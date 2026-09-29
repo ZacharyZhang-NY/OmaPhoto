@@ -280,8 +280,8 @@ void LayerEffectsKernelTests::switchedOffOrEmptyEffectsLeaveThePixels()
 
 void LayerEffectsKernelTests::theKernelRefusesWhatItCannotHold()
 {
-    // Past a hundred million pixels, before any pixel is read.
-    const QImage vast(10'001, 10'000, QImage::Format_Mono);
+    // Past one surface's pixels, before any pixel is read.
+    const QImage vast(20'001, 10'000, QImage::Format_Mono);
     LayerEffects effects;
     effects.stroke = StrokeEffect();
     try {

@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "BrushFixtures.h"
 #include "Document/EditorSession.h"
 #include "IO/ImageExporter.h"
@@ -227,13 +228,13 @@ void ShapeToolTests::shiftSnapsALineToEighthsOfATurn()
 void ShapeToolTests::aShapeTooLargeIsRefused()
 {
     EditorSession session;
-    session.createDocument(20'000, 12'000, true);
+    session.createDocument(30'000, 12'000, true);
     session.selectTool(NavigationTool::shape);
-    // Each side truncated first: 10,001 × 10,000 is over.
+    // Each side truncated first: 20,001 × 10,000 is over.
     session.beginShape(QPointF(0, 0));
-    session.dragShape(QPointF(10'001, 10'000), false, false);
+    session.dragShape(QPointF(20'001, 10'000), false, false);
     session.finishShape();
-    QCOMPARE(session.brushError().value(), QString("That shape is too large. A shape can cover up to 100 megapixels."));
+    QCOMPARE(session.brushError().value(), QStringLiteral("That shape is too large. A shape can cover up to %1 megapixels.").arg(DocumentLimits::maxSurfaceMegapixels()));
     QCOMPARE(session.document().value().layers.size(), size_t(1));
     QVERIFY(!session.shapeDraft());
 }

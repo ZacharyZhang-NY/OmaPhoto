@@ -1,4 +1,5 @@
 #include "Document/EditorSession.h"
+#include "Document/DocumentLimits.h"
 #include "Document/Crop.h"
 #include "Logging.h"
 #include <cmath>
@@ -282,7 +283,7 @@ void EditorSession::insert(const ImportedImage &asset, std::optional<QPointF> ce
 
 void EditorSession::createDocument(int width, int height, bool emptyLayer)
 {
-    if (m_isProjectBusy || m_isImporting || width < 1 || width > 30'000 || height < 1 || height > 30'000)
+    if (m_isProjectBusy || m_isImporting || width < 1 || width > DocumentLimits::maxSide || height < 1 || height > DocumentLimits::maxSide)
         return;
     commitTransform();
     beginEdit(QStringLiteral("New Canvas"));

@@ -104,7 +104,7 @@ void ExportTests::blankCanvasAndOversizedCanvas()
     const auto sized = [](int width, int height) {
         return ProjectSnapshot{.manifest = {.documentID = QUuid::createUuid(), .width = width, .height = height, .activeLayerID = std::nullopt, .layers = {}}, .images = {}};
     };
-    for (const QSize &size : {QSize(30'000, 30'000), QSize(30'001, 1), QSize(1, 30'001), QSize(0, 5), QSize(5, 0), QSize(10'001, 10'000)}) {
+    for (const QSize &size : {QSize(30'000, 30'000), QSize(30'001, 1), QSize(1, 30'001), QSize(0, 5), QSize(5, 0), QSize(20'001, 10'000)}) {
         try {
             ImageExporter::render(sized(size.width(), size.height()));
             QFAIL("an oversized or empty canvas must be refused");

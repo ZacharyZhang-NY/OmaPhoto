@@ -1,4 +1,5 @@
 #include "Document/LayerEffects+Renderer.h"
+#include "Document/DocumentLimits.h"
 #include "Document/BrushStroke.h"
 #include "IO/ImageExporter.h"
 #include "Logging.h"
@@ -116,7 +117,7 @@ LayerEffectsRenderer::Rendered LayerEffectsRenderer::render(const QImage &image,
         throw ProjectError(ProjectError::Kind::invalid);
     const double inset = margin(effects);
     const qint64 width = image.width() + qint64(inset) * 2, height = image.height() + qint64(inset) * 2;
-    if (width <= 0 || height <= 0 || width * height > 100'000'000)
+    if (width <= 0 || height <= 0 || width * height > DocumentLimits::maxSurfacePixels)
         throw ProjectError(ProjectError::Kind::tooLarge);
     // The pixels with room round them, then the effects.
     QImage padded = BrushRaster::context(int(width), int(height), false);

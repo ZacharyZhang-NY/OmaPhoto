@@ -202,6 +202,7 @@ private:
     void stepMarqueeAutoscroll();
     void stopMarqueeAutoscroll();
     void updateAntsTimer();
+    void stepAnts();
     // Swift's brush gestures (EditorCanvas+Brush.cpp).
     void brushMouseDown(QPointF point, Qt::KeyboardModifiers modifiers);
     bool brushMouseMove(QPointF point, Qt::KeyboardModifiers modifiers, bool dragging);
@@ -291,6 +292,8 @@ private:
     QTimer m_marqueeAutoscroll;
     std::optional<QPointF> m_marqueeAutoscrollPoint;
     QTimer m_antsTimer;
+    // A repaint still pending skips a tick: slow outlines stutter.
+    bool m_antsRepaintPending = false;
     std::optional<DocumentSelection> m_displayedOutline;
     std::optional<LassoDraft> m_displayedDraft;
     std::optional<ShapeShown> m_displayedShape;

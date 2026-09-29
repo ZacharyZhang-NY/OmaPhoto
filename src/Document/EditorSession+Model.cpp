@@ -1,4 +1,5 @@
 #include "Document/EditorSession+Model.h"
+#include "Document/DocumentLimits.h"
 #include "IO/ProjectStore.h"
 #include <algorithm>
 
@@ -85,7 +86,7 @@ std::optional<int> CanvasDocument::validDimension(const QString &value)
     while (last > first && isWhitespace(value[last - 1]))
         --last;
     const std::optional<int> number = wholeNumber(QStringView(value).mid(first, last - first));
-    if (!number || *number < 1 || *number > 30'000)
+    if (!number || *number < 1 || *number > DocumentLimits::maxSide)
         return std::nullopt;
     return number;
 }

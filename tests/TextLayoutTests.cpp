@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "BrushFixtures.h"
 #include "Document/EditorSession.h"
 #include "Rendering/TextLayout.h"
@@ -187,18 +188,18 @@ void TextLayoutTests::imagesKeepSwiftsLimits()
         return std::nullopt;
     };
     QCOMPARE(refused(styled(QStringLiteral("Text"), 0)), std::optional(ProjectError::Kind::invalid));
-    // A side past 30,000, then the area past 100 megapixels.
+    // A side past 30,000, then the area past one surface.
     const LayerTextStyle wide = styled(QStringLiteral("M").repeated(20), 2000);
     const QSizeF wideSize = EditorSession::textBoxSize(wide);
-    QVERIFY(wideSize.width() > 30'000 && wideSize.width() < 40'000 && wideSize.width() * wideSize.height() < 100'000'000);
+    QVERIFY(wideSize.width() > 30'000 && wideSize.width() < 40'000 && wideSize.width() * wideSize.height() < DocumentLimits::maxSurfacePixels);
     QCOMPARE(refused(wide), std::optional(ProjectError::Kind::tooLarge));
     const LayerTextStyle tall = styled(QStringLiteral("a\n").repeated(13), 2000);
     const QSizeF tallSize = EditorSession::textBoxSize(tall);
-    QVERIFY(tallSize.height() > 30'000 && tallSize.height() < 40'000 && tallSize.width() * tallSize.height() < 100'000'000);
+    QVERIFY(tallSize.height() > 30'000 && tallSize.height() < 40'000 && tallSize.width() * tallSize.height() < DocumentLimits::maxSurfacePixels);
     QCOMPARE(refused(tall), std::optional(ProjectError::Kind::tooLarge));
-    const LayerTextStyle large = styled(QStringLiteral("M").repeated(14) + QStringLiteral("\nM"), 2000);
+    const LayerTextStyle large = styled(QStringLiteral("M").repeated(14) + QStringLiteral("\nM").repeated(3), 2000);
     const QSizeF largeSize = EditorSession::textBoxSize(large);
-    QVERIFY(largeSize.width() < 30'000 && largeSize.width() * largeSize.height() > 100'000'000);
+    QVERIFY(largeSize.width() < 30'000 && largeSize.width() * largeSize.height() > DocumentLimits::maxSurfacePixels);
     QCOMPARE(refused(large), std::optional(ProjectError::Kind::tooLarge));
     QVERIFY(!refused(styled(QStringLiteral("M").repeated(10), 2000)));
     // A fractional box rounds up to whole pixels.

@@ -1,9 +1,37 @@
+#include "Document/DocumentLimits.h"
 #include "Document/LayerMask.h"
+#include "BudgetFixtures.h"
 #include "ProjectFixtures.h"
+#include <QBuffer>
 #include <QImageWriter>
 #include <QTemporaryDir>
 #include <QtTest>
 #include <limits>
+
+namespace {
+// A PNG whose header claims pixels it never holds.
+QByteArray claimingPNG(int width, int height)
+{
+    QByteArray data;
+    QBuffer buffer(&data);
+    QImageWriter(&buffer, "png").write(QImage(1, 1, QImage::Format_Grayscale8));
+    for (int index = 0; index < 4; ++index) {
+        data[16 + index] = char(quint32(width) >> (24 - 8 * index));
+        data[20 + index] = char(quint32(height) >> (24 - 8 * index));
+    }
+    // The header chunk's CRC-32 over its type and fields.
+    quint32 crc = 0xFFFFFFFF;
+    for (int index = 12; index < 29; ++index) {
+        crc ^= uchar(data[index]);
+        for (int bit = 0; bit < 8; ++bit)
+            crc = (crc >> 1) ^ (0xEDB88320 & (0u - (crc & 1)));
+    }
+    crc = ~crc;
+    for (int index = 0; index < 4; ++index)
+        data[29 + index] = char(crc >> (24 - 8 * index));
+    return data;
+}
+}
 
 class ProjectTests : public QObject {
     Q_OBJECT
@@ -381,22 +409,30 @@ void ProjectTests::sizeLimitsHoldOnSaveAndLoad()
     ProjectSnapshot long1 = snapshot;
     long1.images.insert_or_assign(id, asset(gray(30'001, 1, 9).convertToFormat(QImage::Format_RGBA8888_Premultiplied), "long"));
     QCOMPARE(projectError([&] { ProjectStore::save(long1, root.filePath("Long.comp")); }), std::optional(ProjectError::Kind::tooLarge));
-    // Masks share 100 million pixels, apart from the images'.
+    // Masks share the document budget, apart from the images'.
     ProjectSnapshot heavy = snapshot;
     const QUuid second = heavy.manifest.layers[1].id;
     heavy.manifest.layers[0].maskFile = uuidString(id) + ".mask.png";
     heavy.manifest.layers[1].maskFile = uuidString(second) + ".mask.png";
-    heavy.masks.insert({id, asset(gray(10'000, 10'000, 255), "whole budget")});
-    heavy.masks.insert({second, asset(gray(1, 1, 255), "one too many")});
+    // Rows of 30,000 and a remainder fill the budget exactly.
+    const qint64 budget = DocumentLimits::documentPixelBudget();
+    const qint64 rows = (budget - 1) / 30'000, rest = budget - rows * 30'000;
+    // Saving judges sizes before pixels: one over, summed, refused.
+    heavy.masks.insert({id, asset(gray(int(rest) + 1, 1, 255), "one too many")});
+    heavy.masks.insert({second, claimed(30'000, int(rows))});
     QCOMPARE(projectError([&] { ProjectStore::save(heavy, root.filePath("Heavy.comp")); }), std::optional(ProjectError::Kind::tooLarge));
-    // 99,990,000 and 10,000 pixels fill the budget exactly.
-    heavy.masks.insert_or_assign(id, asset(gray(10'000, 9'999, 255), "nearly all"));
-    heavy.masks.insert_or_assign(second, asset(gray(100, 100, 255), "the rest"));
+    QVERIFY(!heavy.masks.at(second).raster->hasMaterializedPixels());
+    heavy.masks.insert_or_assign(id, asset(gray(int(rest), 1, 255), "the rest"));
+    heavy.masks.insert_or_assign(second, asset(gray(1, 1, 255), "small"));
     QCOMPARE(projectError([&] { ProjectStore::save(heavy, root.filePath("Heavy.comp")); }), std::nullopt);
     QCOMPARE(projectError([&] { ProjectStore::load(root.filePath("Heavy.comp")); }), std::nullopt);
-    // On load the same sum comes from the files' headers.
+    // Loaded, headers sum exactly to it; images count apart.
     const QString firstMask = root.filePath("Heavy.comp/images/") + uuidString(id) + ".mask.png";
-    overwrite(firstMask, png(gray(10'000, 10'000, 255)));
+    const QString secondMask = root.filePath("Heavy.comp/images/") + uuidString(second) + ".mask.png";
+    overwrite(secondMask, claimingPNG(30'000, int(rows)));
+    QCOMPARE(projectError([&] { ProjectStore::load(root.filePath("Heavy.comp")); }), std::optional(ProjectError::Kind::missingImage));
+    // The first mask's one more pixel tips the sum over.
+    overwrite(firstMask, png(gray(int(rest) + 1, 1, 255)));
     QCOMPARE(projectError([&] { ProjectStore::load(root.filePath("Heavy.comp")); }), std::optional(ProjectError::Kind::tooLarge));
 }
 

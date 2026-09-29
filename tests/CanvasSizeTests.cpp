@@ -1,3 +1,4 @@
+#include "BudgetFixtures.h"
 #include "AddressSpaceLimit.h"
 #include "Document/CanvasSize.h"
 #include "Document/EditorSession.h"
@@ -264,13 +265,18 @@ void CanvasSizeTests::masksPlacedApartMoveWithTheirLayers()
 
 void CanvasSizeTests::theExtensionCountsAgainstTheBudgets()
 {
-    // A painted 9000 x 9000 layer leaves 19 megapixels.
-    const QUuid id = QUuid::createUuid();
-    const std::shared_ptr<const RasterSnapshot> raster = painted(solid(9000, 9000, qRgba(0, 0, 0, 0)), {});
-    const ProjectLayerRecord record{.id = id, .name = "Painted", .isVisible = true, .transform = {.origin = {0, 0}, .size = {9000, 9000}},
-                                    .imageFile = uuidString(id) + ".png"};
-    const ProjectSnapshot input{.manifest = {.documentID = QUuid::createUuid(), .width = 100, .height = 100, .activeLayerID = id, .layers = {record}},
-                                .images = {{id, ImportedImage(raster, solid(1, 1, 0), "Painted")}}};
+    // Painted layers leave 19 megapixels of the document budget.
+    ProjectSnapshot input{.manifest = {.documentID = QUuid::createUuid(), .width = 100, .height = 100, .activeLayerID = std::nullopt, .layers = {}},
+                          .images = {}};
+    for (const ImportedImage &layer : claiming(DocumentLimits::documentPixelBudget() - 19'000'000)) {
+        const QUuid layerID = QUuid::createUuid();
+        input.manifest.layers.push_back({.id = layerID, .name = "Painted", .isVisible = true, .transform = {.origin = {0, 0}, .size = QSizeF(layer.size())},
+                                         .imageFile = uuidString(layerID) + ".png"});
+        input.images.insert({layerID, layer});
+    }
+    const QUuid id = input.manifest.layers.front().id;
+    input.manifest.activeLayerID = id;
+    const std::shared_ptr<const RasterSnapshot> raster = input.images.at(id).raster;
     const CanvasExtensionColor white{1, 1, 1};
     QVERIFY(!raster->hasMaterializedPixels());
     QCOMPARE(resizeError(input, {.width = 4750, .height = 4001, .fill = white}), std::optional(ProjectError::Kind::tooLarge));

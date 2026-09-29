@@ -1,4 +1,5 @@
 #include "Document/EditorSession.h"
+#include "Document/DocumentLimits.h"
 #include "Logging.h"
 
 std::optional<ProjectSnapshot> EditorSession::projectSnapshot() const
@@ -69,7 +70,7 @@ void EditorSession::clearProject()
 
 void EditorSession::createNewProject(int width, int height)
 {
-    if (m_isProjectBusy || m_isImporting || width < 1 || width > 30'000 || height < 1 || height > 30'000)
+    if (m_isProjectBusy || m_isImporting || width < 1 || width > DocumentLimits::maxSide || height < 1 || height > DocumentLimits::maxSide)
         return;
     clearProject();
     createDocument(width, height, true);

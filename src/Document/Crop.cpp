@@ -1,4 +1,5 @@
 #include "Document/Crop.h"
+#include "Document/DocumentLimits.h"
 #include "Document/Distort.h"
 #include "Document/EditorSession.h"
 #include "IO/CanvasResizer.h"
@@ -19,7 +20,7 @@ QRectF CropGeometry::snapped(const QRectF &rect)
 bool CropGeometry::valid(const QRectF &rect)
 {
     const QRectF standard = rect.normalized();
-    return standard.width() >= 1 && standard.width() <= 30'000 && standard.height() >= 1 && standard.height() <= 30'000
+    return standard.width() >= 1 && standard.width() <= DocumentLimits::maxSide && standard.height() >= 1 && standard.height() <= DocumentLimits::maxSide
         && std::abs(standard.left()) <= 1'000'000 && std::abs(standard.top()) <= 1'000'000;
 }
 

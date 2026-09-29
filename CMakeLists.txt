@@ -52,6 +52,7 @@ add_library(compositor_core STATIC
     src/Document/ProjectWorkspace+Copy.cpp
     src/Document/SelectionClipboard.cpp
     src/Document/Crop.cpp
+    src/Document/DocumentLimits.cpp
     src/Document/Guides.cpp
     src/Document/ToolDefaults.cpp
     src/Document/ObjectSelection.cpp
@@ -194,6 +195,7 @@ add_library(compositor_core STATIC
     src/Rendering/EyedropperIcon.cpp
     src/Rendering/SampleRingOverlay.cpp
     src/Rendering/TransformOverlay.cpp
+    src/Rendering/TransformOverlay+Ants.cpp
     src/Rendering/HslBlend.cpp
     src/Rendering/SeparableBlend.cpp
     src/Rendering/LayerEffectsKernel.cpp

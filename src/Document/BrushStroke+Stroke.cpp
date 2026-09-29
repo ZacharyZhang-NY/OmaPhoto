@@ -1,4 +1,5 @@
 #include "Document/BrushStroke.h"
+#include "Document/DocumentLimits.h"
 #include "Rendering/PoolMap.h"
 #include "Document/PixelAdjust.h"
 #include "IO/ImageExporter.h"
@@ -72,7 +73,7 @@ BrushStroke::Grid BrushStroke::grid(const ImageLayer &layer, bool mask, const Br
         : layer.asset ? layer.asset->size().width() : int(std::round(layer.size().width()));
     const int originalHeight = placedMask ? layer.mask->asset.size().height()
         : layer.asset ? layer.asset->size().height() : int(std::round(layer.size().height()));
-    if (originalWidth < 1 || originalWidth > 30'000 || originalHeight < 1 || originalHeight > 30'000)
+    if (originalWidth < 1 || originalWidth > DocumentLimits::maxSide || originalHeight < 1 || originalHeight > DocumentLimits::maxSide)
         throw ProjectError(ProjectError::Kind::tooLarge);
     const QTransform originalMapping = BrushRaster::pixelToDocument(base, originalWidth, originalHeight);
     const QRectF originalBounds(0, 0, originalWidth, originalHeight);
@@ -301,7 +302,7 @@ void BrushStroke::allocateTile(qint64 key, qint64 x, qint64 y)
         return;
     const QRectF rect(x * tileSize, y * tileSize, std::min<qint64>(tileSize, width - x * tileSize), std::min<qint64>(tileSize, height - y * tileSize));
     const QRectF nextBounds = m_allocatedBounds ? m_allocatedBounds->united(rect) : m_source ? sourceRect.united(rect) : rect;
-    if (nextBounds.width() > 30'000 || nextBounds.height() > 30'000 || nextBounds.width() * nextBounds.height() > pixelLimit)
+    if (nextBounds.width() > DocumentLimits::maxSide || nextBounds.height() > DocumentLimits::maxSide || nextBounds.width() * nextBounds.height() > pixelLimit)
         throw ProjectError(ProjectError::Kind::tooLarge);
     m_allocatedBounds = nextBounds;
     QImage context = BrushRaster::context(int(rect.width()), int(rect.height()), isMask);

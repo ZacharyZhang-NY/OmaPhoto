@@ -4,6 +4,7 @@
 #include "Document/ColorPalette.h"
 #include "Document/Gradient.h"
 #include "Document/Distort.h"
+#include "Document/DocumentLimits.h"
 #include "Document/Filters.h"
 #include "Document/LevelsAutomatic.h"
 #include "Document/FloatingSelection.h"

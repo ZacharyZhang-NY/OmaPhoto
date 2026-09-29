@@ -67,10 +67,8 @@ CanvasView::CanvasView(EditorSession &session, QWidget *parent)
     connect(&m_marqueeAutoscroll, &QTimer::timeout, this, &CanvasView::stepMarqueeAutoscroll);
     m_antsTimer.setObjectName(QStringLiteral("antsTimer"));
     m_antsTimer.setInterval(120);
-    connect(&m_antsTimer, &QTimer::timeout, this, [this] {
-        m_overlay.antsPhase = std::fmod(m_overlay.antsPhase + 1, 8.0);
-        update(m_overlay.selectionRect(rect()));
-    });
+    connect(&m_antsTimer, &QTimer::timeout, this, &CanvasView::stepAnts);
+    m_overlay.repaintAnts = [this] { update(m_overlay.selectionRect(rect())); };
 }
 
 CanvasView::DisplayState CanvasView::displayState() const
@@ -205,6 +203,7 @@ std::optional<QRectF> CanvasView::renderBounds() const
 
 void CanvasView::paintEvent(QPaintEvent *event)
 {
+    m_antsRepaintPending = false;
     // The dirty rect, image-backed: hand blends and coverage read pixels.
     QPainter painter(this);
     painter.setClipRect(event->rect());

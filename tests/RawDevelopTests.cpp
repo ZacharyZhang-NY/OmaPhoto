@@ -1,3 +1,4 @@
+#include "BudgetFixtures.h"
 #include "ContentView.h"
 #include "DNGFixture.h"
 #include "IO/RawImporter.h"
@@ -113,11 +114,13 @@ void RawDevelopTests::whatCannotBeDevelopedIsReported()
     DNGFixture::Options wide, tall, big;
     wide.claimed = QSize(30'001, 48);
     tall.claimed = QSize(64, 30'001);
-    big.claimed = QSize(20'000, 5'001);
+    big.claimed = QSize(30'000, 30'000);
+    // Rows of 30,000 within the document budget.
+    const int rows = int(DocumentLimits::documentPixelBudget() / 30'000);
     DNGFixture::Options fits;
-    fits.claimed = QSize(20'000, 5'000);
+    fits.claimed = QSize(30'000, rows);
     const QUrl fitting = dng(folder, "Fits.dng", fits);
-    QCOMPARE(RawImporter::pixelSize(fitting.toLocalFile()), std::optional(QSize(20'000, 5'000)));
+    QCOMPARE(RawImporter::pixelSize(fitting.toLocalFile()), std::optional(QSize(30'000, rows)));
     EditorSession session;
     bool done = false;
     const QList<QUrl> urls{QUrl::fromLocalFile(fake.fileName()), dng(folder, "Wide.dng", wide), dng(folder, "Tall.dng", tall), dng(folder, "Big.dng", big), png(folder)};
@@ -127,12 +130,6 @@ void RawDevelopTests::whatCannotBeDevelopedIsReported()
     const QString unreadable = ImageImportError(ImageImportError::Kind::unreadable).what(), tooLarge = ImageImportError(ImageImportError::Kind::tooLarge).what();
     QCOMPARE(session.importError().value(), QStringList({"Fake.dng: " + unreadable, "Wide.dng: " + tooLarge, "Tall.dng: " + tooLarge, "Big.dng: " + tooLarge}).join("\n\n"));
     QCOMPARE(names(session), QStringList{"Plain"});
-    // The canvas's 4 by 2 pixels count against the budget.
-    session.setImportError(std::nullopt);
-    done = false;
-    session.importImages({fitting}, std::nullopt, [&done] { done = true; });
-    QTRY_VERIFY(done);
-    QCOMPARE(session.importError().value(), "Fits.dng: " + tooLarge);
     // Accepted, then unreadable when the full develop runs.
     session.setImportError(std::nullopt);
     done = false;
@@ -158,6 +155,22 @@ void RawDevelopTests::whatCannotBeDevelopedIsReported()
     QTRY_VERIFY(done);
     QCOMPARE(session.importError().value(), "Warm.dng: " + QString(ImageImportError(ImageImportError::Kind::whiteBalance).what()));
     QCOMPARE(names(session), QStringList{"Plain"});
+    // Past one surface yet within the document budget, it opens.
+    session.setImportError(std::nullopt);
+    done = false;
+    session.importImages({fitting}, std::nullopt, [&done] { done = true; });
+    QTRY_VERIFY(session.rawDevelop());
+    session.finishRawDevelop(std::nullopt);
+    QTRY_VERIFY(done);
+    QCOMPARE(session.importError(), std::nullopt);
+    // The slack filled, the canvas's 8 pixels tip it.
+    for (const ImportedImage &layer : claiming(DocumentLimits::documentPixelBudget() - qint64(rows) * 30'000))
+        session.insert(layer);
+    session.setImportError(std::nullopt);
+    done = false;
+    session.importImages({fitting}, std::nullopt, [&done] { done = true; });
+    QTRY_VERIFY(done);
+    QCOMPARE(session.importError().value(), "Fits.dng: " + tooLarge);
 }
 
 void RawDevelopTests::theLimitsLetTheirEdgeThrough()

@@ -1,4 +1,5 @@
 #include "Document/FloatingSelection.h"
+#include "Document/DocumentLimits.h"
 #include "Document/BrushStroke.h"
 #include "Document/Distort.h"
 #include "Document/EditorSession.h"
@@ -168,7 +169,7 @@ FloatingMerge::Merged FloatingMerge::merge(const QImage &pixels, const LayerTran
     const QRectF floatingBounds = toPixels.mapRect(BrushRaster::pixelToDocument(transform, pixels.width(), pixels.height()).mapRect(QRectF(pixels.rect())));
     const QRectF original(0, 0, width, height);
     const QRectF extent = integral(original.united(floatingBounds));
-    if (extent.width() > 30'000 || extent.height() > 30'000 || extent.width() * extent.height() > 100'000'000)
+    if (extent.width() > DocumentLimits::maxSide || extent.height() > DocumentLimits::maxSide || extent.width() * extent.height() > DocumentLimits::maxSurfacePixels)
         throw ProjectError(ProjectError::Kind::tooLarge);
     QImage context = BrushRaster::context(int(extent.width()), int(extent.height()), false);
     const QRectF placed = original.translated(-extent.topLeft());

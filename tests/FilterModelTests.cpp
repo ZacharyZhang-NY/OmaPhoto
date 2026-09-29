@@ -183,10 +183,10 @@ void FilterModelTests::aBlurGrowsTheGridAndNeverShrinksIt()
     // A motion blur's reach is half its streak.
     const FilterEdit motion(FilterKind::motionBlur, layer(4, 4), std::nullopt, FilterSettings{.distance = 9}, std::nullopt);
     QCOMPARE(motion.grownImage.value().size(), QSize(18, 18));
-    // Past 30,000 a side or 100 million pixels: refused.
+    // Past 30,000 a side or one surface's pixels: refused.
     QVERIFY_THROWS_EXCEPTION(ProjectError, FilterEdit(FilterKind::gaussianBlur, layer(29990, 1), std::nullopt, FilterSettings{.radius = 3}, std::nullopt));
     QVERIFY_THROWS_EXCEPTION(ProjectError, FilterEdit(FilterKind::gaussianBlur, layer(1, 29990), std::nullopt, FilterSettings{.radius = 3}, std::nullopt));
-    QVERIFY_THROWS_EXCEPTION(ProjectError, FilterEdit(FilterKind::gaussianBlur, ImageLayer(painted(9990, 9990), QPointF()), std::nullopt,
+    QVERIFY_THROWS_EXCEPTION(ProjectError, FilterEdit(FilterKind::gaussianBlur, ImageLayer(painted(14'140, 14'140), QPointF()), std::nullopt,
                                                       FilterSettings{.radius = 3}, std::nullopt));
 }
 

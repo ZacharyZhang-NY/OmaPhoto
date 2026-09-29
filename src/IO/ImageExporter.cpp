@@ -1,4 +1,5 @@
 #include "IO/ImageExporter.h"
+#include "Document/DocumentLimits.h"
 #include "Document/LayerEffects+Renderer.h"
 #include "Document/LayerGroups.h"
 #include "Document/LayerMask.h"
@@ -15,11 +16,11 @@
 #include <cmath>
 
 namespace {
-const char *description(ExportError::Kind kind)
+std::string description(ExportError::Kind kind)
 {
     switch (kind) {
     case ExportError::Kind::tooLarge:
-        return "Image export supports canvases up to 100 megapixels and 30,000 pixels per side.";
+        return QStringLiteral("Image export supports canvases up to %1 megapixels and %2 pixels per side.").arg(DocumentLimits::maxSurfaceMegapixels()).arg(DocumentLimits::maxSideText()).toStdString();
     case ExportError::Kind::render:
         return "The canvas could not be rendered. Try a smaller canvas.";
     case ExportError::Kind::encode:
@@ -50,7 +51,7 @@ ExportError::ExportError(Kind kind) : std::runtime_error(description(kind)), kin
 ExportRaster ImageExporter::render(const ProjectSnapshot &snapshot)
 try {
     const qint64 width = snapshot.manifest.width, height = snapshot.manifest.height;
-    if (width < 1 || width > 30'000 || height < 1 || height > 30'000 || width * height > 100'000'000)
+    if (width < 1 || width > DocumentLimits::maxSide || height < 1 || height > DocumentLimits::maxSide || width * height > DocumentLimits::maxSurfacePixels)
         throw ExportError(ExportError::Kind::tooLarge);
     QImage image(int(width), int(height), QImage::Format_RGBA8888_Premultiplied);
     if (image.isNull())

@@ -1,4 +1,5 @@
 #include "UI/NewCanvasSheet.h"
+#include "Document/DocumentLimits.h"
 #include "UI/KeyboardShortcuts.h"
 #include <QApplication>
 #include <QBuffer>
@@ -99,7 +100,7 @@ void NewCanvasSheet::synchronize()
 void NewCanvasSheet::validate()
 {
     const bool valid = CanvasDocument::validDimension(m_width->text()) && CanvasDocument::validDimension(m_height->text());
-    m_note->setText(valid ? QStringLiteral("Transparent canvas · sRGB") : QStringLiteral("Enter whole numbers from 1 to 30,000 pixels."));
+    m_note->setText(valid ? QStringLiteral("Transparent canvas · sRGB") : QStringLiteral("Enter whole numbers from 1 to %1 pixels.").arg(DocumentLimits::maxSideText()));
     // The palette's bright text is the theme's warning colour.
     m_note->setForegroundRole(valid ? QPalette::PlaceholderText : QPalette::BrightText);
     m_create->setEnabled(valid);

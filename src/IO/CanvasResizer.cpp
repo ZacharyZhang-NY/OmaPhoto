@@ -1,4 +1,5 @@
 #include "IO/CanvasResizer.h"
+#include "Document/DocumentLimits.h"
 #include "IO/ImageExporter.h"
 #include "Logging.h"
 #include <QPainter>
@@ -9,7 +10,7 @@
 namespace {
 ProjectSnapshot resized(const ProjectSnapshot &snapshot, const CanvasSizeOptions &options)
 {
-    if (options.width < 1 || options.width > 30'000 || options.height < 1 || options.height > 30'000 || options.anchor < 0
+    if (options.width < 1 || options.width > DocumentLimits::maxSide || options.height < 1 || options.height > DocumentLimits::maxSide || options.anchor < 0
         || options.anchor > 8)
         throw ProjectError(ProjectError::Kind::tooLarge);
     const ProjectManifest &old = snapshot.manifest;
@@ -49,7 +50,7 @@ ProjectSnapshot resized(const ProjectSnapshot &snapshot, const CanvasSizeOptions
         qint64 used = 0;
         for (const auto &[id, image] : images)
             used += qint64(image.size().width()) * image.size().height();
-        if (options.width * options.height > 100'000'000 - used || manifest.layers.size() >= 10'000)
+        if (options.width * options.height > DocumentLimits::documentPixelBudget() - used || manifest.layers.size() >= 10'000)
             throw ProjectError(ProjectError::Kind::tooLarge);
         const CanvasExtensionColor &color = *options.fill;
         for (const double part : {color.red, color.green, color.blue}) {

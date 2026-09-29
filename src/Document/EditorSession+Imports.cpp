@@ -1,4 +1,5 @@
 #include "Document/EditorSession.h"
+#include "Document/DocumentLimits.h"
 #include "Document/ProjectWorkspace.h"
 #include "Document/PixelAdjust.h"
 #include "IO/PSD/PSDReader.h"
@@ -108,12 +109,12 @@ void EditorSession::decodeNext()
     }
     const QUrl url = request.urls[m_importIndex];
     if (url.isLocalFile() && RawImporter::matches(url.toLocalFile())) {
-        decodeRaw(url.toLocalFile(), 100'000'000 - usedPixels);
+        decodeRaw(url.toLocalFile(), DocumentLimits::documentPixelBudget() - usedPixels);
         return;
     }
     if (url.isLocalFile() && PSDReader::matches(url.toLocalFile())) {
         beginPSDReading(QStringLiteral("Open “%1”?").arg(url.fileName()), QStringLiteral("Import"));
-        m_photoshopReader.setFuture(QtConcurrent::run([path = url.toLocalFile(), remaining = 100'000'000 - usedPixels]() -> PhotoshopRead {
+        m_photoshopReader.setFuture(QtConcurrent::run([path = url.toLocalFile(), remaining = DocumentLimits::documentPixelBudget() - usedPixels]() -> PhotoshopRead {
             try {
                 PSDDocument document = ImageImporter::loadPhotoshop(path, remaining);
                 std::map<QUuid, ImportedImage> assets = ImageImporter::photoshopAssets(document);
@@ -128,7 +129,7 @@ void EditorSession::decodeNext()
         }));
         return;
     }
-    m_decoder.setFuture(QtConcurrent::run([url, remaining = 100'000'000 - usedPixels]() -> Decoded {
+    m_decoder.setFuture(QtConcurrent::run([url, remaining = DocumentLimits::documentPixelBudget() - usedPixels]() -> Decoded {
         try {
             if (!url.isLocalFile())
                 throw ImageImportError(ImageImportError::Kind::unsupported);
@@ -150,7 +151,7 @@ void EditorSession::decodeRaw(const QString &path, qint64 remaining)
     };
     if (!size)
         return refuse(ImageImportError::Kind::unreadable);
-    if (size->width() > 30'000 || size->height() > 30'000 || qint64(size->width()) * size->height() > remaining)
+    if (size->width() > DocumentLimits::maxSide || size->height() > DocumentLimits::maxSide || qint64(size->width()) * size->height() > remaining)
         return refuse(ImageImportError::Kind::tooLarge);
     developRaw(path, [this, path, name](std::optional<RawDevelopSettings> settings) {
         if (!settings) {

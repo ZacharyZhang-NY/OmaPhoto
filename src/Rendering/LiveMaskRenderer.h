@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/DocumentLimits.h"
 #include "Document/LayerAdjustment.h"
 #include "Document/LayerAppearance.h"
 #include <QImage>
@@ -13,7 +14,7 @@
 // Per-render dependency cache: a layer shows through its source's alpha.
 class LiveMaskRenderer {
 public:
-    static constexpr qint64 pixelBudget = 100'000'000;
+    static constexpr qint64 pixelBudget = DocumentLimits::maxSurfacePixels;
     using Source = std::function<std::optional<QUuid>(QUuid)>;
     // Draws a layer through `clip`: device-sized coverage, null for none.
     using DrawOwn = std::function<void(QUuid, QPainter &, const QImage &clip)>;

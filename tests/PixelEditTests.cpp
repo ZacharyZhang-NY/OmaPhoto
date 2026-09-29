@@ -1,3 +1,4 @@
+#include "BudgetFixtures.h"
 #include "BrushFixtures.h"
 #include "IO/ImageExporter.h"
 #include "IO/ProjectStore.h"
@@ -228,12 +229,14 @@ void PixelEditTests::aRasterEditLandsOnlyOnTheLayerItReadAndTheBudgetCountsEvery
     QCOMPARE(session->history.undoCount(), 0);
     QCOMPARE(int(layerWith(*session, id).mask.value().asset.image().constScanLine(5)[5]), 0);
     QCOMPARE(pixel(layerWith(*session, id).asset.value().image(), 5, 5), (std::vector<int>{255, 0, 0, 255}));
-    // Six layers of 16 megapixels leave a stroke 4 million.
+    // The other layers leave a stroke 4 million pixels.
     const auto big = std::make_unique<EditorSession>();
     big->createDocument(4000, 4000, true);
-    for (int i = 0; i < 6; ++i) {
-        const auto raster = std::make_shared<const RasterSnapshot>(4000, 4000, BrushRaster::context(1, 1, false), QRectF(0, 0, 4000, 4000), std::vector<BrushPatch>{});
-        big->insert(ImportedImage(raster, QImage(), QStringLiteral("Big %1").arg(i)));
+    const QUuid first = big->activeLayerID().value();
+    QSet<QUuid> claims;
+    for (const ImportedImage &layer : claiming(DocumentLimits::documentPixelBudget() - 4'000'000)) {
+        big->insert(layer);
+        claims.insert(big->activeLayerID().value());
     }
     big->addBlankLayer();
     big->selectTool(NavigationTool::brush);
@@ -248,14 +251,15 @@ void PixelEditTests::aRasterEditLandsOnlyOnTheLayerItReadAndTheBudgetCountsEvery
     QVERIFY(big->brushStroke());
     big->cancelBrush();
     // A masked layer's budget counts the other masks too.
-    QImage mask = BrushRaster::context(4000, 4000, true);
     const QUuid last = big->activeLayerID().value();
     rewrite(*big, [&](ProjectSnapshot &snapshot) {
         for (ProjectLayerRecord &record : snapshot.manifest.layers)
-            setMask(snapshot, record.id, LayerMask::assetFrom(mask));
+            setMask(snapshot, record.id, claims.contains(record.id) ? claimed(snapshot.images.at(record.id).size().width(), snapshot.images.at(record.id).size().height())
+                                                                    : claimed(4000, 4000));
     });
+    QVERIFY(layerWith(*big, first).mask);
     big->selectLayerTarget(last, false);
-    // Seven other 16-million masks: the budget runs below zero.
+    // The claims' masks and a 16-million one: below zero.
     QCOMPARE(big->makeRasterEdit(big->activeLayer().value())->pixelLimit, qint64(-12'000'000));
 }
 

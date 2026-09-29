@@ -1,3 +1,4 @@
+#include "Document/DocumentLimits.h"
 #include "Document/DocumentHistory.h"
 #include "IO/ImageExporter.h"
 #include "Rendering/RasterSnapshot.h"
@@ -78,7 +79,7 @@ void RasterSnapshotTests::contextAllocationFailureThrowsARenderError()
         QCOMPARE(QString(error.what()), QString("The canvas could not be rendered. Try a smaller canvas."));
     }
     QCOMPARE(QString(ExportError(ExportError::Kind::tooLarge).what()),
-             QString("Image export supports canvases up to 100 megapixels and 30,000 pixels per side."));
+             QStringLiteral("Image export supports canvases up to %1 megapixels and 30,000 pixels per side.").arg(DocumentLimits::maxSurfaceMegapixels()));
     QCOMPARE(QString(ExportError(ExportError::Kind::encode).what()), QString("The image could not be encoded."));
 }
 

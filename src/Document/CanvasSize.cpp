@@ -1,4 +1,5 @@
 #include "Document/CanvasSize.h"
+#include "Document/DocumentLimits.h"
 #include <cmath>
 
 QString rawValue(CanvasUnit unit)
@@ -24,7 +25,7 @@ CanvasSizeDraft::CanvasSizeDraft(qint64 width, qint64 height, double resolution)
 bool CanvasSizeDraft::valid() const
 {
     // NaN and infinity fail both range tests.
-    return std::round(width) >= 1 && std::round(width) <= 30'000 && std::round(height) >= 1 && std::round(height) <= 30'000;
+    return std::round(width) >= 1 && std::round(width) <= DocumentLimits::maxSide && std::round(height) >= 1 && std::round(height) <= DocumentLimits::maxSide;
 }
 
 double CanvasSizeDraft::displayed(bool widthAxis) const

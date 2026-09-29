@@ -1,7 +1,7 @@
 // Swift's ShapeTool extension: shapes dragged out as new layers.
 public:
     // Pixels one shape layer may hold, an import's budget.
-    static constexpr qint64 maxShapePixels = 100'000'000;
+    static constexpr qint64 maxShapePixels = DocumentLimits::maxSurfacePixels;
     ShapeKind shapeKind() const { return m_shapeKind; }
     void setShapeKind(ShapeKind kind);
     // A rectangle's corner radius, in pixels; 0 keeps corners square.
