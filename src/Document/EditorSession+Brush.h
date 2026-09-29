@@ -1,7 +1,7 @@
 // Swift's EditorSession+Brush extension: a stroke from press to commit.
 public:
     bool canPaint() const;
-    std::unique_ptr<BrushStroke> makeRasterEdit(const ImageLayer &layer, const BrushSettings &settings = BrushSettings()) const;
+    std::unique_ptr<BrushStroke> makeRasterEdit(const ImageLayer &layer, const BrushSettings &settings = BrushSettings(), bool growsMask = false) const;
     void beginBrush(QPointF point);
     void continueBrush(QPointF point);
     // Where a Shift-click's line starts; nil on another target.
@@ -22,5 +22,8 @@ public:
 
 private:
     void finishRasterCommit();
+    // A mask painted: grown or placed, it keeps its place.
+    static LayerMask placedMask(const LayerMask &mask, const ImportedImage &asset, const QRectF &bounds, const LayerTransform &transform,
+                                const BrushStroke &stroke);
     // Where Smoothing lets the brush go; none while slack.
     std::optional<QPointF> smoothed(QPointF point);

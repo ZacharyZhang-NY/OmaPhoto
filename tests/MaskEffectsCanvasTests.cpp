@@ -135,7 +135,7 @@ void MaskEffectsCanvasTests::aFinerPlacedMaskMapsIntoTheLayersGrid()
     const QImage painting = scene.shot();
     // The oracle: a whole render through the stroke's mask.
     const ImageLayer square = layerWith(scene.session, scene.square);
-    const QImage preview = scene.session.brushStroke()->placedMaskPreview(square.mask.value().placement.value()).value();
+    const QImage preview = scene.session.brushStroke()->placedMaskPreview(scene.session.brushStroke()->paintTransform).value();
     const LayerEffectsRenderer::Rendered expected = LayerEffectsRenderer::render(square.asset.value().image(), preview, outline(2));
     int largest = 0;
     for (int y = 10; y < 30; ++y) {

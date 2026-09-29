@@ -42,8 +42,8 @@ void CanvasView::drawStroke(const BrushStroke &stroke, const ImageLayer &layer, 
         // A placed mask: the layer draws through its own grid.
         if (!layer.asset)
             return;
-        const std::optional<QImage> preview = stroke.placedMaskPreview(*stroke.layer.mask->placement);
-        if (preview && drawSurface(placedMaskSurface(layer, stroke, *stroke.layer.mask->placement, *preview)))
+        const std::optional<QImage> preview = stroke.placedMaskPreview(stroke.paintTransform);
+        if (preview && drawSurface(placedMaskSurface(layer, stroke, *preview)))
             return;
         LayerRenderer::Options through = options;
         through.mask = preview.value_or(QImage());
@@ -95,7 +95,7 @@ LayerEffectsSurface *CanvasView::strokeSurface(const ImageLayer &layer, const Br
 }
 
 // A placed mask paints its grid; the surface, the layer's.
-LayerEffectsSurface *CanvasView::placedMaskSurface(const ImageLayer &layer, const BrushStroke &stroke, const LayerTransform &placement, const QImage &preview)
+LayerEffectsSurface *CanvasView::placedMaskSurface(const ImageLayer &layer, const BrushStroke &stroke, const QImage &preview)
 {
     const LayerEffects effects = layer.effects.value_or(LayerEffects()).visible();
     if (effects.isEmpty() || !effects.isValid() || !stroke.layer.asset)
@@ -106,7 +106,7 @@ LayerEffectsSurface *CanvasView::placedMaskSurface(const ImageLayer &layer, cons
         m_strokeSurface = LayerEffectsSurface::make(layer.id, effects, full.size(), full);
     if (!m_strokeSurface)
         return nullptr;
-    const QTransform toGrid = BrushRaster::pixelToDocument(placement, stroke.width, stroke.height)
+    const QTransform toGrid = BrushRaster::pixelToDocument(stroke.paintTransform, stroke.width, stroke.height)
         * BrushRaster::pixelToDocument(stroke.layer.transform, base.width(), base.height()).inverted();
     m_strokeSurface->update(stroke.layer.asset, {}, std::nullopt, LayerEffectsSurface::MaskStroke{stroke.patches(), toGrid, [preview, full](const QRectF &region) {
         QImage coverage = BrushRaster::context(int(region.width()), int(region.height()), true);

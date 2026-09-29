@@ -67,16 +67,21 @@ void CanvasThumbnailTests::masksFillTheCanvasWithTheirEdgeTone()
         for (int x = 5; x < 15; ++x)
             framed.setPixel(x, y, qRgb(0, 0, 0));
     }
-    QCOMPARE(CanvasThumbnail::edgeTone(framed), 1.0);
+    QCOMPARE(LayerMask::background(framed), 1.0);
     const QPixmap shown = CanvasThumbnail::mask(framed, transform, canvas, 30);
     QCOMPARE(shown.deviceIndependentSize(), QSizeF(30, 15));
     QVERIFY(read(shown, 2, 2)[0] > 245);
     QVERIFY(read(shown, 22, 15)[0] < 10);
-    // A mid-gray frame reads as its mean.
-    QImage half(4, 3, QImage::Format_Grayscale8);
-    half.fill(128);
-    half.setPixel(1, 1, qRgb(0, 0, 0));
-    QCOMPARE(CanvasThumbnail::edgeTone(half), 128.0 / 255);
+    // A stroke reaching the edge: the rest still reads white.
+    for (int y = 8; y < 12; ++y) {
+        for (int x = 0; x < 20; ++x)
+            framed.setPixel(x, y, qRgb(0, 0, 0));
+    }
+    QVERIFY(read(CanvasThumbnail::mask(framed, transform, canvas, 30), 2, 2)[0] > 245);
+    // Mostly black at the edge: black beyond.
+    QImage dark(4, 3, QImage::Format_Grayscale8);
+    dark.fill(100);
+    QVERIFY(read(CanvasThumbnail::mask(dark, transform, canvas, 30), 2, 2)[0] < 10);
 }
 
 QTEST_MAIN(CanvasThumbnailTests)

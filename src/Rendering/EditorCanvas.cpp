@@ -342,8 +342,9 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
                                  .mask = mask.value_or(QImage()), .clip = clip});
             return;
         }
-        // A pixel stroke draws its grid by its own transform.
-        const LayerTransform transform = stroke && !stroke->isMask ? stroke->paintTransform : m_session.displayedTransform(layer);
+        // A stroke draws its grid, a placed mask's the layer's.
+        const bool placedStroke = stroke && stroke->isMask && stroke->layer.mask && stroke->layer.mask->placement;
+        const LayerTransform transform = stroke && !placedStroke ? stroke->paintTransform : m_session.displayedTransform(layer);
         const std::optional<LayerTransform> placement = m_session.displayedMaskPlacement(layer);
         std::optional<QImage> mask;
         if (const std::optional<QImage> distorted = m_session.maskDistortPreview(layer)) {

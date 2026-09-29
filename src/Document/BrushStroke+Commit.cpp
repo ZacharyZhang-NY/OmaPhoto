@@ -131,8 +131,9 @@ PaintSnapshot BrushStroke::paintSnapshot() const
         const QRectF placed = rect.translated(tile.rect.topLeft());
         bounds = bounds ? std::optional(bounds->united(placed)) : std::optional(placed);
     }
-    const QRectF crop = bounds.value_or(committedBounds());
-    const std::shared_ptr<const RasterSnapshot> raster = RasterSnapshot::replacing(m_source, sourceRect, patches(), crop, isMask);
+    // A mask keeps every tile touched: past its pixels, grows.
+    const QRectF crop = isMask ? committedBounds() : bounds.value_or(committedBounds());
+    const std::shared_ptr<const RasterSnapshot> raster = RasterSnapshot::replacing(m_source, sourceRect, patches(), crop, isMask, maskBackground);
     return {ImportedImage(raster, raster->thumbnail(), layer.name), transform(crop), crop};
 }
 
@@ -142,7 +143,7 @@ BrushCommit::Input BrushStroke::commitInput() const
     std::vector<BrushPatch> shifted;
     for (const BrushPatch &patch : patches())
         shifted.push_back({patch.rect.translated(-bounds.topLeft()), patch.image});
-    return {int(bounds.width()), int(bounds.height()), m_source, shifted, isMask, layer.name, sourceRect.translated(-bounds.topLeft())};
+    return {int(bounds.width()), int(bounds.height()), m_source, shifted, isMask, layer.name, sourceRect.translated(-bounds.topLeft()), maskBackground};
 }
 
 ImportedImage BrushCommit::expandMask(const ImportedImage &asset, const Input &input, const QRectF &crop)
@@ -161,6 +162,8 @@ ImportedImage BrushCommit::expandMask(const ImportedImage &asset, const Input &i
 BrushCommit::Output BrushCommit::render(const Input &input)
 {
     QImage context = BrushRaster::context(input.width, input.height, input.mask);
+    if (input.mask)
+        context.fill(qRound(input.fill * 255));
     QPainter painter(&context);
     if (input.source)
         drawSource(*input.source, input.sourceRect, painter);

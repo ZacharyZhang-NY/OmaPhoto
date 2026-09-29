@@ -65,27 +65,9 @@ QPixmap CanvasThumbnail::layer(const QImage &image, const LayerTransform &transf
 QPixmap CanvasThumbnail::mask(const QImage &image, const LayerTransform &transform, QSizeF canvas, double box)
 {
     return render(canvas, box, [&](QPainter &painter, QSize size, double scale) {
-        const double tone = edgeTone(image);
+        // White or black, as the canvas treats it, never gray.
+        const double tone = LayerMask::background(image);
         painter.fillRect(QRect(QPoint(0, 0), size), QColor::fromRgbF(tone, tone, tone));
         place(image, transform, scale, painter);
     });
-}
-
-double CanvasThumbnail::edgeTone(const QImage &image)
-{
-    const QImage gray = image.convertToFormat(QImage::Format_Grayscale8);
-    if (gray.width() <= 0 || gray.height() <= 0)
-        return 1;
-    qint64 total = 0, count = 0;
-    for (int y = 0; y < gray.height(); ++y) {
-        const uchar *row = gray.constScanLine(y);
-        const bool edgeRow = y == 0 || y == gray.height() - 1;
-        for (int x = 0; x < gray.width(); ++x) {
-            if (edgeRow || x == 0 || x == gray.width() - 1) {
-                total += row[x];
-                ++count;
-            }
-        }
-    }
-    return count == 0 ? 1 : double(total) / double(count) / 255;
 }

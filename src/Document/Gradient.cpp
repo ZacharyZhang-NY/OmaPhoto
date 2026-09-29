@@ -48,7 +48,7 @@ void EditorSession::beginGradient(QPointF point)
         return;
     finishOpacityEdit();
     try {
-        m_gradientEdit = GradientEdit{std::shared_ptr<BrushStroke>(makeRasterEdit(*layer)), point, point};
+        m_gradientEdit = GradientEdit{std::shared_ptr<BrushStroke>(makeRasterEdit(*layer, BrushSettings(), true)), point, point};
         ++m_brushRevision;
         notify();
     } catch (const ProjectError &error) {

@@ -64,20 +64,26 @@ double BrushStroke::spacingFraction(double hardness)
     return hardness >= 1 ? 0.015 : 0.025;
 }
 
-BrushStroke::Grid BrushStroke::grid(const ImageLayer &layer, bool mask, const BrushSettings &settings, const QRectF &canvas)
+BrushStroke::Grid BrushStroke::grid(const ImageLayer &layer, bool mask, const BrushSettings &settings, const QRectF &canvas, bool growsMask)
 {
     // A placed mask paints in its grid; else the layer's.
     const bool placedMask = mask && layer.mask && layer.mask->placement;
     const LayerTransform base = placedMask ? *layer.mask->placement : layer.transform;
-    const int originalWidth = placedMask ? layer.mask->asset.size().width()
-        : layer.asset ? layer.asset->size().width() : int(std::round(layer.size().width()));
-    const int originalHeight = placedMask ? layer.mask->asset.size().height()
-        : layer.asset ? layer.asset->size().height() : int(std::round(layer.size().height()));
+    // A solid placed mask gets a pixel per document pixel.
+    const bool solidPlaced = placedMask && layer.mask->asset.size().width() <= 2 && layer.mask->asset.size().height() <= 2;
+    const int originalWidth = solidPlaced ? std::max(1, int(std::round(base.size.width())))
+        : placedMask            ? layer.mask->asset.size().width()
+        : layer.asset           ? layer.asset->size().width()
+                                : int(std::round(layer.size().width()));
+    const int originalHeight = solidPlaced ? std::max(1, int(std::round(base.size.height())))
+        : placedMask             ? layer.mask->asset.size().height()
+        : layer.asset            ? layer.asset->size().height()
+                                 : int(std::round(layer.size().height()));
     if (originalWidth < 1 || originalWidth > DocumentLimits::maxSide || originalHeight < 1 || originalHeight > DocumentLimits::maxSide)
         throw ProjectError(ProjectError::Kind::tooLarge);
     const QTransform originalMapping = BrushRaster::pixelToDocument(base, originalWidth, originalHeight);
     const QRectF originalBounds(0, 0, originalWidth, originalHeight);
-    const QRectF extent = mask ? originalBounds : originalBounds.united(integral(originalMapping.inverted().mapRect(canvas)));
+    const QRectF extent = mask && !growsMask ? originalBounds : originalBounds.united(integral(originalMapping.inverted().mapRect(canvas)));
     // Judged as a double: past int the conversion is undefined.
     if (extent.width() < 1 || extent.width() > 1'000'000'000 || extent.height() < 1 || extent.height() > 1'000'000'000)
         throw ProjectError(ProjectError::Kind::tooLarge);
@@ -93,14 +99,15 @@ BrushStroke::Grid BrushStroke::grid(const ImageLayer &layer, bool mask, const Br
     return grid;
 }
 
-BrushStroke::BrushStroke(const ImageLayer &layer, bool mask, const BrushSettings &settings, QSizeF canvas)
-    : BrushStroke(layer, mask, settings, QRectF(QPointF(0, 0), canvas), grid(layer, mask, settings, QRectF(QPointF(0, 0), canvas)))
+BrushStroke::BrushStroke(const ImageLayer &layer, bool mask, const BrushSettings &settings, QSizeF canvas, bool growsMask)
+    : BrushStroke(layer, mask, settings, QRectF(QPointF(0, 0), canvas), grid(layer, mask, settings, QRectF(QPointF(0, 0), canvas), growsMask))
 {
 }
 
 BrushStroke::BrushStroke(const ImageLayer &layer, bool mask, const BrushSettings &settings, const QRectF &canvas, const Grid &grid)
     : layer(layer), isMask(mask), settings(settings), canvas(canvas), width(grid.width), height(grid.height), sourceRect(grid.sourceRect),
       pixelToDocument(grid.pixelToDocument), paintTransform(grid.paintTransform),
+      maskBackground(mask && layer.mask ? LayerMask::background(layer.mask->asset.thumbnail) : 1),
       m_source(mask ? (layer.mask ? std::optional(layer.mask->asset) : std::nullopt) : layer.asset),
       m_paintColor(mask ? QColor::fromRgbF(settings.red, settings.red, settings.red) : QColor::fromRgbF(settings.red, settings.green, settings.blue))
 {
@@ -306,6 +313,9 @@ void BrushStroke::allocateTile(qint64 key, qint64 x, qint64 y)
         throw ProjectError(ProjectError::Kind::tooLarge);
     m_allocatedBounds = nextBounds;
     QImage context = BrushRaster::context(int(rect.width()), int(rect.height()), isMask);
+    // Past the mask's pixels a tile starts as its background.
+    if (isMask)
+        context.fill(qRound(maskBackground * 255));
     QPainter painter(&context);
     const QRectF initialRect = sourceRect.translated(-rect.topLeft());
     if (m_source && m_source->raster) {

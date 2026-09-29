@@ -86,7 +86,8 @@ void EditorSession::applyPixelEdit(const ImageLayer &layer, const QString &name,
 {
     finishOpacityEdit();
     try {
-        std::unique_ptr<BrushStroke> edit = makeRasterEdit(layer);
+        // A fill on a mask covers the canvas too.
+        std::unique_ptr<BrushStroke> edit = makeRasterEdit(layer, BrushSettings(), true);
         paint(*edit);
         if (edit->patches().empty()) {
             if (done)

@@ -48,16 +48,16 @@ std::vector<BrushPatch> without(const BrushPatch &piece, const QRectF &overlap)
 }
 
 RasterSnapshot::RasterSnapshot(int width, int height, QImage base, QRectF baseRect, std::vector<BrushPatch> patches,
-                               bool isMask, std::optional<QPointF> alignment)
+                               bool isMask, std::optional<QPointF> alignment, double fill)
     : width(width), height(height), base(std::move(base)), baseRect(baseRect), patches(std::move(patches)),
-      isMask(isMask), alignment(alignment.value_or(baseRect.topLeft()))
+      isMask(isMask), alignment(alignment.value_or(baseRect.topLeft())), fill(fill)
 {
 }
 
 std::shared_ptr<const RasterSnapshot> RasterSnapshot::replacing(const std::optional<ImportedImage> &source,
                                                                 const QRectF &sourceRect,
                                                                 const std::vector<BrushPatch> &added,
-                                                                const QRectF &crop, bool isMask)
+                                                                const QRectF &crop, bool isMask, double fill)
 {
     const std::shared_ptr<const RasterSnapshot> old = source ? source->raster : nullptr;
     const QPointF shift = sourceRect.topLeft() - crop.topLeft();
@@ -107,7 +107,7 @@ std::shared_ptr<const RasterSnapshot> RasterSnapshot::replacing(const std::optio
     const QRectF baseRect = old ? old->baseRect.translated(shift) : sourceRect.translated(-crop.topLeft());
     const QPointF alignment = sourceRect.topLeft() + (old ? old->alignment : QPointF(0, 0)) - crop.topLeft();
     return std::make_shared<const RasterSnapshot>(int(crop.width()), int(crop.height()), base, baseRect,
-                                                  std::move(inside), isMask, alignment);
+                                                  std::move(inside), isMask, alignment, fill);
 }
 
 void RasterSnapshot::draw(const QRectF &rect, QPainter &context) const
@@ -115,9 +115,9 @@ void RasterSnapshot::draw(const QRectF &rect, QPainter &context) const
     context.save();
     context.setClipRect(rect, Qt::IntersectClip);
     context.setRenderHint(QPainter::Antialiasing, false);
-    // A grown mask reveals the pixels outside it.
+    // Past its pixels a grown mask is its background.
     if (isMask)
-        context.fillRect(rect, Qt::white);
+        context.fillRect(rect, QColor::fromRgbF(float(fill), float(fill), float(fill)));
     const double sx = rect.width() / width, sy = rect.height() / height;
     const auto mapped = [&](const QRectF &r) {
         return QRectF(rect.left() + r.left() * sx, rect.top() + r.top() * sy, r.width() * sx, r.height() * sy);

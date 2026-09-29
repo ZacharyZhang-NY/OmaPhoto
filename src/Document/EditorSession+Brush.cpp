@@ -38,11 +38,11 @@ bool EditorSession::canPaint() const
 }
 
 // A tiled raster edit of pixels or mask, within budget.
-std::unique_ptr<BrushStroke> EditorSession::makeRasterEdit(const ImageLayer &layer, const BrushSettings &settings) const
+std::unique_ptr<BrushStroke> EditorSession::makeRasterEdit(const ImageLayer &layer, const BrushSettings &settings, bool growsMask) const
 {
     if (!m_document)
         throw ProjectError(ProjectError::Kind::tooLarge);
-    auto stroke = std::make_unique<BrushStroke>(layer, m_isMaskSelected, settings, m_document->size());
+    auto stroke = std::make_unique<BrushStroke>(layer, m_isMaskSelected, settings, m_document->size(), growsMask);
     qint64 used = 0;
     for (const ImageLayer &other : m_document->layers) {
         if (other.id == layer.id)
@@ -108,7 +108,7 @@ void EditorSession::beginBrush(QPointF point)
             settings.green = settings.red;
             settings.blue = settings.red;
         }
-        m_brushStroke = makeRasterEdit(layer, settings);
+        m_brushStroke = makeRasterEdit(layer, settings, m_tool == NavigationTool::brush);
         m_brushStroke->clone = clone;
         m_brushStroke->isBlur = m_tool == NavigationTool::blur;
         m_brushStroke->append(point);
@@ -225,6 +225,16 @@ void EditorSession::finishBrush()
     finishBrushImmediately();
 }
 
+// Grown past its layer, or placed already: keeps its place.
+LayerMask EditorSession::placedMask(const LayerMask &mask, const ImportedImage &asset, const QRectF &bounds, const LayerTransform &transform,
+                                   const BrushStroke &stroke)
+{
+    LayerMask painted = mask.replacing(asset);
+    if (mask.placement || bounds != stroke.sourceRect)
+        painted.placement = transform;
+    return painted;
+}
+
 // Immutable tiles land at once, undo entry included.
 void EditorSession::commitPaintSnapshot(const BrushStroke &stroke)
 {
@@ -249,7 +259,7 @@ void EditorSession::commitPaintSnapshot(const BrushStroke &stroke)
                                                                  : QStringLiteral("Brush Stroke")));
     ImageLayer &layer = m_document->layers[index];
     if (stroke.isMask) {
-        layer.mask = current.mask ? current.mask->replacing(result.asset) : LayerMask(result.asset);
+        layer.mask = current.mask ? placedMask(*current.mask, result.asset, result.bounds, result.transform, stroke) : LayerMask(result.asset);
     } else {
         layer.asset = result.asset;
         layer.transform = result.transform;
@@ -327,7 +337,8 @@ void EditorSession::finishRasterCommit()
         beginEdit(pending.name);
         ImageLayer &layer = m_document->layers[index];
         if (stroke.isMask) {
-            layer.mask = current.mask ? current.mask->replacing(result.asset) : LayerMask(result.asset);
+            const QRectF bounds = result.pixelBounds.translated(stroke.committedBounds().topLeft());
+            layer.mask = current.mask ? placedMask(*current.mask, result.asset, bounds, transform, stroke) : LayerMask(result.asset);
         } else {
             layer.asset = result.asset;
             layer.transform = transform;

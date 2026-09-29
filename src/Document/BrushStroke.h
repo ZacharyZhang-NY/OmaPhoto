@@ -75,6 +75,8 @@ struct Input {
     bool mask;
     QString name;
     QRectF sourceRect;
+    // A grown mask where no old pixel or edit reaches.
+    double fill = 1;
 };
 struct Output {
     ImportedImage asset;
@@ -87,7 +89,8 @@ Output render(const Input &input);
 // Only touched 256 px tiles hold pixels; snapshots copy those.
 class BrushStroke {
 public:
-    BrushStroke(const ImageLayer &layer, bool mask, const BrushSettings &settings, QSizeF canvas);
+    // `growsMask`: the brush and fills reach the canvas on masks.
+    BrushStroke(const ImageLayer &layer, bool mask, const BrushSettings &settings, QSizeF canvas, bool growsMask = false);
 
     const ImageLayer layer;
     const bool isMask;
@@ -98,6 +101,8 @@ public:
     const QRectF sourceRect;
     const QTransform pixelToDocument;
     const LayerTransform paintTransform;
+    // A mask past its pixels: 1 reveals, 0 hides.
+    const double maskBackground;
     // Swift's Int: the budget left may run below zero.
     qint64 pixelLimit = DocumentLimits::documentPixelBudget();
     // Limits every edit to the document selection; nil when none.
@@ -163,7 +168,7 @@ private:
         QTransform pixelToDocument;
         LayerTransform paintTransform;
     };
-    static Grid grid(const ImageLayer &layer, bool mask, const BrushSettings &settings, const QRectF &canvas);
+    static Grid grid(const ImageLayer &layer, bool mask, const BrushSettings &settings, const QRectF &canvas, bool growsMask);
     BrushStroke(const ImageLayer &layer, bool mask, const BrushSettings &settings, const QRectF &canvas, const Grid &grid);
     std::vector<BrushSegment> continuousCurve(QPointF start, QPointF end, QPointF before, QPointF after) const;
     std::set<qint64> continuousKeys(const std::vector<BrushSegment> &segments) const;

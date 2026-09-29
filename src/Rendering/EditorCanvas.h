@@ -156,7 +156,7 @@ private:
     void drawNewText(bool &drawn, double scale, const Center &center, QPainter &target, const QImage &clip);
     void handOnDraftEffects(const CanvasDocument &document);
     // Swift's effects surface on the canvas (EditorCanvas+Effects.cpp).
-    LayerEffectsSurface *placedMaskSurface(const ImageLayer &layer, const BrushStroke &stroke, const LayerTransform &placement, const QImage &preview);
+    LayerEffectsSurface *placedMaskSurface(const ImageLayer &layer, const BrushStroke &stroke, const QImage &preview);
     LayerEffectsSurface *strokeSurface(const ImageLayer &layer, const BrushStroke &stroke, const std::optional<QImage> &mask);
     // The stroke is over: its surface stands in meanwhile.
     void handOnStrokeSurface();
