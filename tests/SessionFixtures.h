@@ -58,3 +58,12 @@ inline ImportedImage coverage()
         image.scanLine(index / 2)[index % 2] = values[index];
     return LayerMask::assetFrom(image);
 }
+
+// New text whose box starts at `corner`, unlike a click.
+inline void beginTextAt(EditorSession &session, QPointF corner)
+{
+    session.beginText(corner, true);
+    TextDraft draft = session.textDraft().value();
+    draft.origin = corner;
+    session.setTextDraft(draft);
+}

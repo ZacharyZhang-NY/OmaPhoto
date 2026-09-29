@@ -13,12 +13,12 @@
 class EditorSession;
 class QKeyEvent;
 class QPainter;
-class QWidget;
+class CanvasView;
 
 // Swift's InlineTextEditor and its text view, painted by the canvas.
 class InlineTextEditor {
 public:
-    InlineTextEditor(EditorSession &session, QWidget &canvas);
+    InlineTextEditor(EditorSession &session, CanvasView &canvas);
     // Swift's synchronize: size, placement, content and style.
     void synchronize(const TextDraft &draft);
     QUuid draftID() const { return m_draftID; }
@@ -132,7 +132,7 @@ private:
     void updateInputMethod() const;
 
     EditorSession &m_session;
-    QWidget &m_canvas;
+    CanvasView &m_canvas;
     QUuid m_draftID;
     std::optional<LayerTextStyle> m_shownStyle;
     QSizeF m_logicalSize{360, 160};

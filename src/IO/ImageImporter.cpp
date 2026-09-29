@@ -1,5 +1,7 @@
 #include "IO/ImageImporter.h"
+#include "Document/BrushStroke.h"
 #include "Document/DocumentLimits.h"
+#include "Document/PixelAdjust.h"
 #include "IO/PSD/PSDDocumentBuilder.h"
 #include "IO/PSD/PSDReader.h"
 #include "Logging.h"
@@ -8,6 +10,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImageReader>
+#include <QPainter>
+#include <QSvgRenderer>
 #include <QTransform>
 #include <cmath>
 #include <libheif/heif.h>
@@ -264,4 +268,31 @@ PSDDocument ImageImporter::loadPhotoshop(const QString &path, qint64 remainingPi
 std::map<QUuid, ImportedImage> ImageImporter::photoshopAssets(const PSDDocument &document)
 {
     return PSDDocumentBuilder::assets(document);
+}
+
+bool ImageImporter::isSVG(const QString &path)
+{
+    const QString suffix = QFileInfo(path).suffix();
+    return suffix.compare(QLatin1String("svg"), Qt::CaseInsensitive) == 0 || suffix.compare(QLatin1String("svgz"), Qt::CaseInsensitive) == 0;
+}
+
+ImportedImage ImageImporter::decodeSVG(const QString &path, std::optional<QSizeF> fitting, qint64 remainingPixels)
+{
+    QSvgRenderer svg(path);
+    const QSizeF size = svg.defaultSize();
+    // A drawing Qt cannot read measures nothing.
+    if (size.width() <= 0 || size.height() <= 0)
+        throw ImageImportError(ImageImportError::Kind::unreadable);
+    const double scale = fitting ? std::min(fitting->width() / size.width(), fitting->height() / size.height()) : 1;
+    const double width = std::max(1.0, std::round(size.width() * scale)), height = std::max(1.0, std::round(size.height() * scale));
+    if (!(width <= DocumentLimits::maxSide && height <= DocumentLimits::maxSide && width * height <= double(remainingPixels)))
+        throw ImageImportError(ImageImportError::Kind::tooLarge);
+    QImage image = BrushRaster::context(int(width), int(height), false);
+    QPainter painter(&image);
+    svg.render(&painter, QRectF(0, 0, width, height));
+    painter.end();
+    image.setColorSpace(QColorSpace::SRgb);
+    const QString name = QFileInfo(path).completeBaseName();
+    qCInfo(lcIO).noquote() << "imported" << path << image.width() << "x" << image.height();
+    return ImportedImage(image, PixelAdjust::thumbnail(image), name.isEmpty() ? QFileInfo(path).fileName() : name);
 }

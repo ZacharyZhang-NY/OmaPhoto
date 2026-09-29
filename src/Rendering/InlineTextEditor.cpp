@@ -10,7 +10,7 @@
 #include <QStyleHints>
 #include <cmath>
 
-InlineTextEditor::InlineTextEditor(EditorSession &session, QWidget &canvas) : m_session(session), m_canvas(canvas)
+InlineTextEditor::InlineTextEditor(EditorSession &session, CanvasView &canvas) : m_session(session), m_canvas(canvas)
 {
     // NSTextView's insertion point blinks at the system's pace.
     m_blink.setObjectName(QStringLiteral("caretBlink"));
@@ -76,10 +76,14 @@ void InlineTextEditor::synchronize(const TextDraft &draft)
     // The text view takes the keys, sparing a text field.
     QMetaObject::invokeMethod(
         &m_canvas,
-        [canvas = QPointer<QWidget>(&m_canvas), session = &m_session, id = draft.id] {
+        [canvas = QPointer<CanvasView>(&m_canvas), session = &m_session, id = draft.id, existing = draft.layerID.has_value()] {
             if (!canvas || !session->textDraft() || session->textDraft().value().id != id || qobject_cast<QLineEdit *>(QApplication::focusWidget()))
                 return;
             canvas->setFocus(Qt::OtherFocusReason);
+            // Existing text: the caret after it, unless clicked in.
+            InlineTextEditor *editor = canvas->inlineTextEditor();
+            if (existing && editor && editor->m_anchor == 0 && editor->m_position == 0)
+                editor->moveTo(int(session->textDraft().value().style.content.size()), false);
         },
         Qt::QueuedConnection);
 }

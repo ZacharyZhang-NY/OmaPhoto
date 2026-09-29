@@ -19,7 +19,7 @@ std::unique_ptr<EditorSession> makeSession()
 QUuid textLayer(EditorSession &session, QPointF at, const QString &content)
 {
     session.selectTool(NavigationTool::type);
-    session.beginText(at, true);
+    beginTextAt(session, at);
     TextDraft draft = session.textDraft().value();
     draft.style.content = content;
     if (!session.applyText(draft))
@@ -234,7 +234,7 @@ void TypeSessionTests::aClickFindsTheTextUnderIt()
     const TextDraft fresh = session->textDraft().value();
     QVERIFY(!fresh.layerID && fresh.style.content.isEmpty() && !fresh.style.boxSize);
     QVERIFY(fresh.style.red == 0.25 && fresh.style.green == 1 && fresh.style.blue == 0.5);
-    QCOMPARE(fresh.origin, QPointF(700, 300));
+    QVERIFY(fresh.origin.x() == 688 && std::abs(fresh.origin.y() + fresh.style.lineHeight() - 288) < fresh.style.fontSize / 3);
     session->cancelText();
     session->beginText(QPointF(NAN, 5));
     QVERIFY(!session->textDraft());

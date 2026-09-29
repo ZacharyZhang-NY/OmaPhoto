@@ -102,7 +102,7 @@ void InlineTextDrawTests::theCaretShowsWhileTheCanvasHasFocus()
     field->show();
     shown.canvas->setFocus();
     QTRY_VERIFY(shown.canvas->hasFocus());
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("ab"));
     const QRectF caret = shown.editor().textTransform().mapRect(
         QRectF(QPointF(LayerTextStyle::padding, LayerTextStyle::padding), QSizeF(1, shown.session.textDraft().value().style.lineHeight()))
@@ -149,7 +149,7 @@ void InlineTextDrawTests::aSelectionShowsBehindItsText()
     DrawnText shown;
     shown.canvas->setFocus();
     QTRY_VERIFY(shown.canvas->hasFocus());
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("iiii"));
     QTest::keyClick(shown.canvas, Qt::Key_A, Qt::ControlModifier);
     // Above the letters, the line's height is highlighted.
@@ -204,13 +204,13 @@ void InlineTextDrawTests::aFreshDraftTakesTheKeysButSparesAField()
     button->show();
     field->setFocus();
     QTRY_VERIFY(field->hasFocus());
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::qWait(50);
     QVERIFY(field->hasFocus());
     shown.session.cancelText();
     button->setFocus();
     QTRY_VERIFY(button->hasFocus());
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTRY_VERIFY(shown.canvas->hasFocus());
     // A focus request leaves open text's keys alone.
     button->setFocus();
@@ -235,7 +235,7 @@ void InlineTextDrawTests::theDraftTakesItsKeysAheadOfShortcuts()
     QTRY_VERIFY(shown.canvas->hasFocus());
     QTest::keyClick(shown.canvas, Qt::Key_A, Qt::ControlModifier);
     QCOMPARE(triggered, 1);
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("all"));
     QTest::keyClick(shown.canvas, Qt::Key_A, Qt::ControlModifier);
     QCOMPARE(triggered, 1);
@@ -281,7 +281,7 @@ void InlineTextDrawTests::theEditMenuReachesOpenText()
     EditorSession &session = bar.session();
     session.createDocument(400, 300, true);
     session.selectTool(NavigationTool::type);
-    session.beginText(QPointF(20, 30), true);
+    beginTextAt(session, QPointF(20, 30));
     auto *canvas = bar.window.findChild<CanvasView *>();
     QTRY_VERIFY(canvas->hasFocus());
     QTest::keyClicks(canvas, QStringLiteral("menu"));
@@ -316,7 +316,7 @@ void InlineTextDrawTests::editsRepaintTheEditor()
     field->show();
     field->setFocus();
     QTRY_VERIFY(field->hasFocus());
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::qWait(50);
     PaintSpy spy(*shown.canvas);
     QTest::keyClicks(shown.canvas, QStringLiteral("Wide words"));
@@ -327,7 +327,7 @@ void InlineTextDrawTests::editsRepaintTheEditor()
     shown.session.cancelText();
     QTRY_VERIFY(spy.painted.contains(stood));
     // A paste grows the box past its old margins.
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::qWait(50);
     QVERIFY(!shown.canvas->findChild<QTimer *>(QStringLiteral("caretBlink"))->isActive());
     spy.painted = QRect();
@@ -361,7 +361,7 @@ void InlineTextDrawTests::editsRepaintTheEditor()
     QTRY_VERIFY(spy.painted.contains(right));
     // The caret's line after a final newline falls far below.
     shown.session.cancelText();
-    shown.session.beginText(QPointF(20, 20), true);
+    beginTextAt(shown.session, QPointF(20, 20));
     shown.session.changeTextStyle([](LayerTextStyle &style) {
         style.fontSize = 24;
         style.leading = 120;
@@ -378,7 +378,7 @@ void InlineTextDrawTests::editsRepaintTheEditor()
 void InlineTextDrawTests::openingTextRepaintsItsWholeLayer()
 {
     DrawnText shown;
-    shown.session.beginText(QPointF(20, 20), true);
+    beginTextAt(shown.session, QPointF(20, 20));
     shown.session.changeTextStyle([](LayerTextStyle &style) { style.fontSize = 24; });
     QTest::keyClicks(shown.canvas, QStringLiteral("Tall"));
     QVERIFY(shown.session.finishText());

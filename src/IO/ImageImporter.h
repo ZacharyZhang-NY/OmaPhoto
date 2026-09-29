@@ -52,4 +52,8 @@ void liftAllocationLimit();
 ImportedImage decode(const QString &path, qint64 remainingPixels = DocumentLimits::documentPixelBudget(), bool flattenedPhotoshop = false);
 PSDDocument loadPhotoshop(const QString &path, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
 std::map<QUuid, ImportedImage> photoshopAssets(const PSDDocument &document);
+// Swift's `UTType.svg` by suffix: `svg` and `svgz`.
+bool isSVG(const QString &path);
+// Drawn once: fitted to the canvas, else its declared size.
+ImportedImage decodeSVG(const QString &path, std::optional<QSizeF> fitting, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
 }

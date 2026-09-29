@@ -114,6 +114,12 @@ void CanvasView::wheelEvent(QWheelEvent *event)
 
 void CanvasView::mousePressEvent(QMouseEvent *event)
 {
+    press(event, 1);
+}
+
+// Swift's mouseDown with its click count.
+void CanvasView::press(QMouseEvent *event, int clicks)
+{
     // The middle button pans in any tool, beside the left.
     if (event->button() == Qt::MiddleButton && m_session.document()) {
         m_middlePanPoint = event->position();
@@ -156,6 +162,8 @@ void CanvasView::mousePressEvent(QMouseEvent *event)
         m_lastDragPoint = point;
         updateCursor();
     } else if (m_session.tool() == NavigationTool::move) {
+        if (clicks >= 2 && beginLiveTextEdit(point))
+            return;
         if (!beginGuideDrag(point))
             beginTransformDrag(point, event->modifiers());
     } else if (isSelectionTool(m_session.tool())) {
@@ -199,8 +207,8 @@ void CanvasView::mouseDoubleClickEvent(QMouseEvent *event)
         updateCursor();
         return;
     }
-    // Else, picking included, it is a press, as Swift's mouseDown.
-    QWidget::mouseDoubleClickEvent(event);
+    // Else, picking included, it is Swift's second mouseDown.
+    press(event, 2);
 }
 
 void CanvasView::mouseMoveEvent(QMouseEvent *event)

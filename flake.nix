@@ -20,7 +20,7 @@
           filter = path: type: path != "${toString self}/build";
         };
         nativeBuildInputs = with pkgs; [ cmake ninja pkg-config qt6.wrapQtAppsHook ];
-        buildInputs = with pkgs; [ qt6.qtbase qt6.qtimageformats libheif libde265 libraw fontconfig onnxruntime ];
+        buildInputs = with pkgs; [ qt6.qtbase qt6.qtsvg qt6.qtimageformats libheif libde265 libraw fontconfig onnxruntime ];
         cmakeFlags = [ "-DOMAPHOTO_MODEL=${model}" ];
         ninjaFlags = [ "omaphoto" ];
         # Staged: profiles build MIME caches outside the store.

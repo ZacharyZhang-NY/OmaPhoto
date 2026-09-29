@@ -223,7 +223,7 @@ void PickingTests::theInlineEditorStandsAsideForThePicker()
     Picking shown;
     QObject::connect(&shown.session, &EditorSession::changed, shown.canvas, [&shown] { shown.canvas->synchronizeDisplay(); });
     shown.tool(NavigationTool::type);
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("Hello there"));
     QTest::keyClick(shown.canvas, Qt::Key_Home);
     const InlineTextEditor &editor = *shown.canvas->inlineTextEditor();

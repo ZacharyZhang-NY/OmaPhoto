@@ -105,6 +105,11 @@ void EditorSession::decodeNext()
         decodeRaw(url.toLocalFile(), remainingPixels());
         return;
     }
+    // An SVG goes by its suffix, before Photoshop's bytes.
+    if (url.isLocalFile() && ImageImporter::isSVG(url.toLocalFile())) {
+        decode(url, false);
+        return;
+    }
     if (url.isLocalFile() && PSDReader::matches(url.toLocalFile())) {
         beginPSDReading(QStringLiteral("Open “%1”?").arg(url.fileName()), QStringLiteral("Import"));
         m_photoshopReader.setFuture(QtConcurrent::run([path = url.toLocalFile(), remaining = remainingPixels()]() -> PhotoshopRead {
@@ -143,10 +148,13 @@ qint64 EditorSession::remainingPixels() const
 // `flattened`: a layerless Photoshop file, read as its merged image.
 void EditorSession::decode(const QUrl &url, bool flattened)
 {
-    m_decoder.setFuture(QtConcurrent::run([url, flattened, remaining = remainingPixels()]() -> Decoded {
+    const std::optional<QSizeF> fitting = m_document ? std::optional(m_document->size()) : std::nullopt;
+    m_decoder.setFuture(QtConcurrent::run([url, flattened, fitting, remaining = remainingPixels()]() -> Decoded {
         try {
             if (!url.isLocalFile())
                 throw ImageImportError(ImageImportError::Kind::unsupported);
+            if (ImageImporter::isSVG(url.toLocalFile()))
+                return {ImageImporter::decodeSVG(url.toLocalFile(), fitting, remaining), QString()};
             return {ImageImporter::decode(url.toLocalFile(), remaining, flattened), QString()};
         } catch (const ImageImportError &error) {
             return {std::nullopt, url.fileName() + ": " + error.what()};

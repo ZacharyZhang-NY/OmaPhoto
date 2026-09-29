@@ -11,7 +11,7 @@ private slots:
 void InlineTextPreeditTests::markedTextIsUnderlined()
 {
     DrawnText shown;
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QInputMethodEvent composing(QStringLiteral("nn"), {});
     QApplication::sendEvent(shown.canvas, &composing);
     // Below the baseline, where no letter of these reaches.
@@ -48,7 +48,7 @@ void InlineTextPreeditTests::theInputMethodStylesItsPreedit()
     DrawnText shown;
     shown.canvas->setFocus();
     QTRY_VERIFY(shown.canvas->hasFocus());
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     // Its clause's format replaces the underline; its caret hides.
     QTextCharFormat clause;
     clause.setBackground(Qt::yellow);
@@ -63,14 +63,14 @@ void InlineTextPreeditTests::theInputMethodStylesItsPreedit()
     QCOMPARE(shown.grab().pixelColor(above), QColor(Qt::yellow));
     // Formats count from the preedit, wherever it sits.
     shown.session.cancelText();
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("nn"));
     QApplication::sendEvent(shown.canvas, &composing);
     QVERIFY(shown.grab().pixelColor(above) != QColor(Qt::yellow));
     const QPoint later = shown.editor().textTransform().map(QPointF(padding + width * 1.5, baseline - metrics.xHeight() - 4)).toPoint();
     QCOMPARE(shown.grab().pixelColor(later), QColor(Qt::yellow));
     shown.session.cancelText();
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QApplication::sendEvent(shown.canvas, &composing);
     const QRect band = shown.editor().textTransform().mapRect(QRectF(padding, baseline + 1, width - 4, metrics.descent() - 2)).toAlignedRect();
     QVERIFY(!where(shown.grab().copy(band), reddish).isValid());
@@ -85,7 +85,7 @@ void InlineTextPreeditTests::theInputMethodStylesItsPreedit()
     QVERIFY(where(shown.grab().copy(band), reddish).isValid());
     // The input method's selection shows beside its preedit.
     shown.session.cancelText();
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("xx"));
     QInputMethodEvent selecting(QStringLiteral("nn"), {QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 0, 2, QVariant())});
     QApplication::sendEvent(shown.canvas, &selecting);
@@ -95,7 +95,7 @@ void InlineTextPreeditTests::theInputMethodStylesItsPreedit()
     QCOMPARE(shown.grab().pixelColor(first), shown.canvas->palette().color(group, QPalette::Highlight));
     // Past the preedit, it sits after the preedit's letters.
     shown.session.cancelText();
-    shown.session.beginText(QPointF(20, 30), true);
+    beginTextAt(shown.session, QPointF(20, 30));
     QTest::keyClicks(shown.canvas, QStringLiteral("xx"));
     QInputMethodEvent ahead(QStringLiteral("nn"), {QInputMethodEvent::Attribute(QInputMethodEvent::Selection, 2, -2, QVariant())});
     QApplication::sendEvent(shown.canvas, &ahead);

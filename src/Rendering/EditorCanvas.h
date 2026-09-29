@@ -243,6 +243,9 @@ private:
     bool cropKey(const QKeyEvent &key);
     // The Move tool's guide drags (EditorCanvas+Guides.cpp).
     bool beginGuideDrag(QPointF point);
+    // The Move tool's double click: the topmost live text opens.
+    bool beginLiveTextEdit(QPointF point);
+    void press(QMouseEvent *event, int clicks);
     bool guideMove(QPointF point, Qt::MouseButtons buttons);
     void endGuideDrag(QPointF point);
     // Camera Raw's tools on the canvas (EditorCanvas+CameraRaw.cpp).

@@ -2,6 +2,8 @@
 #include "SessionFixtures.h"
 #include "Document/EditorSession.h"
 #include "IO/ImageExporter.h"
+#include "Rendering/TextLayout.h"
+#include <QFontMetricsF>
 #include <QTemporaryDir>
 
 // Swift's TypeToolTests: text layers made, edited, saved, clipped.
@@ -60,6 +62,7 @@ private slots:
     void invalidAndStaleDraftsDoNotChangeDocument();
     void textColorPickerPreviewsAndRestoresDraft();
     void theForegroundPickerPreviewsOpenTextToo();
+    void clickedTextSitsOnItsBaseline();
 };
 
 void TypeToolTests::createEditCancelAndUndo()
@@ -67,6 +70,12 @@ void TypeToolTests::createEditCancelAndUndo()
     const auto session = makeSession();
     const int before = session->history.undoCount();
     session->beginText(QPointF(30, 40));
+    // The first letter starts at the pointer, on its baseline.
+    const TextDraft start = session->textDraft().value();
+    const double descent = QFontMetricsF(TextLayout::font(start.style)).descent();
+    // The laid line's descent, as drawn, within a hundredth.
+    QCOMPARE(start.origin.x(), 30 - LayerTextStyle::padding);
+    QVERIFY(std::abs(start.origin.y() - (40 - (LayerTextStyle::padding + start.style.lineHeight() - descent))) < 0.02);
     type(*session, QStringLiteral("Text"));
     QCOMPARE(session->document().value().layers.size(), size_t(1));
     TextDraft draft = session->textDraft().value();
@@ -74,7 +83,7 @@ void TypeToolTests::createEditCancelAndUndo()
     draft.style.fontSize = 48;
     QVERIFY(session->applyText(draft));
     QCOMPARE(session->activeLayer().value().liveText().value().style, draft.style);
-    QCOMPARE(session->activeLayer().value().origin(), QPointF(30, 40));
+    QCOMPARE(session->activeLayer().value().origin(), start.origin);
     QCOMPARE(session->history.undoCount(), before + 1);
     session->editActiveText();
     session->setTextDraft(std::nullopt);
@@ -162,6 +171,10 @@ void TypeToolTests::clippingToTextExportsColoredGlyphsOnTransparency()
 {
     const auto session = makeSession();
     session->beginText(QPointF(0, 0));
+    // The box on the canvas's corner, where the fill goes.
+    TextDraft corner = session->textDraft().value();
+    corner.origin = QPointF(0, 0);
+    session->setTextDraft(corner);
     type(*session, QStringLiteral("Text"));
     QVERIFY(session->applyText(session->textDraft().value()));
     const QUuid source = session->activeLayerID().value();
@@ -190,6 +203,8 @@ void TypeToolTests::paragraphBoxAndToolSwitchCommitEditableText()
     session->selectTool(NavigationTool::brush);
     QVERIFY(!session->textDraft() && session->tool() == NavigationTool::brush);
     QCOMPARE(session->activeLayer().value().size(), QSizeF(200, 120));
+    // A dragged box sits exactly where it was drawn.
+    QCOMPARE(session->activeLayer().value().origin(), QPointF(40, 60));
     QCOMPARE(session->activeLayer().value().liveText().value().style.boxSize, std::optional(QSizeF(200, 120)));
     session->selectTool(NavigationTool::type);
     session->editActiveText();
@@ -315,6 +330,40 @@ void TypeToolTests::theForegroundPickerPreviewsOpenTextToo()
     paint(PaletteColor{1, 0, 0});
     session->closeColorPicker(false);
     QCOMPARE(colour(), (PaletteColor{1, 0, 0}));
+}
+
+void TypeToolTests::clickedTextSitsOnItsBaseline()
+{
+    // Ink ends on the clicked row, from its column.
+    const auto session = makeSession();
+    // A first text sets the face the next click uses.
+    session->beginText(QPointF(600, 500));
+    TextDraft draft = session->textDraft().value();
+    draft.style.content = QStringLiteral("Face");
+    draft.style.fontName = QStringLiteral("DejaVuSans");
+    draft.style.fontSize = 40;
+    QVERIFY(session->applyText(draft));
+    session->beginText(QPointF(100, 200));
+    draft = session->textDraft().value();
+    draft.style.content = QStringLiteral("HHH");
+    const LayerTextStyle before = draft.style;
+    QCOMPARE(before.fontName, QString("DejaVuSans"));
+    QVERIFY(session->applyText(draft));
+    const ImageLayer layer = session->activeLayer().value();
+    QCOMPARE(layer.liveText().value().style, before);
+    const QImage image = layer.asset.value().image();
+    int bottom = -1, left = image.width();
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (qAlpha(image.pixel(x, y)) > 128) {
+                bottom = y;
+                left = std::min(left, x);
+            }
+        }
+    }
+    const QPointF origin = layer.origin();
+    QVERIFY2(std::abs(origin.y() + bottom + 1 - 200) < 1, qPrintable(QString::number(origin.y() + bottom + 1)));
+    QVERIFY2(std::abs(origin.x() + left - 100) < 5, qPrintable(QString::number(origin.x() + left)));
 }
 
 QTEST_MAIN(TypeToolTests)

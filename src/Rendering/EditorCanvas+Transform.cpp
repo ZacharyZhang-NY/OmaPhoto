@@ -308,3 +308,25 @@ void CanvasView::cancelTransformDrag()
     m_dragCursor.reset();
     updateCursor();
 }
+
+bool CanvasView::beginLiveTextEdit(QPointF point)
+{
+    if (!m_session.document() || !m_session.canEditLayers())
+        return false;
+    const CanvasDocument &document = *m_session.document();
+    const QPointF pixel = m_session.viewport.documentPoint(point, document.size());
+    const QSet<QUuid> visible = document.effectiveVisibleIDs();
+    std::optional<QUuid> found;
+    for (auto layer = document.layers.rbegin(); !found && layer != document.layers.rend(); ++layer) {
+        if (visible.contains(layer->id) && layer->liveText() && layer->transform.contains(pixel))
+            found = layer->id;
+    }
+    if (!found)
+        return false;
+    // Ends an opacity drag and a blend preview, as Swift's.
+    m_session.commitTransform();
+    m_session.selectLayer(*found);
+    m_session.editActiveText();
+    synchronizeInlineText();
+    return true;
+}

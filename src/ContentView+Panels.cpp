@@ -87,7 +87,7 @@ void ContentView::showImporter()
     m_importer = new QFileDialog(this);
     m_importer->setAttribute(Qt::WA_DeleteOnClose);
     m_importer->setFileMode(QFileDialog::ExistingFiles);
-    m_importer->setNameFilter(QStringLiteral("Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd *.psb %1)").arg(RawImporter::globs().join(' ')));
+    m_importer->setNameFilter(QStringLiteral("Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd *.psb *.svg *.svgz %1)").arg(RawImporter::globs().join(' ')));
     connect(m_importer, &QDialog::finished, this, [this, panel = m_importer.data()](int result) {
         // Ours no longer: the flag must not reject it again.
         if (m_importer != panel)

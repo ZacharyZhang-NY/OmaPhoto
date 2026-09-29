@@ -11,7 +11,7 @@ endif()
 
 option(OMAPHOTO_WERROR "Treat warnings as errors" OFF)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent Test)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent Svg Test)
 find_package(libheif REQUIRED)
 find_package(Fontconfig REQUIRED)
 find_package(onnxruntime REQUIRED)
@@ -222,7 +222,7 @@ set_property(SOURCE ${OMAPHOTO_KERNELS}/AdjustPixels.c APPEND PROPERTY COMPILE_O
 # The per-pixel loops vectorise only at -O3.
 set_source_files_properties(src/Rendering/BrushCoverage.cpp src/Rendering/DownsampleCache.cpp PROPERTIES COMPILE_OPTIONS -O3)
 target_include_directories(compositor_core PUBLIC src PRIVATE ${OMAPHOTO_KERNELS})
-target_link_libraries(compositor_core PUBLIC Qt6::Widgets Qt6::Concurrent PRIVATE heif Fontconfig::Fontconfig onnxruntime::onnxruntime PkgConfig::LIBRAW)
+target_link_libraries(compositor_core PUBLIC Qt6::Widgets Qt6::Concurrent PRIVATE Qt6::Svg heif Fontconfig::Fontconfig onnxruntime::onnxruntime PkgConfig::LIBRAW)
 target_compile_options(compositor_core PUBLIC -Wall -Wextra
     $<$<BOOL:${OMAPHOTO_WERROR}>:-Werror>)
 # Empty optionals and bad indexes abort, not pass by luck.

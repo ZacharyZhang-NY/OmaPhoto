@@ -97,8 +97,11 @@ void EditorSession::beginText(QPointF point, bool newLayer)
         style.boxSize = std::nullopt;
     }
     m_tool = NavigationTool::type;
+    // A click puts new text's first baseline on the pointer.
+    const double padding = LayerTextStyle::padding;
+    const QPointF origin = target ? target->origin() : point - QPointF(padding, padding + TextLines(style, QSizeF(100'000, 100'000)).baseline(0));
     setTextDraft(TextDraft{.documentID = m_document->id, .layerID = target ? std::optional(target->id) : std::nullopt,
-                           .origin = target ? target->origin() : point,
+                           .origin = origin,
                            .transform = target ? std::optional(target->transform) : std::nullopt, .style = style});
 }
 
@@ -202,6 +205,8 @@ void EditorSession::beginText(const QRectF &rect)
     beginText(rect.topLeft(), true);
     if (m_textDraft) {
         TextDraft draft = *m_textDraft;
+        // A dragged box is exactly where it was drawn.
+        draft.origin = rect.topLeft();
         draft.style.boxSize = style.boxSize;
         setTextDraft(draft);
     }

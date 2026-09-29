@@ -2,7 +2,7 @@ ARG BASE=ubuntu:24.04
 FROM $BASE
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        g++ cmake ninja-build qt6-base-dev libgl1-mesa-dev qt6-wayland fonts-dejavu-core \
+        g++ cmake ninja-build qt6-base-dev qt6-svg-dev libgl1-mesa-dev qt6-wayland fonts-dejavu-core \
         qt6-image-formats-plugins libheif-dev libheif-plugin-libde265 libfontconfig-dev libraw-dev \
         ca-certificates curl dpkg-dev file fakeroot \
     && rm -rf /var/lib/apt/lists/*

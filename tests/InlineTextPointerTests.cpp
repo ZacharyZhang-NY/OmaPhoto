@@ -47,7 +47,7 @@ void InlineTextPointerTests::aClickOrADragBeginsText()
     shown.session.cancelText();
     // A click is Swift's small box: point text there.
     shown.click(QPointF(50, 60));
-    QCOMPARE(shown.session.textDraft().value().origin, QPointF(50, 60));
+    QCOMPARE(shown.session.textDraft().value().origin, shown.clickedCorner(QPointF(50, 60)));
     QVERIFY(!shown.session.textDraft().value().style.boxSize);
     shown.session.cancelText();
     // A drag draws a box, shown in the accent meanwhile.
@@ -112,7 +112,7 @@ void InlineTextPointerTests::aClickOpensTheTextUnderIt()
     const size_t count = shown.session.document().value().layers.size();
     shown.click(QPointF(300, 250));
     QCOMPARE(shown.session.document().value().layers.size(), count + 1);
-    QCOMPARE(shown.session.textDraft().value().origin, QPointF(300, 250));
+    QCOMPARE(shown.session.textDraft().value().origin, shown.clickedCorner(QPointF(300, 250)));
     shown.session.cancelText();
     // A click opens text, active or not, the caret there.
     const QUuid kept = shown.session.document().value().layers.back().id;
@@ -287,7 +287,7 @@ void InlineTextPointerTests::aLostReleaseDropsTheBox()
     shown.press(QPointF(300, 250));
     QTRY_VERIFY(press.painted.contains(QPoint(40, 80)));
     shown.release(QPointF(300, 250));
-    QCOMPARE(shown.session.textDraft().value().origin, QPointF(300, 250));
+    QCOMPARE(shown.session.textDraft().value().origin, shown.clickedCorner(QPointF(300, 250)));
     QVERIFY(!shown.session.textDraft().value().style.boxSize);
     shown.session.cancelText();
     // So does a lost focus.
