@@ -8,12 +8,12 @@
 #include <algorithm>
 
 namespace {
-// Swift's order: PNG, JPEG, HEIC, TIFF, Photoshop, RAW, then any.
+// Swift's order: PNG, JPEG, HEIC, TIFF, PSD, PSB, RAW, any.
 QStringList pictureFormats(const QMimeData &data)
 {
     QStringList formats;
     for (const QString &format : {QStringLiteral("image/png"), QStringLiteral("image/jpeg"), QStringLiteral("image/heic"), QStringLiteral("image/tiff"),
-                                   QStringLiteral("image/vnd.adobe.photoshop")})
+                                   QStringLiteral("image/vnd.adobe.photoshop"), QStringLiteral("image/x-photoshop-large-image")})
         if (data.hasFormat(format))
             formats << format;
     for (const QString &format : data.formats())

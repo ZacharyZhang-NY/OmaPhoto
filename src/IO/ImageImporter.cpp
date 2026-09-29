@@ -148,6 +148,37 @@ QImage decodeHEIC(const QString &path, qint64 remainingPixels)
     image.setColorSpace(stated);
     return image;
 }
+
+// Into sRGB with the profile still attached, then turned upright.
+ImportedImage finish(QImage image, const QString &path, QImageIOHandler::Transformations orientation)
+{
+    image.convertToColorSpace(QColorSpace::SRgb);
+    image = std::move(image).convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+    // Qt 6.9 renamed mirrored as flipped; the floor stays 6.4.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    Qt::Orientations flips;
+    flips.setFlag(Qt::Horizontal, orientation.testFlag(QImageIOHandler::TransformationMirror));
+    flips.setFlag(Qt::Vertical, orientation.testFlag(QImageIOHandler::TransformationFlip));
+    image = std::move(image).flipped(flips);
+#else
+    image = std::move(image).mirrored(orientation.testFlag(QImageIOHandler::TransformationMirror),
+                                      orientation.testFlag(QImageIOHandler::TransformationFlip));
+#endif
+    if (orientation.testFlag(QImageIOHandler::TransformationRotate90))
+        image = image.transformed(QTransform().rotate(90));
+    if (image.isNull())
+        refuse(ImageImportError::Kind::unreadable, path, QStringLiteral("out of memory"));
+    image.setColorSpace(QColorSpace::SRgb);
+    // Swift: scale = min(1, 96 / longest), extent rounded outward.
+    const qint64 longest = std::max(image.width(), image.height());
+    const QSize small(int((image.width() * 96 + longest - 1) / longest), int((image.height() * 96 + longest - 1) / longest));
+    const QImage thumbnail = longest <= 96 ? image : image.scaled(small, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    if (thumbnail.isNull())
+        refuse(ImageImportError::Kind::unreadable, path, QStringLiteral("out of memory"));
+    const QString name = QFileInfo(path).completeBaseName();
+    qCInfo(lcIO).noquote() << "imported" << path << image.width() << "x" << image.height();
+    return ImportedImage(image, thumbnail, name.isEmpty() ? QFileInfo(path).fileName() : name);
+}
 }
 
 ImportedImage::ImportedImage(QImage image, QImage thumbnail, QString name)
@@ -190,9 +221,12 @@ void ImageImporter::liftAllocationLimit()
     Q_UNUSED(lifted)
 }
 
-ImportedImage ImageImporter::decode(const QString &path, qint64 remainingPixels)
+ImportedImage ImageImporter::decode(const QString &path, qint64 remainingPixels, bool flattenedPhotoshop)
 {
     liftAllocationLimit();
+    // A Photoshop file of a background alone: its merged image.
+    if (flattenedPhotoshop && PSDReader::matches(path))
+        return finish(PSDReader::merged(path, remainingPixels), path, QImageIOHandler::TransformationNone);
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         refuse(ImageImportError::Kind::unreadable, path, file.errorString());
@@ -219,32 +253,7 @@ ImportedImage ImageImporter::decode(const QString &path, qint64 remainingPixels)
         if (!reader.read(&image))
             refuse(ImageImportError::Kind::unreadable, path, reader.errorString());
     }
-    image.convertToColorSpace(QColorSpace::SRgb);
-    image = std::move(image).convertToFormat(QImage::Format_RGBA8888_Premultiplied);
-    // Qt 6.9 renamed mirrored as flipped; the floor stays 6.4.
-#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-    Qt::Orientations flips;
-    flips.setFlag(Qt::Horizontal, orientation.testFlag(QImageIOHandler::TransformationMirror));
-    flips.setFlag(Qt::Vertical, orientation.testFlag(QImageIOHandler::TransformationFlip));
-    image = std::move(image).flipped(flips);
-#else
-    image = std::move(image).mirrored(orientation.testFlag(QImageIOHandler::TransformationMirror),
-                                      orientation.testFlag(QImageIOHandler::TransformationFlip));
-#endif
-    if (orientation.testFlag(QImageIOHandler::TransformationRotate90))
-        image = image.transformed(QTransform().rotate(90));
-    if (image.isNull())
-        refuse(ImageImportError::Kind::unreadable, path, QStringLiteral("out of memory"));
-    image.setColorSpace(QColorSpace::SRgb);
-    // Swift: scale = min(1, 96 / longest), extent rounded outward.
-    const qint64 longest = std::max(image.width(), image.height());
-    const QSize small(int((image.width() * 96 + longest - 1) / longest), int((image.height() * 96 + longest - 1) / longest));
-    const QImage thumbnail = longest <= 96 ? image : image.scaled(small, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    if (thumbnail.isNull())
-        refuse(ImageImportError::Kind::unreadable, path, QStringLiteral("out of memory"));
-    const QString name = QFileInfo(path).completeBaseName();
-    qCInfo(lcIO).noquote() << "imported" << path << image.width() << "x" << image.height();
-    return ImportedImage(image, thumbnail, name.isEmpty() ? QFileInfo(path).fileName() : name);
+    return finish(std::move(image), path, orientation);
 }
 
 PSDDocument ImageImporter::loadPhotoshop(const QString &path, qint64 remainingPixels)

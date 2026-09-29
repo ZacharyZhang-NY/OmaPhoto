@@ -100,23 +100,19 @@ void EditorSession::decodeNext()
         drainImports();
         return;
     }
-    qint64 usedPixels = 0;
-    if (m_document) {
-        for (const ImageLayer &layer : m_document->layers) {
-            if (layer.asset)
-                usedPixels += qint64(layer.asset->size().width()) * layer.asset->size().height();
-        }
-    }
     const QUrl url = request.urls[m_importIndex];
     if (url.isLocalFile() && RawImporter::matches(url.toLocalFile())) {
-        decodeRaw(url.toLocalFile(), DocumentLimits::documentPixelBudget() - usedPixels);
+        decodeRaw(url.toLocalFile(), remainingPixels());
         return;
     }
     if (url.isLocalFile() && PSDReader::matches(url.toLocalFile())) {
         beginPSDReading(QStringLiteral("Open “%1”?").arg(url.fileName()), QStringLiteral("Import"));
-        m_photoshopReader.setFuture(QtConcurrent::run([path = url.toLocalFile(), remaining = DocumentLimits::documentPixelBudget() - usedPixels]() -> PhotoshopRead {
+        m_photoshopReader.setFuture(QtConcurrent::run([path = url.toLocalFile(), remaining = remainingPixels()]() -> PhotoshopRead {
             try {
                 PSDDocument document = ImageImporter::loadPhotoshop(path, remaining);
+                // No layer records: Photoshop wrote the merged image alone.
+                if (document.layers.empty())
+                    return {std::nullopt, {}, QString(), true};
                 std::map<QUuid, ImportedImage> assets = ImageImporter::photoshopAssets(document);
                 return {std::move(document), std::move(assets), QString()};
             } catch (const ImageImportError &error) {
@@ -129,12 +125,34 @@ void EditorSession::decodeNext()
         }));
         return;
     }
-    m_decoder.setFuture(QtConcurrent::run([url, remaining = DocumentLimits::documentPixelBudget() - usedPixels]() -> Decoded {
+    decode(url, false);
+}
+
+qint64 EditorSession::remainingPixels() const
+{
+    qint64 usedPixels = 0;
+    if (m_document) {
+        for (const ImageLayer &layer : m_document->layers) {
+            if (layer.asset)
+                usedPixels += qint64(layer.asset->size().width()) * layer.asset->size().height();
+        }
+    }
+    return DocumentLimits::documentPixelBudget() - usedPixels;
+}
+
+// `flattened`: a layerless Photoshop file, read as its merged image.
+void EditorSession::decode(const QUrl &url, bool flattened)
+{
+    m_decoder.setFuture(QtConcurrent::run([url, flattened, remaining = remainingPixels()]() -> Decoded {
         try {
             if (!url.isLocalFile())
                 throw ImageImportError(ImageImportError::Kind::unsupported);
-            return {ImageImporter::decode(url.toLocalFile(), remaining), QString()};
+            return {ImageImporter::decode(url.toLocalFile(), remaining, flattened), QString()};
         } catch (const ImageImportError &error) {
+            return {std::nullopt, url.fileName() + ": " + error.what()};
+        } catch (const PSDError &error) {
+            return {std::nullopt, url.fileName() + ": " + error.what()};
+        } catch (const ExportError &error) {
             return {std::nullopt, url.fileName() + ": " + error.what()};
         }
     }));
@@ -210,6 +228,12 @@ void EditorSession::finishPhotoshopRead()
         m_importIndex += 1;
         decodeNext();
     };
+    // Swift ends the reading first, then reads the merged image.
+    if (read.layerless) {
+        endPSDReading();
+        decode(url, true);
+        return;
+    }
     // Every image has its asset: making layers cannot fail.
     const std::optional<PSDImport> imported = read.document ? std::optional(PSDDocumentBuilder::makeImport(*read.document, read.assets)) : std::nullopt;
     if (!imported) {

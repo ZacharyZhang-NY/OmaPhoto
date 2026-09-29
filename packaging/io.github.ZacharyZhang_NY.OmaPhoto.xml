@@ -5,4 +5,11 @@
     <sub-class-of type="inode/directory"/>
     <glob pattern="*.comp"/>
   </mime-type>
+  <mime-type type="image/x-photoshop-large-image">
+    <comment>Photoshop Large Document</comment>
+    <glob pattern="*.psb"/>
+    <magic priority="50">
+      <match type="string" value="8BPS\x00\x02" offset="0"/>
+    </magic>
+  </mime-type>
 </mime-info>

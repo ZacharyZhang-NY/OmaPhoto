@@ -154,9 +154,13 @@ void ImageFileDropTests::aPictureIsCopiedToAFileFirst()
     raw.setData("image/gif", "any picture last");
     raw.setData("image/x-adobe-dng", DNGFixture::data({}));
     QCOMPARE(ImageFileDrop::providers(raw).front()->formats(), QStringList{"image/x-adobe-dng"});
+    // A Large Document: after a PSD, before RAW and others.
+    raw.setData("image/x-photoshop-large-image", "large first");
+    QCOMPARE(ImageFileDrop::providers(raw).front()->formats(), QStringList{"image/x-photoshop-large-image"});
     raw.setData("image/vnd.adobe.photoshop", "photoshop first");
     QCOMPARE(ImageFileDrop::providers(raw).front()->formats(), QStringList{"image/vnd.adobe.photoshop"});
     raw.removeFormat("image/vnd.adobe.photoshop");
+    raw.removeFormat("image/x-photoshop-large-image");
     EditorSession developed;
     done = false;
     ImageFileDrop::importProviders(raw, developed, std::nullopt, nullptr, std::nullopt, [&done] { done = true; });

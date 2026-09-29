@@ -86,8 +86,9 @@ void PSDReaderLayerTests::masksAndLayersSpendOneBudget()
     masked.channels.push_back({-2, QByteArray("\0\0\x10\x20\x30\x40", 6)});
     QCOMPARE(PSDReader::read(PSDReaderFixtures::file({masked}), 4).layers[0].mask.value().size(), QSize(2, 2));
     QCOMPARE(refusal<ImageImportError>([&] { PSDReader::read(PSDReaderFixtures::file({masked}), 3); }), std::optional(ImageImportError::Kind::tooLarge));
+    // Past the side, then still past three pixels once cut.
     masked.mask = QRect(0, 0, 30'001, 1);
-    QCOMPARE(refusal<ImageImportError>([&] { PSDReader::read(PSDReaderFixtures::file({masked})); }), std::optional(ImageImportError::Kind::tooLarge));
+    QCOMPARE(refusal<ImageImportError>([&] { PSDReader::read(PSDReaderFixtures::file({masked}), 3); }), std::optional(ImageImportError::Kind::tooLarge));
 }
 
 void PSDReaderLayerTests::resourcesEndWhereTheyDeclare()

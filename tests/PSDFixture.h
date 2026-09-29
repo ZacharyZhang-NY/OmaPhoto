@@ -20,6 +20,13 @@ struct Buffer {
         u16(quint16(value));
     }
     void i32(qint32 value) { u32(quint32(value)); }
+    void u64(quint64 value)
+    {
+        u32(quint32(value >> 32));
+        u32(quint32(value));
+    }
+    // A Large Document's lengths are eight bytes.
+    void length(quint64 value, bool large) { large ? u64(value) : u32(quint32(value)); }
     void bytes(const QByteArray &value) { data.append(value); }
     void string(const char *value) { data.append(value); }
 };
@@ -96,21 +103,21 @@ inline QByteArray packBits(const std::vector<uchar> &row)
 }
 
 // PackBits by row: the counts, then the rows.
-inline QByteArray encode(const std::vector<uchar> &plane, int width, int height)
+inline QByteArray encode(const std::vector<uchar> &plane, int width, int height, bool large = false)
 {
     Buffer counts;
     QByteArray packed;
     for (int row = 0; row < height; ++row) {
         const QByteArray line = packBits(std::vector<uchar>(plane.begin() + row * width, plane.begin() + (row + 1) * width));
-        counts.u16(quint16(line.size()));
+        large ? counts.u32(quint32(line.size())) : counts.u16(quint16(line.size()));
         packed.append(line);
     }
     return counts.data + packed;
 }
 
-inline QByteArray channelPayload(const std::vector<uchar> &plane, int width, int height)
+inline QByteArray channelPayload(const std::vector<uchar> &plane, int width, int height, bool large = false)
 {
-    return QByteArray("\0\1", 2) + encode(plane, width, height);
+    return QByteArray("\0\1", 2) + encode(plane, width, height, large);
 }
 
 inline std::vector<Channel> emptyChannels()
@@ -119,7 +126,7 @@ inline std::vector<Channel> emptyChannels()
     return {{-1, raw}, {0, raw}, {1, raw}, {2, raw}};
 }
 
-inline Prepared layer(const PSDRecord &record)
+inline Prepared layer(const PSDRecord &record, bool large = false)
 {
     const int width = record.image ? record.image->width() : 0, height = record.image ? record.image->height() : 0;
     const int left = int(std::round(record.bounds.left())), top = int(std::round(record.bounds.top()));
@@ -128,12 +135,12 @@ inline Prepared layer(const PSDRecord &record)
     if (record.image && width > 0 && height > 0) {
         const Planes split = planes(*record.image);
         for (const auto &[id, plane] : {std::pair<qint16, const std::vector<uchar> &>(-1, split.alpha), {0, split.red}, {1, split.green}, {2, split.blue}})
-            prepared.channels.push_back({id, channelPayload(plane, width, height)});
+            prepared.channels.push_back({id, channelPayload(plane, width, height, large)});
     } else {
         prepared.channels = emptyChannels();
     }
     if (record.mask)
-        prepared.channels.push_back({-2, channelPayload(grayPlane(*record.mask), record.mask->width(), record.mask->height())});
+        prepared.channels.push_back({-2, channelPayload(grayPlane(*record.mask), record.mask->width(), record.mask->height(), large)});
     prepared.top = top;
     prepared.left = left;
     prepared.bottom = top + height;
@@ -145,7 +152,7 @@ inline Prepared layer(const PSDRecord &record)
     return prepared;
 }
 
-inline Prepared emptyLayer(const QString &name, const QString &blendKey, int section, std::optional<QUuid> parent, const PSDRecord *group = nullptr)
+inline Prepared emptyLayer(const QString &name, const QString &blendKey, int section, std::optional<QUuid> parent, const PSDRecord *group, bool large)
 {
     PSDRecord record;
     record.id = group ? group->id : QUuid::createUuid();
@@ -163,18 +170,25 @@ inline Prepared emptyLayer(const QString &name, const QString &blendKey, int sec
     prepared.isDivider = section == 3;
     prepared.channels = emptyChannels();
     if (record.mask) {
-        prepared.channels.push_back({-2, channelPayload(grayPlane(*record.mask), record.mask->width(), record.mask->height())});
+        prepared.channels.push_back({-2, channelPayload(grayPlane(*record.mask), record.mask->width(), record.mask->height(), large)});
         prepared.maskBottom = record.mask->height();
         prepared.maskRight = record.mask->width();
     }
     return prepared;
 }
 
-inline void additional(Buffer &buffer, const char *key, const QByteArray &payload)
+// Swift's AdditionalLayerInfo: one more block, before the name's.
+struct AdditionalLayerInfo {
+    const char *key;
+    QByteArray payload;
+};
+
+inline void additional(Buffer &buffer, const char *key, const QByteArray &payload, bool large = false)
 {
+    static const QStringList largeKeys{"LMsk", "Lr16", "Lr32", "Layr", "Mt16", "Mt32", "Mtrn", "Alph", "FMsk", "lnk2", "FEid", "FXid", "PxSD"};
     buffer.string("8BIM");
     buffer.string(key);
-    buffer.u32(quint32(payload.size()));
+    buffer.length(quint64(payload.size()), large && largeKeys.contains(QString::fromLatin1(key)));
     buffer.bytes(payload);
     if (payload.size() % 2 == 1)
         buffer.u8(0);
@@ -189,7 +203,7 @@ inline QByteArray luni(const QString &name)
     return data.data;
 }
 
-inline QByteArray extraData(const Prepared &item)
+inline QByteArray extraData(const Prepared &item, bool large, const std::optional<AdditionalLayerInfo> &info)
 {
     Buffer extra;
     if (item.record.mask && item.maskRight > item.maskLeft && item.maskBottom > item.maskTop) {
@@ -209,18 +223,20 @@ inline QByteArray extraData(const Prepared &item)
     extra.u8(uchar(pascal.size()));
     extra.bytes(pascal);
     extra.bytes(QByteArray((4 - ((1 + pascal.size()) % 4)) % 4, '\0'));
-    additional(extra, "luni", luni(item.record.name));
+    if (info)
+        additional(extra, info->key, info->payload, large);
+    additional(extra, "luni", luni(item.record.name), large);
     if (item.record.isGroup || item.isDivider) {
         Buffer payload;
         payload.u32(item.isDivider ? 3 : 1);
         payload.string("8BIM");
         payload.bytes((item.isDivider ? QStringLiteral("norm") : item.record.blendKey + QStringLiteral("    ")).left(4).toLatin1());
-        additional(extra, "lsct", payload.data);
+        additional(extra, "lsct", payload.data, large);
     }
     return extra.data;
 }
 
-inline void writeRecord(Buffer &buffer, const Prepared &item)
+inline void writeRecord(Buffer &buffer, const Prepared &item, bool large, const std::optional<AdditionalLayerInfo> &info)
 {
     buffer.i32(item.top);
     buffer.i32(item.left);
@@ -229,7 +245,7 @@ inline void writeRecord(Buffer &buffer, const Prepared &item)
     buffer.u16(quint16(item.channels.size()));
     for (const Channel &channel : item.channels) {
         buffer.i16(channel.id);
-        buffer.u32(quint32(channel.payload.size()));
+        buffer.length(quint64(channel.payload.size()), large);
     }
     buffer.string("8BIM");
     buffer.bytes((item.record.blendKey + QStringLiteral("    ")).left(4).toLatin1());
@@ -237,49 +253,50 @@ inline void writeRecord(Buffer &buffer, const Prepared &item)
     buffer.u8(item.record.clipping ? 1 : 0);
     buffer.u8(item.record.isVisible ? 0 : 2);
     buffer.u8(0);
-    const QByteArray extra = extraData(item);
+    const QByteArray extra = extraData(item, large, info);
     buffer.u32(quint32(extra.size()));
     buffer.bytes(extra);
 }
 
-inline void emitLayers(const PSDDocument &document, std::optional<QUuid> parent, std::vector<Prepared> &prepared)
+inline void emitLayers(const PSDDocument &document, std::optional<QUuid> parent, std::vector<Prepared> &prepared, bool large)
 {
     // File order runs bottom to top: divider, children, folder.
     for (const PSDRecord &record : document.layers) {
         if (record.parentID != parent)
             continue;
         if (record.isGroup) {
-            prepared.push_back(emptyLayer(QStringLiteral("</Layer group>"), QStringLiteral("norm"), 3, parent));
-            emitLayers(document, record.id, prepared);
-            prepared.push_back(emptyLayer(record.name, record.blendKey, 1, record.parentID, &record));
+            prepared.push_back(emptyLayer(QStringLiteral("</Layer group>"), QStringLiteral("norm"), 3, parent, nullptr, large));
+            emitLayers(document, record.id, prepared, large);
+            prepared.push_back(emptyLayer(record.name, record.blendKey, 1, record.parentID, &record, large));
         } else {
-            prepared.push_back(layer(record));
+            prepared.push_back(layer(record, large));
         }
     }
 }
 
-inline QByteArray layerSection(const PSDDocument &document)
+inline QByteArray layerSection(const PSDDocument &document, bool large, const std::optional<AdditionalLayerInfo> &info)
 {
     std::vector<Prepared> prepared;
-    emitLayers(document, std::nullopt, prepared);
+    emitLayers(document, std::nullopt, prepared, large);
     Buffer records, payloads;
     records.i16(qint16(prepared.size()));
     for (const Prepared &item : prepared) {
-        writeRecord(records, item);
+        writeRecord(records, item, large, info);
         for (const Channel &channel : item.channels)
             payloads.bytes(channel.payload);
     }
-    Buffer info;
-    info.u32(0);
-    info.bytes(records.data);
-    info.bytes(payloads.data);
-    if (info.data.size() % 2 == 1)
-        info.u8(0);
+    Buffer section;
+    section.length(0, large);
+    section.bytes(records.data);
+    section.bytes(payloads.data);
+    if (section.data.size() % 2 == 1)
+        section.u8(0);
+    const int field = large ? 8 : 4;
     Buffer length;
-    length.u32(quint32(info.data.size() - 4));
-    info.data.replace(0, 4, length.data);
-    info.u32(0);
-    return info.data;
+    length.length(quint64(section.data.size() - field), large);
+    section.data.replace(0, field, length.data);
+    section.u32(0);
+    return section.data;
 }
 
 inline QByteArray resolutionResource(double resolution)
@@ -299,11 +316,11 @@ inline QByteArray resolutionResource(double resolution)
     return resource.data;
 }
 
-inline QByteArray data(const PSDDocument &document, const QImage &composite)
+inline QByteArray data(const PSDDocument &document, const QImage &composite, bool large = false, const std::optional<AdditionalLayerInfo> &info = std::nullopt)
 {
     Buffer file;
     file.string("8BPS");
-    file.u16(1);
+    file.u16(large ? 2 : 1);
     file.bytes(QByteArray(6, '\0'));
     file.u16(4);
     file.u32(quint32(document.height));
@@ -314,8 +331,8 @@ inline QByteArray data(const PSDDocument &document, const QImage &composite)
     const QByteArray resources = resolutionResource(document.resolution);
     file.u32(quint32(resources.size()));
     file.bytes(resources);
-    const QByteArray layers = layerSection(document);
-    file.u32(quint32(layers.size()));
+    const QByteArray layers = layerSection(document, large, info);
+    file.length(quint64(layers.size()), large);
     file.bytes(layers);
     // The composite, PackBits by channel.
     QImage flattened = BrushRaster::context(document.width, document.height, false);
@@ -326,9 +343,10 @@ inline QByteArray data(const PSDDocument &document, const QImage &composite)
     file.u16(1);
     QByteArray counts, packed;
     for (const std::vector<uchar> *plane : {&split.red, &split.green, &split.blue, &split.alpha}) {
-        const QByteArray encoded = encode(*plane, document.width, document.height);
-        counts.append(encoded.left(document.height * 2));
-        packed.append(encoded.mid(document.height * 2));
+        const QByteArray encoded = encode(*plane, document.width, document.height, large);
+        const int countBytes = document.height * (large ? 4 : 2);
+        counts.append(encoded.left(countBytes));
+        packed.append(encoded.mid(countBytes));
     }
     file.bytes(counts);
     file.bytes(packed);

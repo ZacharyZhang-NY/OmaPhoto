@@ -192,7 +192,8 @@ void PSDRoundTripTests::oversizedLayerBoundsAreRejected()
 {
     const QByteArray raw("\0\0", 2);
     const auto oversized = layerFile(30'000, 30'000, {{-1, raw}, {0, raw}, {1, raw}, {2, raw}});
-    QCOMPARE(refusal<ImageImportError>([&] { PSDReader::read(oversized); }), std::optional(ImageImportError::Kind::tooLarge));
+    // Cut to its canvas it fits: fifty pixels refuse it.
+    QCOMPARE(refusal<ImageImportError>([&] { PSDReader::read(oversized, 50); }), std::optional(ImageImportError::Kind::tooLarge));
     const QImage fill = PSDFixture::colorImage(20, 20, 1, 0, 0);
     const QByteArray data = PSDFixture::data(PSDDocument{20, 20, 72, {PSDFixture::record("Huge", fill, QRectF(0, 0, 20, 20))}}, fill);
     QCOMPARE(refusal<ImageImportError>([&] { PSDReader::read(data, 50); }), std::optional(ImageImportError::Kind::tooLarge));
@@ -287,7 +288,7 @@ void PSDRoundTripTests::folderOpacityImportsOntoTheFolder()
 
 void PSDRoundTripTests::unsupportedHeadersAreRejected()
 {
-    QCOMPARE(refusal<PSDError>([] { PSDReader::read(header(2)); }), std::optional(PSDError::Kind::unsupportedVersion));
+    QCOMPARE(refusal<PSDError>([] { PSDReader::read(header(3)); }), std::optional(PSDError::Kind::unsupportedVersion));
     QCOMPARE(refusal<PSDError>([] { PSDReader::read(header(1, 8, 8, 8, 4)); }), std::optional(PSDError::Kind::unsupportedColorMode));
     QCOMPARE(refusal<PSDError>([] { PSDReader::read(header(1, 8, 8, 16)); }), std::optional(PSDError::Kind::unsupportedDepth));
     QCOMPARE(refusal<ImageImportError>([] { PSDReader::read(header(1, 30'001, 10)); }), std::optional(ImageImportError::Kind::tooLarge));
@@ -297,7 +298,7 @@ void PSDRoundTripTests::unsupportedHeadersAreRejected()
     QCOMPARE(refusal<PSDError>([] { PSDReader::read(header()); }), std::optional(PSDError::Kind::truncated));
     QCOMPARE(QString::fromUtf8(PSDError(PSDError::Kind::unsupportedDepth).what()), QString("Only 8-bit RGB Photoshop files can be imported."));
     QCOMPARE(QString::fromUtf8(PSDError(PSDError::Kind::unsupportedColorMode).what()), QString("Only 8-bit RGB Photoshop files can be imported."));
-    QCOMPARE(QString::fromUtf8(PSDError(PSDError::Kind::unsupportedVersion).what()), QString("Large Document (.psb) Photoshop files aren’t supported."));
+    QCOMPARE(QString::fromUtf8(PSDError(PSDError::Kind::unsupportedVersion).what()), QString("This Photoshop file uses a format version OmaPhoto can’t read."));
     QCOMPARE(QString::fromUtf8(PSDError(PSDError::Kind::truncated).what()), QString("The Photoshop file could not be read. It may be damaged or incomplete."));
     QCOMPARE(QString::fromUtf8(PSDError(PSDError::Kind::unsupportedCompression).what()),
              QString("This Photoshop file uses a layer compression method that isn’t supported."));

@@ -36,6 +36,8 @@ struct SessionJobs {
         std::optional<PSDDocument> document;
         std::map<QUuid, ImportedImage> assets;
         QString failure;
+        // No layer records: a background alone, read merged next.
+        bool layerless = false;
     };
     struct Baked {
         std::map<QUuid, ImportedImage> images;

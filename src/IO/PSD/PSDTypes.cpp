@@ -8,7 +8,7 @@ QString description(PSDError::Kind kind)
     case PSDError::Kind::truncated:
         return QStringLiteral("The Photoshop file could not be read. It may be damaged or incomplete.");
     case PSDError::Kind::unsupportedVersion:
-        return QStringLiteral("Large Document (.psb) Photoshop files aren’t supported.");
+        return QStringLiteral("This Photoshop file uses a format version OmaPhoto can’t read.");
     case PSDError::Kind::unsupportedColorMode:
     case PSDError::Kind::unsupportedDepth:
         return QStringLiteral("Only 8-bit RGB Photoshop files can be imported.");

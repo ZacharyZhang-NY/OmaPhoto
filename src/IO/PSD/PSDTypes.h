@@ -43,6 +43,8 @@ struct PSDRecord {
     PSDLayerKind kind = PSDLayerKind::raster;
     std::optional<LayerShapeStyle> shape;
     std::vector<QString> shapeNotes;
+    // Cut to the canvas so the file fits the budget.
+    bool croppedToCanvas = false;
     std::optional<LayerBlendMode> blendMode() const;
 };
 

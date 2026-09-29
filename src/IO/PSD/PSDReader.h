@@ -2,6 +2,7 @@
 #include "Document/DocumentLimits.h"
 #include "IO/PSD/PSDTypes.h"
 #include <QByteArray>
+#include <QImage>
 #include <QString>
 #include <map>
 #include <set>
@@ -12,6 +13,8 @@ bool matches(const QString &path);
 bool matches(const QByteArray &data);
 PSDDocument read(const QString &path, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
 PSDDocument read(const QByteArray &data, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
+// A file with no layers: its merged image, profile attached.
+QImage merged(const QString &path, qint64 remainingPixels = DocumentLimits::documentPixelBudget());
 extern const std::set<QString> adjustmentKeys;
 }
 

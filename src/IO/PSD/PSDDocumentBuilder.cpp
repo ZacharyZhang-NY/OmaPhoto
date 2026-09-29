@@ -80,6 +80,9 @@ PSDImport PSDDocumentBuilder::makeImport(const PSDDocument &document, const std:
     std::vector<ImageLayer> layers;
     const QSizeF canvas(document.width, document.height);
     for (const PSDRecord &record : document.layers) {
+        if (record.croppedToCanvas)
+            conversions.push_back(PSDConversion{.layerName = record.name,
+                                                .message = QStringLiteral("Cropped to the canvas so the file fits in memory. Pixels outside the canvas weren't imported.")});
         for (const QString &note : notes(record))
             conversions.push_back(PSDConversion{.layerName = record.name, .message = note});
         if (record.kind == PSDLayerKind::adjustment && !record.adjustment)

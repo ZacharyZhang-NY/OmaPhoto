@@ -323,7 +323,7 @@ void ContentViewTests::theImporterPicksFilesAndClearsItsFlag()
     QTest::qWait(50);
     QCOMPARE(int(session.document().value().layers.size()), 2);
     desk.typeBeforeCancel.clear();
-    const QString panel = "panel|Open|open|file|||1 many Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd " + RawImporter::globs().join(" ") + ")";
+    const QString panel = "panel|Open|open|file|||1 many Images (*.jpg *.jpeg *.png *.heic *.tif *.tiff *.psd *.psb " + RawImporter::globs().join(" ") + ")";
     QCOMPARE(desk.seen.mid(0, 2), (QStringList{panel, panel}));
     QCOMPARE(desk.seen.size(), 3);
     // The flag cleared from elsewhere takes the panel down.

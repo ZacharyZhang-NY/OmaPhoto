@@ -159,6 +159,7 @@ add_library(compositor_core STATIC
     src/IO/PSD/PSDChannelCoder.cpp
     src/IO/PSD/PSDDocumentBuilder.cpp
     src/IO/PSD/PSDReader.cpp
+    src/IO/PSD/PSDReader+Records.cpp
     src/IO/PSD/PSDReader+Adjustments.cpp
     src/IO/PSD/PSDTypes.cpp
     src/IO/PSD/PSDVector.cpp

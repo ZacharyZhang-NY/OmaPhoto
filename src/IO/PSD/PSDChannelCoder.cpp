@@ -2,65 +2,140 @@
 #include "Document/BrushStroke.h"
 #include "IO/PSD/PSDTypes.h"
 #include <QColorSpace>
+#include <span>
 
 namespace {
-std::vector<uchar> unpackRLE(int width, int height, const QByteArray &data)
-{
+struct Reader {
+    const QByteArray &data;
     qsizetype offset = 0;
-    const auto next = [&]() -> uchar {
+    uchar next()
+    {
         if (offset >= data.size())
             throw PSDError(PSDError::Kind::truncated);
         return uchar(data[offset++]);
-    };
-    std::vector<qsizetype> counts(static_cast<size_t>(height));
-    for (int row = 0; row < height; ++row) {
-        const uchar hi = next(), lo = next();
-        counts[size_t(row)] = qsizetype(hi) << 8 | lo;
     }
-    std::vector<uchar> plane(size_t(width) * size_t(height));
-    for (int row = 0; row < height; ++row) {
-        const qsizetype end = offset + counts[size_t(row)];
-        if (end > data.size())
+    // Two bytes a row, or four in a Large Document.
+    qsizetype count(bool largeDocument)
+    {
+        qsizetype value = 0;
+        for (int index = 0; index < (largeDocument ? 4 : 2); ++index)
+            value = value << 8 | next();
+        return value;
+    }
+};
+
+// The rows' counts, first checked to fit in the data.
+std::vector<qsizetype> counts(Reader &reader, qint64 height, bool largeDocument)
+{
+    if (height > (reader.data.size() - reader.offset) / (largeDocument ? 4 : 2))
+        throw PSDError(PSDError::Kind::truncated);
+    std::vector<qsizetype> result(static_cast<size_t>(height));
+    for (qsizetype &count : result)
+        count = reader.count(largeDocument);
+    return result;
+}
+
+// Only the crop's columns kept: no source-wide row.
+std::vector<uchar> unpackRows(Reader &reader, const std::vector<qsizetype> &counts, qint64 width, const PSDCrop &crop)
+{
+    std::vector<uchar> plane(static_cast<size_t>(crop.width * crop.height));
+    for (size_t index = 0; index < counts.size(); ++index) {
+        const qint64 y = qint64(index);
+        const qsizetype end = reader.offset + counts[index];
+        if (end > reader.data.size())
             throw PSDError(PSDError::Kind::truncated);
-        int written = 0;
-        uchar *line = plane.data() + size_t(row) * size_t(width);
+        if (y < crop.y || y >= crop.y + crop.height) {
+            reader.offset = end;
+            continue;
+        }
+        // Checked: a row past the crop would overrun.
+        const std::span<uchar> target = std::span(plane).subspan(static_cast<size_t>((y - crop.y) * crop.width), static_cast<size_t>(crop.width));
+        // What of a run lies in the crop's columns.
+        const auto keep = [&](qint64 from, qint64 count, const auto &put) {
+            const qint64 first = std::max(from, crop.x), last = std::min(from + count, crop.x + crop.width);
+            for (qint64 x = first; x < last; ++x)
+                target[static_cast<size_t>(x - crop.x)] = put(x - from);
+        };
+        qint64 written = 0;
         while (written < width) {
-            if (offset >= end)
+            if (reader.offset >= end)
                 throw PSDError(PSDError::Kind::truncated);
-            const int n = qint8(data[offset++]);
+            const int n = qint8(reader.data[reader.offset++]);
             if (n >= 0) {
-                const int count = n + 1;
-                if (written + count > width || offset + count > end)
+                const qint64 count = n + 1;
+                if (written + count > width || reader.offset + count > end)
                     throw PSDError(PSDError::Kind::truncated);
-                std::copy_n(data.constData() + offset, count, line + written);
-                offset += count;
+                const qsizetype at = reader.offset;
+                keep(written, count, [&](qint64 i) { return uchar(reader.data[at + i]); });
+                reader.offset += count;
                 written += count;
             } else if (n != -128) {
-                const int count = 1 - n;
-                if (written + count > width || offset >= end)
+                const qint64 count = 1 - n;
+                if (written + count > width || reader.offset >= end)
                     throw PSDError(PSDError::Kind::truncated);
-                std::fill_n(line + written, count, uchar(data[offset++]));
+                const uchar value = uchar(reader.data[reader.offset++]);
+                keep(written, count, [&](qint64) { return value; });
                 written += count;
             }
         }
-        offset = end;
+        reader.offset = end;
     }
+    return plane;
+}
+
+std::vector<uchar> cropRaw(qint64 width, qint64 height, const QByteArray &data, qsizetype start, const PSDCrop &crop)
+{
+    if (data.size() - start < width * height)
+        throw PSDError(PSDError::Kind::truncated);
+    std::vector<uchar> plane(static_cast<size_t>(crop.width * crop.height));
+    for (qint64 row = 0; row < crop.height; ++row)
+        std::copy_n(data.constData() + start + (crop.y + row) * width + crop.x, crop.width, plane.data() + row * crop.width);
     return plane;
 }
 }
 
-std::vector<uchar> PSDChannelCoder::decode(int compression, int width, int height, const QByteArray &data)
+std::vector<uchar> PSDChannelCoder::decode(int compression, qint64 width, qint64 height, const QByteArray &data, bool largeDocument,
+                                           const std::optional<PSDCrop> &crop)
 {
     if (width <= 0 || height <= 0)
         return {};
-    const qsizetype expected = qsizetype(width) * height;
+    const PSDCrop part = crop.value_or(PSDCrop{0, 0, width, height});
+    if (part.x < 0 || part.y < 0 || part.width < 0 || part.height < 0 || part.x + part.width > width || part.y + part.height > height)
+        throw PSDError(PSDError::Kind::truncated);
+    if (part.width == 0 || part.height == 0)
+        return {};
     switch (compression) {
     case 0:
-        if (data.size() < expected)
-            throw PSDError(PSDError::Kind::truncated);
-        return std::vector<uchar>(data.constData(), data.constData() + expected);
-    case 1:
-        return unpackRLE(width, height, data);
+        return cropRaw(width, height, data, 0, part);
+    case 1: {
+        Reader reader{data};
+        return unpackRows(reader, counts(reader, height, largeDocument), width, part);
+    }
+    default:
+        throw PSDError(PSDError::Kind::unsupportedCompression);
+    }
+}
+
+std::vector<std::vector<uchar>> PSDChannelCoder::mergedPlanes(int compression, int width, int height, int channels, int wanted, const QByteArray &data,
+                                                             bool largeDocument)
+{
+    const PSDCrop whole{0, 0, width, height};
+    std::vector<std::vector<uchar>> planes;
+    switch (compression) {
+    case 0:
+        for (int channel = 0; channel < wanted; ++channel)
+            planes.push_back(cropRaw(width, height, data, qsizetype(channel) * width * height, whole));
+        return planes;
+    case 1: {
+        // Every channel's counts come first; only the wanted are unpacked.
+        Reader reader{data};
+        std::vector<std::vector<qsizetype>> table;
+        for (int channel = 0; channel < channels; ++channel)
+            table.push_back(counts(reader, height, largeDocument));
+        for (int channel = 0; channel < wanted; ++channel)
+            planes.push_back(unpackRows(reader, table[size_t(channel)], width, whole));
+        return planes;
+    }
     default:
         throw PSDError(PSDError::Kind::unsupportedCompression);
     }

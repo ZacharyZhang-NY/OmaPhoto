@@ -330,6 +330,8 @@ private:
     void updateBusyIndicator();
     void drainImports();
     void decodeNext();
+    qint64 remainingPixels() const;
+    void decode(const QUrl &url, bool flattened);
     void finishDecode();
     void finishPhotoshopRead();
     void endDuplicateTransform();

@@ -70,7 +70,7 @@ void DesktopIntegrationTests::theEntryOpensSwiftsDocumentTypes()
     QCOMPARE(keys.value("Terminal"), QString("false"));
     QVERIFY(keys.value("Categories").split(QLatin1Char(';')).contains("Graphics"));
     // Swift's two document types: its projects, then four pictures.
-    QCOMPARE(keys.value("MimeType"), QString("application/x-compositor-project;image/png;image/jpeg;image/heic;image/tiff;image/vnd.adobe.photoshop;image/x-dcraw;"));
+    QCOMPARE(keys.value("MimeType"), QString("application/x-compositor-project;image/png;image/jpeg;image/heic;image/tiff;image/vnd.adobe.photoshop;image/x-photoshop-large-image;image/x-dcraw;"));
 }
 
 void DesktopIntegrationTests::aProjectFolderIsAType()
@@ -87,9 +87,15 @@ void DesktopIntegrationTests::aProjectFolderIsAType()
             seen << "glob:" + xml.attributes().value("pattern").toString();
         else if (name == QLatin1String("comment"))
             seen << "comment:" + xml.readElementText();
+        else if (name == QLatin1String("magic"))
+            seen << "magic:" + xml.attributes().value("priority").toString();
+        else if (name == QLatin1String("match"))
+            seen << "match:" + xml.attributes().value("value").toString() + "@" + xml.attributes().value("offset").toString();
     }
     QVERIFY2(!xml.hasError(), qPrintable(xml.errorString()));
-    QCOMPARE(seen, (QStringList{"mime-type:application/x-compositor-project", "comment:OmaPhoto Project", "sub-class-of:inode/directory", "glob:*.comp"}));
+    QCOMPARE(seen, (QStringList{"mime-type:application/x-compositor-project", "comment:OmaPhoto Project", "sub-class-of:inode/directory", "glob:*.comp",
+                                "mime-type:image/x-photoshop-large-image", "comment:Photoshop Large Document", "glob:*.psb", "magic:50",
+                                "match:8BPS\\x00\\x02@0"}));
 }
 
 void DesktopIntegrationTests::anInstallLaysDownTheAppItsEntryIconsAndLicense()
