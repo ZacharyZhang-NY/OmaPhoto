@@ -68,25 +68,54 @@ void ProjectController::finish(const std::function<void(bool)> &done, bool value
 
 void ProjectController::save(bool asNew, std::function<void(bool)> done)
 {
-    if (!session.document() || !begin()) {
+    if (!session.document()) {
         finish(done, false);
         return;
     }
-    saveCurrent(asNew, [this, done](bool saved) {
-        session.setIsProjectBusy(false);
-        finish(done, saved);
+    // A save still writing finishes; this one saves what changed.
+    finishWriting([this, asNew, done] {
+        if (!begin()) {
+            finish(done, false);
+            return;
+        }
+        prepareSave(asNew, [this, done](std::optional<Prepared> prepared) {
+            // The writer is reserved before the tools go free.
+            if (prepared)
+                write(*prepared, [this, done](bool saved) { finish(done, saved); });
+            session.setIsProjectBusy(false);
+            if (!prepared)
+                finish(done, false);
+        });
     });
 }
 
 void ProjectController::saveCurrent(bool asNew, std::function<void(bool)> then)
 {
-    const std::optional<ProjectSnapshot> snapshot = session.projectSnapshot();
-    if (!snapshot) {
+    if (!session.document()) {
         then(true);
         return;
     }
+    prepareSave(asNew, [this, then](std::optional<Prepared> prepared) {
+        if (!prepared) {
+            then(false);
+            return;
+        }
+        write(*prepared, then);
+    });
+}
+
+void ProjectController::prepareSave(bool asNew, std::function<void(std::optional<Prepared>)> then)
+{
+    const QUuid revision = session.history.currentRevision();
+    // Undo may have taken the document while this waited.
+    const std::optional<ProjectSnapshot> captured = session.projectSnapshot();
+    if (!captured) {
+        then(std::nullopt);
+        return;
+    }
+    const ProjectSnapshot snapshot = *captured;
     if (!asNew && session.projectPath()) {
-        write(*snapshot, *session.projectPath(), then);
+        then(Prepared{snapshot, *session.projectPath(), revision});
         return;
     }
     auto *panel = new QFileDialog(window, asNew ? QStringLiteral("Save Project As") : QStringLiteral("Save Project"));
@@ -94,15 +123,15 @@ void ProjectController::saveCurrent(bool asNew, std::function<void(bool)> then)
     panel->setAcceptMode(QFileDialog::AcceptSave);
     panel->setDefaultSuffix(QStringLiteral("comp"));
     panel->selectFile(session.projectPath() ? QFileInfo(*session.projectPath()).fileName() : QStringLiteral("Untitled.comp"));
-    connect(panel, &QDialog::finished, this, [this, panel, snapshot = *snapshot, then](int result) {
+    connect(panel, &QDialog::finished, this, [this, panel, snapshot, revision, then](int result) {
         if (result != QDialog::Accepted) {
-            then(false);
+            then(std::nullopt);
             return;
         }
         // The panel only suggests the suffix; a project needs it.
         const QString chosen = panel->selectedFiles().value(0);
         if (isProject(QUrl::fromLocalFile(chosen))) {
-            write(snapshot, chosen, then);
+            then(Prepared{snapshot, chosen, revision});
             return;
         }
         // The panel never saw this name: nothing there is replaced.
@@ -110,36 +139,58 @@ void ProjectController::saveCurrent(bool asNew, std::function<void(bool)> then)
         // A link that leads nowhere is still in the way.
         if (renamed.exists() || renamed.isSymLink()) {
             showError(QStringLiteral("Couldn’t save the project"),
-                      QStringLiteral("“%1” already exists. Choose another name.").arg(renamed.fileName()), [then] { then(false); });
+                      QStringLiteral("“%1” already exists. Choose another name.").arg(renamed.fileName()), [then] { then(std::nullopt); });
             return;
         }
-        write(snapshot, renamed.filePath(), then);
+        then(Prepared{snapshot, renamed.filePath(), revision});
     });
     panel->open();
 }
 
-void ProjectController::write(const ProjectSnapshot &snapshot, const QString &destination, std::function<void(bool)> then)
+void ProjectController::finishWriting(std::function<void()> then)
 {
+    if (!m_writing) {
+        then();
+        return;
+    }
+    m_writeWaiters.push_back(std::move(then));
+}
+
+// Writes a captured document; only that version counts as saved.
+void ProjectController::write(const Prepared &prepared, std::function<void(bool)> then)
+{
+    m_writing = true;
+    // Waiters go on from the event loop once it lands.
+    const auto landed = [this, then](bool saved) {
+        m_writing = false;
+        // Each looks again: an earlier one may be writing.
+        for (std::function<void()> &waiter : std::exchange(m_writeWaiters, {}))
+            QMetaObject::invokeMethod(this, [this, waiter = std::move(waiter)] { finishWriting(waiter); }, Qt::QueuedConnection);
+        then(saved);
+    };
     // Our own save changes the package: its events are ours.
     externalChanges.saving = true;
+    const QString destination = prepared.destination;
+    const ProjectSnapshot snapshot = prepared.snapshot;
     auto *watcher = new QFutureWatcher<std::optional<QString>>(this);
-    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, destination, then] {
+    connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, destination, revision = prepared.revision, landed] {
         watcher->deleteLater();
         if (const std::optional<QString> failure = watcher->result()) {
             // Swift's defer: the guard lasts until the alert is answered.
-            showError(QStringLiteral("Couldn’t save the project"), *failure, [this, then] {
+            showError(QStringLiteral("Couldn’t save the project"), *failure, [this, landed] {
                 externalChanges.saving = false;
-                then(false);
+                landed(false);
             });
             return;
         }
+        // Marked first: the path's signal shows the saved state.
+        session.history.markSaved(revision);
         session.setProjectPath(destination);
-        session.history.markSaved();
         m_saveGeneration += 1;
-        rememberProjectDigest(destination, [this, destination, then] {
+        rememberProjectDigest(destination, [this, destination, landed] {
             watchProject(destination);
             externalChanges.saving = false;
-            then(true);
+            landed(true);
         });
     });
     // The store blocks on the disk: off the UI thread.
@@ -190,36 +241,39 @@ void ProjectController::open(std::optional<QString> path, std::function<void(boo
         // A folder's trailing slash would leave it without a name.
         while (source.endsWith(QLatin1Char('/')))
             source.chop(1);
-        // Validated first: a corrupt project never discards the live document.
-        load(source, [this, end, refuse, source](const Loaded &first) {
-            if (!first.snapshot) {
-                refuse(first.failure);
-                return;
-            }
-            const int previousSave = m_saveGeneration;
-            confirmReplacement([this, end, refuse, source, first, previousSave](bool proceed) {
-                if (!proceed) {
-                    end(false);
+        // A write in flight lands first: no read mid-save.
+        finishWriting([this, end, refuse, source] {
+            // Validated first: a corrupt project never discards the live document.
+            load(source, [this, end, refuse, source](const Loaded &first) {
+                if (!first.snapshot) {
+                    refuse(first.failure);
                     return;
                 }
-                // Saving in the confirmation can replace the opened file.
-                if (m_saveGeneration == previousSave || !samePlace(session.projectPath(), source)) {
-                    session.installProject(*first.snapshot, source);
-                    rememberProjectDigest(source, [this, source, end] {
-                        watchProject(source);
-                        end(true);
-                    });
-                    return;
-                }
-                load(source, [this, end, refuse, source](const Loaded &again) {
-                    if (!again.snapshot) {
-                        refuse(again.failure);
+                const int previousSave = m_saveGeneration;
+                confirmReplacement([this, end, refuse, source, first, previousSave](bool proceed) {
+                    if (!proceed) {
+                        end(false);
                         return;
                     }
-                    session.installProject(*again.snapshot, source);
-                    rememberProjectDigest(source, [this, source, end] {
-                        watchProject(source);
-                        end(true);
+                    // Saving in the confirmation can replace the opened file.
+                    if (m_saveGeneration == previousSave || !samePlace(session.projectPath(), source)) {
+                        session.installProject(*first.snapshot, source);
+                        rememberProjectDigest(source, [this, source, end] {
+                            watchProject(source);
+                            end(true);
+                        });
+                        return;
+                    }
+                    load(source, [this, end, refuse, source](const Loaded &again) {
+                        if (!again.snapshot) {
+                            refuse(again.failure);
+                            return;
+                        }
+                        session.installProject(*again.snapshot, source);
+                        rememberProjectDigest(source, [this, source, end] {
+                            watchProject(source);
+                            end(true);
+                        });
                     });
                 });
             });
@@ -293,26 +347,29 @@ void ProjectController::confirmQuit(std::function<void(bool)> done)
 
 void ProjectController::confirmReplacement(std::function<void(bool)> then)
 {
-    if (!session.isModified() || !session.document()) {
-        then(true);
-        return;
-    }
-    const QString name = session.projectPath() ? QFileInfo(*session.projectPath()).fileName() : QStringLiteral("Untitled");
-    auto *alert = new QMessageBox(window);
-    alert->setAttribute(Qt::WA_DeleteOnClose);
-    alert->setIcon(QMessageBox::Warning);
-    alert->setText(QStringLiteral("Save changes to %1?").arg(name));
-    alert->setInformativeText(QStringLiteral("Your changes will be lost if you don’t save them."));
-    const QPushButton *save = alert->addButton(QStringLiteral("Save"), QMessageBox::AcceptRole);
-    alert->addButton(QStringLiteral("Cancel"), QMessageBox::RejectRole);
-    const QPushButton *discard = alert->addButton(QStringLiteral("Don’t Save"), QMessageBox::DestructiveRole);
-    connect(alert, &QDialog::finished, this, [this, alert, save, discard, then] {
-        if (alert->clickedButton() == save)
-            saveCurrent(false, then);
-        else
-            then(alert->clickedButton() == discard);
+    // A save still writing finishes: no file is cut short.
+    finishWriting([this, then] {
+        if (!session.isModified() || !session.document()) {
+            then(true);
+            return;
+        }
+        const QString name = session.projectPath() ? QFileInfo(*session.projectPath()).fileName() : QStringLiteral("Untitled");
+        auto *alert = new QMessageBox(window);
+        alert->setAttribute(Qt::WA_DeleteOnClose);
+        alert->setIcon(QMessageBox::Warning);
+        alert->setText(QStringLiteral("Save changes to %1?").arg(name));
+        alert->setInformativeText(QStringLiteral("Your changes will be lost if you don’t save them."));
+        const QPushButton *save = alert->addButton(QStringLiteral("Save"), QMessageBox::AcceptRole);
+        alert->addButton(QStringLiteral("Cancel"), QMessageBox::RejectRole);
+        const QPushButton *discard = alert->addButton(QStringLiteral("Don’t Save"), QMessageBox::DestructiveRole);
+        connect(alert, &QDialog::finished, this, [this, alert, save, discard, then] {
+            if (alert->clickedButton() == save)
+                saveCurrent(false, then);
+            else
+                then(alert->clickedButton() == discard);
+        });
+        alert->open();
     });
-    alert->open();
 }
 
 void ProjectController::showError(const QString &title, const QString &message, std::function<void()> then)

@@ -26,6 +26,10 @@ public:
     bool isModified() const { return m_revision != m_savedRevision; }
     int undoCount() const { return int(m_past.size()); }
     void markSaved() { m_savedRevision = m_revision; }
+    // The document now, for a save that finishes later.
+    QUuid currentRevision() const { return m_revision; }
+    // A save of `saved` finished; later edits stay modified.
+    void markSaved(QUuid saved) { m_savedRevision = saved; }
     void reset();
     // Takes the steps a staged copy of this history recorded.
     void adopt(DocumentHistory &&staged) noexcept;

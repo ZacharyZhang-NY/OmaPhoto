@@ -70,10 +70,20 @@ private:
         QString failure;
     };
 
+    struct Prepared {
+        ProjectSnapshot snapshot;
+        QString destination;
+        QUuid revision;
+    };
+
     bool begin();
     void finish(const std::function<void(bool)> &done, bool value);
     void saveCurrent(bool asNew, std::function<void(bool)> then);
-    void write(const ProjectSnapshot &snapshot, const QString &destination, std::function<void(bool)> then);
+    // Swift's prepareSave: the document now, and where it goes.
+    void prepareSave(bool asNew, std::function<void(std::optional<Prepared>)> then);
+    void write(const Prepared &prepared, std::function<void(bool)> then);
+    // A save still writing finishes first; then `then` runs.
+    void finishWriting(std::function<void()> then);
     void load(const QString &path, std::function<void(Loaded)> then);
     void confirmReplacement(std::function<void(bool)> then);
     void showError(const QString &title, const QString &message, std::function<void()> then);
@@ -96,6 +106,9 @@ private:
     void askToRevert(std::function<void(bool)> then);
 
     int m_saveGeneration = 0;
+    // Swift's `writing`: a save writes in the background.
+    bool m_writing = false;
+    std::vector<std::function<void()>> m_writeWaiters;
     std::deque<Incoming> m_incoming;
     bool m_processing = false;
 };

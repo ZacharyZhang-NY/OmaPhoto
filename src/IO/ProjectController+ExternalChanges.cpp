@@ -83,6 +83,13 @@ void ProjectController::checkExternalChange()
     connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, path = *path] {
         watcher->deleteLater();
         const std::optional<QByteArray> digest = watcher->result();
+        // Our save began meanwhile: look again once it lands.
+        if (externalChanges.saving) {
+            externalChanges.pending = true;
+            externalChanges.checking = false;
+            finishWriting([this] { resumeExternalChangeCheck(); });
+            return;
+        }
         if (!digest || digest == externalChanges.knownDigest) {
             checkExternalChange();
             return;
@@ -102,9 +109,12 @@ void ProjectController::checkExternalChange()
             externalChanges.checking = false;
             return;
         }
-        askToRevert([this, path, digest](bool revert) {
+        const int askedAtSave = m_saveGeneration;
+        askToRevert([this, path, digest, askedAtSave](bool revert) {
             if (!revert) {
-                externalChanges.knownDigest = digest;
+                // A save while asking remembered what it wrote.
+                if (m_saveGeneration == askedAtSave)
+                    externalChanges.knownDigest = digest;
                 checkExternalChange();
                 return;
             }
@@ -132,22 +142,25 @@ void ProjectController::reloadFromDisk(const QString &path, std::function<void()
 {
     externalChanges.recheckAttempt = 0;
     session.setIsProjectBusy(true);
-    // A package that fails to load leaves the document alone.
-    load(path, [this, path, then](const Loaded &loaded) {
-        if (!loaded.snapshot || session.projectPath() != path || !session.document()) {
-            if (!loaded.snapshot)
-                qCInfo(lcIO).noquote() << "the changed package did not load yet:" << loaded.failure;
-            session.setIsProjectBusy(false);
-            then();
-            return;
-        }
-        session.reloadProject(*loaded.snapshot);
-        // As loaded, not first seen: it may have changed.
-        rememberProjectDigest(path, [this, path, then] {
-            externalChanges.reloadCount += 1;
-            qCInfo(lcIO).noquote() << "reloaded" << path << "after it changed on disk";
-            session.setIsProjectBusy(false);
-            then();
+    // Swift's store is an actor: no read mid-write.
+    finishWriting([this, path, then] {
+        // A package that fails to load leaves the document alone.
+        load(path, [this, path, then](const Loaded &loaded) {
+            if (!loaded.snapshot || session.projectPath() != path || !session.document()) {
+                if (!loaded.snapshot)
+                    qCInfo(lcIO).noquote() << "the changed package did not load yet:" << loaded.failure;
+                session.setIsProjectBusy(false);
+                then();
+                return;
+            }
+            session.reloadProject(*loaded.snapshot);
+            // As loaded, not first seen: it may have changed.
+            rememberProjectDigest(path, [this, path, then] {
+                externalChanges.reloadCount += 1;
+                qCInfo(lcIO).noquote() << "reloaded" << path << "after it changed on disk";
+                session.setIsProjectBusy(false);
+                then();
+            });
         });
     });
 }
