@@ -46,6 +46,27 @@ void EditorSession::installProject(const ProjectSnapshot &snapshot, const QStrin
     notify();
 }
 
+void EditorSession::reloadProject(const ProjectSnapshot &snapshot)
+{
+    if (!m_projectPath)
+        return;
+    const CanvasViewport kept = viewport;
+    const QSet<QUuid> collapsed = m_collapsedGroupIDs;
+    const std::optional<QUuid> active = m_activeLayerID;
+    const QSet<QUuid> selected = m_selectedLayerIDs;
+    installProject(snapshot, *m_projectPath);
+    viewport = kept;
+    QSet<QUuid> ids;
+    for (const ProjectLayerRecord &record : snapshot.manifest.layers)
+        ids.insert(record.id);
+    m_collapsedGroupIDs = collapsed & ids;
+    if (active && ids.contains(*active)) {
+        setActiveLayerID(active);
+        m_selectedLayerIDs = (selected & ids) | QSet<QUuid>{*active};
+    }
+    notify();
+}
+
 void EditorSession::setProjectPath(std::optional<QString> path)
 {
     m_projectPath = std::move(path);

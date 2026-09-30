@@ -92,6 +92,7 @@ void ProjectWorkspace::select(QUuid id)
     current().session.commitTransform();
     m_selectedID = id;
     current().controller.window = window;
+    current().controller.resumeExternalChangeCheck();
     emit changed();
 }
 

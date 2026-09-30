@@ -1,6 +1,7 @@
 #pragma once
 #include "Document/EditorSession.h"
 #include "IO/ImageExporter.h"
+#include "IO/ProjectController+ExternalChanges.h"
 #include <QList>
 #include <QPointer>
 #include <QUrl>
@@ -44,6 +45,15 @@ public:
     void exportPNG(std::function<void()> done = {});
     void exportJPEG(std::function<void()> done = {});
 
+    // Swift's ProjectController+ExternalChanges: the package kept in step.
+    ExternalChangeState externalChanges;
+    void watchProject(const QString &path);
+    void stopWatchingProject();
+    // Remembers the package as it is now, then calls `then`.
+    void rememberProjectDigest(const QString &path, std::function<void()> then);
+    // Its tab came to the front: ask a held question.
+    void resumeExternalChangeCheck();
+
 private:
     struct Incoming {
         QList<QUrl> urls;
@@ -78,6 +88,12 @@ private:
     void drainIncoming();
     void handle(const Incoming &request);
     std::optional<QUuid> ownTab() const;
+    void noteExternalChange();
+    void checkExternalChange();
+    bool isFrontmost() const;
+    void scheduleRecheck();
+    void reloadFromDisk(const QString &path, std::function<void()> then);
+    void askToRevert(std::function<void(bool)> then);
 
     int m_saveGeneration = 0;
     std::deque<Incoming> m_incoming;

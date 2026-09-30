@@ -7,6 +7,7 @@
 #include <QFutureWatcher>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QTimer>
 #include <QtConcurrent>
 
 bool ProjectController::isProject(const QUrl &url)
@@ -24,7 +25,13 @@ bool ProjectController::samePlace(const std::optional<QString> &path, const QStr
     return path && resolved(*path) == resolved(other);
 }
 
-ProjectController::ProjectController(EditorSession &session) : session(session) {}
+ProjectController::ProjectController(EditorSession &session) : session(session)
+{
+    externalChanges.recheck = new QTimer(this);
+    externalChanges.recheck->setSingleShot(true);
+    externalChanges.recheck->setTimerType(Qt::PreciseTimer);
+    connect(externalChanges.recheck, &QTimer::timeout, this, &ProjectController::noteExternalChange);
+}
 
 bool ProjectController::canStart() const
 {
@@ -113,17 +120,27 @@ void ProjectController::saveCurrent(bool asNew, std::function<void(bool)> then)
 
 void ProjectController::write(const ProjectSnapshot &snapshot, const QString &destination, std::function<void(bool)> then)
 {
+    // Our own save changes the package: its events are ours.
+    externalChanges.saving = true;
     auto *watcher = new QFutureWatcher<std::optional<QString>>(this);
     connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, destination, then] {
         watcher->deleteLater();
         if (const std::optional<QString> failure = watcher->result()) {
-            showError(QStringLiteral("Couldn’t save the project"), *failure, [then] { then(false); });
+            // Swift's defer: the guard lasts until the alert is answered.
+            showError(QStringLiteral("Couldn’t save the project"), *failure, [this, then] {
+                externalChanges.saving = false;
+                then(false);
+            });
             return;
         }
         session.setProjectPath(destination);
         session.history.markSaved();
         m_saveGeneration += 1;
-        then(true);
+        rememberProjectDigest(destination, [this, destination, then] {
+            watchProject(destination);
+            externalChanges.saving = false;
+            then(true);
+        });
     });
     // The store blocks on the disk: off the UI thread.
     watcher->setFuture(QtConcurrent::run([snapshot, destination]() -> std::optional<QString> {
@@ -188,7 +205,10 @@ void ProjectController::open(std::optional<QString> path, std::function<void(boo
                 // Saving in the confirmation can replace the opened file.
                 if (m_saveGeneration == previousSave || !samePlace(session.projectPath(), source)) {
                     session.installProject(*first.snapshot, source);
-                    end(true);
+                    rememberProjectDigest(source, [this, source, end] {
+                        watchProject(source);
+                        end(true);
+                    });
                     return;
                 }
                 load(source, [this, end, refuse, source](const Loaded &again) {
@@ -197,7 +217,10 @@ void ProjectController::open(std::optional<QString> path, std::function<void(boo
                         return;
                     }
                     session.installProject(*again.snapshot, source);
-                    end(true);
+                    rememberProjectDigest(source, [this, source, end] {
+                        watchProject(source);
+                        end(true);
+                    });
                 });
             });
         });
@@ -230,8 +253,10 @@ void ProjectController::newCanvas()
         return;
     confirmReplacement([this](bool proceed) {
         session.setIsProjectBusy(false);
-        if (proceed)
-            session.clearProject();
+        if (!proceed)
+            return;
+        session.clearProject();
+        stopWatchingProject();
     });
 }
 
@@ -248,6 +273,7 @@ void ProjectController::close(QWidget *closing)
         if (!proceed)
             return;
         session.clearProject();
+        stopWatchingProject();
         if (closing)
             closing->close();
     });

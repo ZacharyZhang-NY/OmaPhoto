@@ -156,6 +156,7 @@ add_library(compositor_core STATIC
     src/IO/ProjectController.cpp
     src/IO/ProjectController+Resize.cpp
     src/IO/ProjectController+Export.cpp
+    src/IO/ProjectController+ExternalChanges.cpp
     src/IO/ImageFileDrop.cpp
     src/IO/PSD/PSDChannelCoder.cpp
     src/IO/PSD/PSDDocumentBuilder.cpp
@@ -167,7 +168,9 @@ add_library(compositor_core STATIC
     src/IO/PSD/PSDText+Engine.cpp
     src/IO/PSD/PSDTypes.cpp
     src/IO/PSD/PSDVector.cpp
+    src/IO/ProjectDigest.cpp
     src/IO/ProjectStore.cpp
+    src/IO/ProjectWatcher.cpp
     src/IO/ProjectStore+Adjustment.cpp
     src/IO/ProjectStore+Effects.cpp
     src/IO/ProjectStore+Manifest.cpp
