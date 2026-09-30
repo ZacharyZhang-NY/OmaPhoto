@@ -20,6 +20,7 @@ class CanvasSizeSheet : public QWidget {
 public:
     CanvasSizeSheet(const CanvasDocument &document, PaletteColor foreground, PaletteColor background,
                     std::function<void(std::optional<CanvasSizeOptions>)> finish, QWidget *parent = nullptr);
+    ~CanvasSizeSheet() override;
 
 private:
     PickerField *dimension(bool widthAxis);

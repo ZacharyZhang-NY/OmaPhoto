@@ -4,15 +4,19 @@
 #include <functional>
 #include <optional>
 #include <utility>
+#include <vector>
 
 // Swift's CameraRawSliderTrack: a coloured track, or the system's.
 struct CameraRawSliderTrack {
-    enum class Kind { plain, temperature, tint, chroma, hue, saturation, luminance };
+    enum class Kind { plain, temperature, tint, chroma, hue, saturation, luminance, opposing, spectrum };
     Kind kind = Kind::plain;
-    // A family's centre, for hue, saturation and luminance.
+    // A family's centre, for hue, saturation, luminance and spectrum.
     double degrees = 0;
-    // Left and right colours; none keeps the system track.
-    std::optional<std::pair<QColor, QColor>> colors() const;
+    // Opposing's two ends, as Color Balance's Cyan / Red.
+    QColor from = {};
+    QColor to = {};
+    // Left-to-right colours, evenly spaced; none keeps the system track.
+    std::optional<std::vector<QColor>> colors() const;
 };
 
 // Swift's CameraRawSlider: a double click on the knob resets.
@@ -23,7 +27,10 @@ public:
                     std::function<void()> reset, QWidget *parent = nullptr);
     // Shows a value, unless a drag holds the knob.
     void display(double value);
+    // Swift's updateNSView: new bounds and track, the value shown again.
+    void reshape(double low, double high, CameraRawSliderTrack track, double value);
     double shown() const;
+    const CameraRawSliderTrack &track() const { return m_track; }
     bool isOnKnob(QPoint point) const;
 
 protected:
@@ -31,9 +38,9 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
-    const double m_low;
-    const double m_high;
-    const CameraRawSliderTrack m_track;
+    double m_low;
+    double m_high;
+    CameraRawSliderTrack m_track;
     const std::function<void(double)> m_change;
     const std::function<void()> m_reset;
 };

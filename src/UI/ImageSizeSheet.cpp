@@ -343,3 +343,8 @@ void ImageSizeSheet::synchronize()
     m_result->setForegroundRole(isValid ? QPalette::PlaceholderText : QPalette::BrightText);
     m_resize->setEnabled(isValid);
 }
+
+ImageSizeSheet::~ImageSizeSheet()
+{
+    releaseFocus(*this);
+}

@@ -114,6 +114,7 @@ add_library(compositor_core STATIC
     src/UI/LayersPanel.cpp
     src/UI/LevelsSheet.cpp
     src/UI/HueSaturationSheet.cpp
+    src/UI/HueSaturationSheet+Spectrum.cpp
     src/UI/CurvesControls.cpp
     src/UI/NativeLayerList.cpp
     src/UI/NativeLayerList+Buttons.cpp
@@ -136,6 +137,7 @@ add_library(compositor_core STATIC
     src/UI/CameraRawSlider.cpp
     src/UI/FilterSheet.cpp
     src/UI/FilterSheet+Adjustments.cpp
+    src/UI/FilterSheet+Controls.cpp
     src/UI/FilterSheet+Finishing.cpp
     src/UI/FloatingPanel.cpp
     src/UI/KeyboardShortcuts.cpp

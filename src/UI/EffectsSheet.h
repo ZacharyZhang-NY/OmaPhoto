@@ -14,6 +14,7 @@ class EffectsSheet : public QWidget {
     Q_OBJECT
 public:
     EffectsSheet(EditorSession &session, LayerEffectKind kind, QWidget *parent = nullptr);
+    ~EffectsSheet() override;
 
 private:
     // Swift's slider: a title, a slider, a whole-number field.

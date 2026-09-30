@@ -15,6 +15,7 @@ class LevelsSheet : public QWidget {
     Q_OBJECT
 public:
     explicit LevelsSheet(EditorSession &session, QWidget *parent = nullptr);
+    ~LevelsSheet() override;
 
 protected:
     // A new theme recolours the eyedroppers' ink.

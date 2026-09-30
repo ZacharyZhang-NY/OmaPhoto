@@ -151,6 +151,13 @@ void PickerField::keyPressEvent(QKeyEvent *event)
     QLineEdit::keyPressEvent(event);
 }
 
+void releaseFocus(QWidget &owner)
+{
+    // Destroyed focused, it would commit into freed members.
+    if (QWidget *focus = owner.focusWidget(); focus && focus->hasFocus())
+        focus->clearFocus();
+}
+
 void PickerField::focusOutEvent(QFocusEvent *event)
 {
     // A menu or popup borrows the focus: the typing stays.
@@ -375,4 +382,9 @@ void ColorPickerPanelController::close()
 void ColorPickerPanelController::refocus()
 {
     FloatingPanel::refocus(identifier());
+}
+
+ColorPickerSheet::~ColorPickerSheet()
+{
+    releaseFocus(*this);
 }

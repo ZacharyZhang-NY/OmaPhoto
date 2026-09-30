@@ -12,7 +12,6 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
-#include <QSlider>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <algorithm>
@@ -30,9 +29,6 @@ constexpr std::array<Row, 3> rows{{{"Hue", "°", &HueSaturationSettings::hue, &H
                                    {"Saturation", "", &HueSaturationSettings::saturation, &HueSaturationSettings::setSaturation},
                                    {"Lightness", "", &HueSaturationSettings::lightness, &HueSaturationSettings::setLightness}}};
 
-// Sliders move in hundredths, as Swift's run freely.
-constexpr double sliderScale = 100;
-
 // Swift's ranges: Colorize sets hue and saturation outright.
 std::pair<double, double> bounds(size_t index, bool colorize)
 {
@@ -43,90 +39,27 @@ std::pair<double, double> bounds(size_t index, bool colorize)
     return {-100.0, 100.0};
 }
 
+// Swift's tracks: hue circle, gray to colour, black to white.
+CameraRawSliderTrack track(size_t index, const HueSaturationSettings &settings)
+{
+    using Kind = CameraRawSliderTrack::Kind;
+    // The middle of the chosen range; Master centres on red.
+    const auto found = std::find(colorRanges.begin(), colorRanges.end(), settings.range);
+    const double rangeHue = found == colorRanges.end() ? 0 : double(found - colorRanges.begin()) * 60;
+    if (index == 0)
+        return {Kind::spectrum, settings.colorize ? 180 : rangeHue};
+    if (index == 1) {
+        if (settings.colorize)
+            return {Kind::saturation, settings.hue()};
+        return settings.range == ColorRange::master ? CameraRawSliderTrack{Kind::chroma} : CameraRawSliderTrack{Kind::saturation, rangeHue};
+    }
+    return {.kind = Kind::opposing, .from = Qt::black, .to = Qt::white};
+}
+
 // Swift's `current`: the open edit's settings, else the defaults.
 HueSaturationSettings current(const EditorSession &session)
 {
     return session.hueSaturation() ? session.hueSaturation()->settings : HueSaturationSettings();
-}
-
-// Swift's 72 hue slices, as they are or adjusted.
-class Spectrum : public QWidget {
-public:
-    Spectrum(std::function<HueSaturationSettings()> value, bool after, QWidget *parent) : QWidget(parent), m_value(std::move(value)), m_after(after)
-    {
-        setFixedHeight(16);
-    }
-
-protected:
-    void paintEvent(QPaintEvent *) override
-    {
-        constexpr int slices = 72;
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        QPainterPath rounded;
-        rounded.addRoundedRect(QRectF(rect()), 3, 3);
-        painter.setClipPath(rounded);
-        const HueSaturationSettings settings = m_value();
-        const double width = double(this->width()) / slices;
-        for (int slice = 0; slice < slices; ++slice) {
-            const double hue = double(slice) / slices * 360;
-            const double shown = m_after ? HueSaturationFilter::shiftedHue(hue, settings) : hue;
-            painter.fillRect(QRectF(slice * width, 0, width + 0.5, height()), QColor::fromHsvF(float(shown / 360), 1, 1));
-        }
-    }
-
-private:
-    const std::function<HueSaturationSettings()> m_value;
-    const bool m_after;
-};
-
-// Swift's handles: shoulders as blocks, the core's ends as bars.
-class SpectrumHandles : public QWidget {
-public:
-    SpectrumHandles(std::function<HueSaturationSettings()> value, std::function<void(double, double, bool)> drag, QWidget *parent)
-        : QWidget(parent), m_value(std::move(value)), m_drag(std::move(drag))
-    {
-        setFixedHeight(12);
-    }
-
-protected:
-    void paintEvent(QPaintEvent *) override
-    {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        const std::array<double, 4> handles = m_value().band().handles();
-        for (size_t index = 0; index < handles.size(); ++index) {
-            const double x = handles[index] / 360 * width();
-            const bool inner = index == 1 || index == 2;
-            painter.fillRect(inner ? QRectF(x - 1, 0, 2, height()) : QRectF(x - 3.5, height() / 2.0 - 2.5, 7, 5), palette().color(QPalette::WindowText));
-        }
-    }
-    void mousePressEvent(QMouseEvent *event) override
-    {
-        if (event->button() == Qt::LeftButton)
-            m_drag(event->position().x(), width(), true);
-    }
-    void mouseMoveEvent(QMouseEvent *event) override
-    {
-        if (event->buttons().testFlag(Qt::LeftButton))
-            m_drag(event->position().x(), width(), false);
-    }
-
-private:
-    const std::function<HueSaturationSettings()> m_value;
-    const std::function<void(double, double, bool)> m_drag;
-};
-
-// The nearest handle round the circle; ties take the first.
-int nearestHandle(const HueBand &band, double degrees)
-{
-    const std::array<double, 4> handles = band.handles();
-    std::array<double, 4> distances{};
-    for (size_t index = 0; index < handles.size(); ++index) {
-        const double gap = std::fmod(std::abs(handles[index] - degrees), 360);
-        distances[index] = std::min(gap, 360 - gap);
-    }
-    return int(std::min_element(distances.begin(), distances.end()) - distances.begin());
 }
 
 // Swift's plain sampling buttons: a glyph, tinted when chosen.
@@ -214,56 +147,6 @@ QFrame *line(QFrame::Shape shape, QWidget *parent)
     made->setForegroundRole(QPalette::Mid);
     return made;
 }
-}
-
-SpectrumEditor::SpectrumEditor(std::function<HueSaturationSettings()> value, std::function<void(const HueSaturationSettings &)> change, QWidget *parent)
-    : QWidget(parent), m_value(std::move(value)), m_change(std::move(change)),
-      m_handles(new SpectrumHandles(m_value, [this](double x, double width, bool pressed) { drag(x, width, pressed); }, this)),
-      m_after(new Spectrum(m_value, true, this)), m_readout(new QLabel(this))
-{
-    auto *before = new Spectrum(m_value, false, this);
-    before->setObjectName(QStringLiteral("spectrumBefore"));
-    m_handles->setObjectName(QStringLiteral("spectrumHandles"));
-    m_after->setObjectName(QStringLiteral("spectrumAfter"));
-    m_readout->setObjectName(QStringLiteral("spectrumReadout"));
-    // Swift's .caption in the secondary ink.
-    QFont small = m_readout->font();
-    small.setPixelSize(10);
-    m_readout->setFont(small);
-    m_readout->setForegroundRole(QPalette::PlaceholderText);
-    auto *column = new QVBoxLayout(this);
-    column->setContentsMargins(0, 0, 0, 0);
-    column->setSpacing(5);
-    column->addWidget(before);
-    column->addWidget(m_handles);
-    column->addWidget(m_after);
-    column->addWidget(m_readout, 0, Qt::AlignHCenter);
-    synchronize();
-}
-
-void SpectrumEditor::synchronize()
-{
-    QStringList degrees;
-    for (const double handle : m_value().band().handles())
-        degrees << QStringLiteral("%1°").arg(std::lround(handle));
-    m_readout->setText(degrees.join(QStringLiteral("   ")));
-    m_handles->update();
-    m_after->update();
-}
-
-void SpectrumEditor::drag(double x, double width, bool pressed)
-{
-    // A press starts afresh: Qt can lose a release.
-    if (pressed)
-        m_dragging.reset();
-    const double degrees = std::clamp(x, 0.0, width) / width * 360;
-    HueSaturationSettings settings = m_value();
-    HueBand band = settings.band();
-    const int index = m_dragging.value_or(nearestHandle(band, degrees));
-    m_dragging = index;
-    band.setHandle(index, degrees);
-    settings.setBand(band);
-    m_change(settings);
 }
 
 HueSaturationSheet::HueSaturationSheet(EditorSession &session, QWidget *parent)
@@ -382,15 +265,25 @@ QWidget *HueSaturationSheet::row(size_t index)
                                                    m_fields[index]->setModified(false);
                                                    synchronize();
                                                }});
-    auto *slider = new QSlider(Qt::Horizontal, box);
+    const auto [low, high] = bounds(index, current(m_session).colorize);
+    auto *slider = new CameraRawSlider(
+        low, high, track(index, current(m_session)), title + QStringLiteral(". Double-click to reset."),
+        [this, index](double value) {
+            // Swift sets whole numbers; unchanged, the knob keeps its travel.
+            const double rounded = std::round(value);
+            if ((current(m_session).*rows[index].value)() == rounded)
+                return;
+            change([&](HueSaturationSettings &settings) { (settings.*rows[index].set)(rounded); });
+            // Its value replaces the field's typing.
+            m_fields[index]->setModified(false);
+            synchronize();
+        },
+        [this, index] { reset(index); }, box);
     slider->setObjectName(title.toLower() + QStringLiteral("Slider"));
     label->setBuddy(slider);
-    connect(slider, &QSlider::valueChanged, this, [this, index](int value) {
-        change([&](HueSaturationSettings &settings) { (settings.*rows[index].set)(value / sliderScale); });
-        // Its value replaces the field's typing.
-        m_fields[index]->setModified(false);
-        synchronize();
-    });
+    // After the scrub's filter, so this one runs first.
+    label->installEventFilter(this);
+    m_titles[index] = label;
     // A readable number applies as typed, as Swift's value binding.
     auto *field = new PickerField([this, index] {
         PickerField &edited = *m_fields[index];
@@ -426,6 +319,29 @@ QWidget *HueSaturationSheet::row(size_t index)
     return box;
 }
 
+void HueSaturationSheet::reset(size_t index)
+{
+    change([index](HueSaturationSettings &settings) {
+        const HueSaturationSettings start = settings.colorize ? HueSaturationSettings::colorizeStart() : HueSaturationSettings();
+        (settings.*rows[index].set)((start.*rows[index].value)());
+    });
+    m_fields[index]->setModified(false);
+    synchronize();
+}
+
+// Swift's double click on a title resets its slider.
+bool HueSaturationSheet::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonDblClick && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
+        for (size_t index = 0; index < m_titles.size(); ++index) {
+            if (m_titles[index] == watched && m_titles[index]->isEnabled())
+                reset(index);
+        }
+    }
+    // The scrub still takes the second press, as Swift's drag.
+    return QWidget::eventFilter(watched, event);
+}
+
 void HueSaturationSheet::change(const std::function<void(HueSaturationSettings &)> &edit)
 {
     HueSaturationSettings settings = current(m_session);
@@ -454,12 +370,8 @@ void HueSaturationSheet::synchronize()
         const auto [low, high] = bounds(index, settings.colorize);
         m_scrubs[index]->reshape(1, low, high);
         const double value = (settings.*rows[index].value)();
-        {
-            // The sliders show the session's numbers without writing back.
-            const QSignalBlocker quiet(m_sliders[index]);
-            m_sliders[index]->setRange(int(low * sliderScale), int(high * sliderScale));
-            m_sliders[index]->setValue(int(std::lround(std::clamp(value, low, high) * sliderScale)));
-        }
+        // Swift's updateNSView: range and track follow the settings.
+        m_sliders[index]->reshape(low, high, track(index, settings), std::clamp(value, low, high));
         // Ungrouped digits; a field being typed in keeps its typing.
         QLocale locale = m_fields[index]->locale();
         locale.setNumberOptions(QLocale::OmitGroupSeparator);
@@ -475,4 +387,9 @@ void HueSaturationSheet::synchronize()
     m_preview->setChecked(edit->preview);
     // An adjustment layer's editor ignores the selection.
     m_limited->setVisible(!m_session.adjustmentOriginal() && m_session.selection());
+}
+
+HueSaturationSheet::~HueSaturationSheet()
+{
+    releaseFocus(*this);
 }

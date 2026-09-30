@@ -32,6 +32,7 @@ public:
     // `slide` takes the slider's own value, `type` a typed number.
     CameraRawRow(Spec spec, std::function<double()> value, std::function<void(double)> slide, std::function<void(double)> type,
                  std::function<void()> reset, QWidget *parent = nullptr);
+    ~CameraRawRow() override;
     // Shows the value; a focused field keeps its typing.
     void synchronize();
 

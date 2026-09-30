@@ -1,5 +1,6 @@
 #pragma once
 #include "Document/EditorSession.h"
+#include "UI/CameraRawSlider.h"
 #include <QWidget>
 
 class CurvesControls;
@@ -38,6 +39,16 @@ class FilterSheet : public QWidget {
     Q_OBJECT
 public:
     explicit FilterSheet(EditorSession &session, QWidget *parent = nullptr);
+    ~FilterSheet() override;
+    // Swift's resetting: that setting back to the filter's default.
+    static FilterSettings resetting(const std::function<double &(FilterSettings &)> &key, FilterSettings settings);
+    // Color Balance's tracks, each colour to its opposite.
+    static CameraRawSliderTrack cyanRedTrack();
+    static CameraRawSliderTrack magentaGreenTrack();
+    static CameraRawSliderTrack yellowBlueTrack();
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     // Swift's control: a slider, an exact field and its unit.
@@ -49,9 +60,18 @@ private:
         bool logarithmic;
         QSlider *slider;
         PickerField *field;
+        QLabel *title;
+        // A coloured track, as Camera Raw's; a double click resets.
+        std::function<CameraRawSliderTrack(const FilterSettings &)> track;
     };
+    // A slider's travel: thousandths of its range.
+    static constexpr int travel = 1000;
     void control(const QString &title, std::function<double &(FilterSettings &)> key, double low, double high, const QString &unit,
-                 int decimals, bool logarithmic);
+                 int decimals, bool logarithmic, std::function<CameraRawSliderTrack(const FilterSettings &)> track = {});
+    void showControl(Control &control, const FilterSettings &settings);
+    // Swift's LabelWidthKey: every shown title as wide as the widest.
+    void alignTitles();
+    void reset(size_t index);
     void noise();
     // Vignette's colour and rows, Bloom / Glow's, Tonal Contrast's.
     void finishing(FilterKind kind);

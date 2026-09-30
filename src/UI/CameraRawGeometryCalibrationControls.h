@@ -14,6 +14,7 @@ class CameraRawGeometryControls : public QWidget {
     Q_OBJECT
 public:
     explicit CameraRawGeometryControls(EditorSession &session, QWidget *parent = nullptr);
+    ~CameraRawGeometryControls() override;
     void synchronize();
 
 private:
@@ -35,6 +36,7 @@ class CameraRawCalibrationControls : public QWidget {
     Q_OBJECT
 public:
     explicit CameraRawCalibrationControls(EditorSession &session, QWidget *parent = nullptr);
+    ~CameraRawCalibrationControls() override;
     void synchronize();
 
 private:

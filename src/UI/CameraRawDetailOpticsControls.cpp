@@ -1,4 +1,5 @@
 #include "UI/CameraRawDetailOpticsControls.h"
+#include "UI/ColorPickerSheet.h"
 #include "Rendering/EyedropperIcon.h"
 #include "UI/CameraRawControls.h"
 #include <QCheckBox>
@@ -251,4 +252,14 @@ void CameraRawOpticsControls::synchronize()
         row->synchronize();
     for (const auto &[slider, key] : m_hueSliders)
         slider->display(optics.*key);
+}
+
+CameraRawDetailControls::~CameraRawDetailControls()
+{
+    releaseFocus(*this);
+}
+
+CameraRawOpticsControls::~CameraRawOpticsControls()
+{
+    releaseFocus(*this);
 }

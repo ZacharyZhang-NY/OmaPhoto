@@ -1,4 +1,5 @@
 #include "Rendering/EyedropperIcon.h"
+#include "UI/ColorPickerSheet.h"
 #include "UI/CameraRawColorControls.h"
 #include "UI/LayerIcons.h"
 #include <QAbstractButton>
@@ -314,4 +315,9 @@ void CameraRawMixerControls::synchronize()
         each->synchronize();
     m_target->setChecked(shown.targetsMixer);
     m_target->setIcon(QIcon(LayerIcons::pixmap(LayerIcon::scope, 14, palette().color(QPalette::ButtonText), devicePixelRatioF())));
+}
+
+CameraRawMixerControls::~CameraRawMixerControls()
+{
+    releaseFocus(*this);
 }

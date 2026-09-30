@@ -101,11 +101,11 @@ void FilterControlsTests::eachKindShowsSwiftsControls()
             QVERIFY(field.alignment() & Qt::AlignRight);
             QVERIFY(!field.accessibleName().isEmpty() && field.placeholderText() == field.accessibleName());
             QSlider &slider = sheet.child<QSlider>(qPrintable(name + QStringLiteral("Slider")));
-            // Swift's title: sixty points at least, naming the slider.
+            // Swift's title: the widest title's width, sixty at least.
             QLabel *title = nullptr;
             for (QLabel *each : slider.parentWidget()->findChildren<QLabel *>())
                 title = each->buddy() == &slider ? each : title;
-            QVERIFY(title && title->text() == field.accessibleName() && title->minimumWidth() == 60);
+            QVERIFY(title && title->text() == field.accessibleName() && title->minimumWidth() >= 60 && title->maximumWidth() == title->minimumWidth());
         }
         QCOMPARE(sheet.sheet->findChild<CurvesControls *>() != nullptr, kind == FilterKind::curves);
         QCOMPARE(sheet.sheet->findChild<GradientMapControls *>() != nullptr, kind == FilterKind::gradientMap);

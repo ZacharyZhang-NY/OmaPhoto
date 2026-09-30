@@ -1,4 +1,5 @@
 #include "UI/CameraRawGeometryCalibrationControls.h"
+#include "UI/ColorPickerSheet.h"
 #include "UI/CameraRawColorControls.h"
 #include "UI/CameraRawControls.h"
 #include "UI/LayerIcons.h"
@@ -212,4 +213,14 @@ void CameraRawCalibrationControls::synchronize()
     m_summary->setToolTip(summary(calibration.process));
     for (CameraRawRow *row : m_rows)
         row->synchronize();
+}
+
+CameraRawGeometryControls::~CameraRawGeometryControls()
+{
+    releaseFocus(*this);
+}
+
+CameraRawCalibrationControls::~CameraRawCalibrationControls()
+{
+    releaseFocus(*this);
 }

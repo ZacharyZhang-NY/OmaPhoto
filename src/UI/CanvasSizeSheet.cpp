@@ -343,3 +343,8 @@ void CanvasSizeSheet::synchronize()
     m_customRow->setVisible(m_extension->currentIndex() == 5);
     m_ok->setEnabled(valid);
 }
+
+CanvasSizeSheet::~CanvasSizeSheet()
+{
+    releaseFocus(*this);
+}

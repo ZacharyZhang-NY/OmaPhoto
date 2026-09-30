@@ -429,3 +429,8 @@ void LevelsSheet::synchronize()
     m_spinner->setVisible(edit->committing);
     setEnabled(!edit->committing);
 }
+
+LevelsSheet::~LevelsSheet()
+{
+    releaseFocus(*this);
+}

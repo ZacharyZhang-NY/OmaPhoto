@@ -1,4 +1,5 @@
 #include "UI/CameraRawControls.h"
+#include "UI/ColorPickerSheet.h"
 #include "UI/CameraRawColorControls.h"
 #include "UI/CameraRawDetailOpticsControls.h"
 #include "UI/CameraRawGeometryCalibrationControls.h"
@@ -399,4 +400,9 @@ void CameraRawControls::synchronize()
         m_glowStyle->setCurrentIndex(int(settings.glowStyle));
         m_vignetteStyle->setCurrentIndex(int(settings.vignetteStyle));
     }
+}
+
+CameraRawControls::~CameraRawControls()
+{
+    releaseFocus(*this);
 }

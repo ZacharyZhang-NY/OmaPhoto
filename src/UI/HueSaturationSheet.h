@@ -1,5 +1,6 @@
 #pragma once
 #include "Document/EditorSession.h"
+#include "UI/CameraRawSlider.h"
 #include <QWidget>
 #include <array>
 #include <functional>
@@ -40,12 +41,18 @@ class HueSaturationSheet : public QWidget {
     Q_OBJECT
 public:
     explicit HueSaturationSheet(EditorSession &session, QWidget *parent = nullptr);
+    ~HueSaturationSheet() override;
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     // Swift's settings binding: changed, then handed to the session.
     void change(const std::function<void(HueSaturationSettings &)> &edit);
     // Swift's slider row: title, slider, field and unit.
     QWidget *row(size_t index);
+    // Swift's resetValues: that row back to Colorize's start or none.
+    void reset(size_t index);
     void synchronize();
 
     EditorSession &m_session;
@@ -54,7 +61,8 @@ private:
     QWidget *const m_divider;
     QToolButton *const m_targeting;
     // Hue, Saturation, Lightness; the rows make them.
-    std::array<QSlider *, 3> m_sliders{};
+    std::array<CameraRawSlider *, 3> m_sliders{};
+    std::array<QLabel *, 3> m_titles{};
     std::array<PickerField *, 3> m_fields{};
     // Each title's scrub; Colorize changes its range.
     std::array<NumericScrub *, 3> m_scrubs{};

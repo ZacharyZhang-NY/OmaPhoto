@@ -17,16 +17,24 @@ QColor hsb(double degrees, double saturation, double brightness)
 }
 }
 
-std::optional<std::pair<QColor, QColor>> CameraRawSliderTrack::colors() const
+std::optional<std::vector<QColor>> CameraRawSliderTrack::colors() const
 {
     switch (kind) {
     case Kind::plain: return std::nullopt;
-    case Kind::temperature: return std::pair(QColor::fromRgbF(0.22f, 0.46f, 0.95f), QColor::fromRgbF(0.98f, 0.82f, 0.18f));
-    case Kind::tint: return std::pair(QColor::fromRgbF(0.28f, 0.70f, 0.34f), QColor::fromRgbF(0.70f, 0.40f, 0.64f));
-    case Kind::chroma: return std::pair(QColor::fromRgbF(0.62f, 0.62f, 0.64f), QColor::fromRgbF(0.86f, 0.18f, 0.20f));
-    case Kind::hue: return std::pair(hsb(degrees - 50, 0.85, 0.9), hsb(degrees + 50, 0.85, 0.9));
-    case Kind::saturation: return std::pair(QColor::fromRgbF(0.55f, 0.55f, 0.56f), hsb(degrees, 0.9, 0.9));
-    case Kind::luminance: return std::pair(hsb(degrees, 0.55, 0.18), hsb(degrees, 0.35, 0.95));
+    case Kind::temperature: return std::vector{QColor::fromRgbF(0.22f, 0.46f, 0.95f), QColor::fromRgbF(0.98f, 0.82f, 0.18f)};
+    case Kind::tint: return std::vector{QColor::fromRgbF(0.28f, 0.70f, 0.34f), QColor::fromRgbF(0.70f, 0.40f, 0.64f)};
+    case Kind::chroma: return std::vector{QColor::fromRgbF(0.62f, 0.62f, 0.64f), QColor::fromRgbF(0.86f, 0.18f, 0.20f)};
+    case Kind::hue: return std::vector{hsb(degrees - 50, 0.85, 0.9), hsb(degrees + 50, 0.85, 0.9)};
+    case Kind::saturation: return std::vector{QColor::fromRgbF(0.55f, 0.55f, 0.56f), hsb(degrees, 0.9, 0.9)};
+    case Kind::luminance: return std::vector{hsb(degrees, 0.55, 0.18), hsb(degrees, 0.35, 0.95)};
+    case Kind::opposing: return std::vector{from, to};
+    case Kind::spectrum: {
+        // Every 30 degrees round the circle, that hue centred.
+        std::vector<QColor> circle;
+        for (int offset = -180; offset <= 180; offset += 30)
+            circle.push_back(hsb(degrees + offset, 0.85, 0.9));
+        return circle;
+    }
     }
     throw std::logic_error("unknown slider track");
 }
@@ -52,6 +60,15 @@ void CameraRawSlider::display(double value)
     setValue(int(std::lround((value - m_low) / (m_high - m_low) * travel)));
 }
 
+void CameraRawSlider::reshape(double low, double high, CameraRawSliderTrack track, double value)
+{
+    m_low = low;
+    m_high = high;
+    m_track = track;
+    display(value);
+    update();
+}
+
 double CameraRawSlider::shown() const
 {
     return m_low + (m_high - m_low) * value() / travel;
@@ -67,7 +84,7 @@ bool CameraRawSlider::isOnKnob(QPoint point) const
 // Swift's GradientSliderCell: the whole track shows the colours.
 void CameraRawSlider::paintEvent(QPaintEvent *event)
 {
-    const std::optional<std::pair<QColor, QColor>> colors = m_track.colors();
+    const std::optional<std::vector<QColor>> colors = m_track.colors();
     if (!colors) {
         QSlider::paintEvent(event);
         return;
@@ -80,8 +97,8 @@ void CameraRawSlider::paintEvent(QPaintEvent *event)
     const double height = 4;
     const QRectF bar(groove.left(), groove.center().y() + 0.5 - height / 2, groove.width(), height);
     QLinearGradient gradient(bar.topLeft(), bar.topRight());
-    gradient.setColorAt(0, colors->first);
-    gradient.setColorAt(1, colors->second);
+    for (size_t index = 0; index < colors->size(); ++index)
+        gradient.setColorAt(double(index) / double(colors->size() - 1), colors->at(index));
     QPainterPath shape;
     shape.addRoundedRect(bar, height / 2, height / 2);
     painter.fillPath(shape, gradient);

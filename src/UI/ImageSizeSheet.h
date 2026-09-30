@@ -17,6 +17,7 @@ class ImageSizeSheet : public QWidget {
     Q_OBJECT
 public:
     ImageSizeSheet(const CanvasDocument &document, std::function<void(std::optional<ImageSizeOptions>)> finish, QWidget *parent = nullptr);
+    ~ImageSizeSheet() override;
 
 private:
     bool valid() const;

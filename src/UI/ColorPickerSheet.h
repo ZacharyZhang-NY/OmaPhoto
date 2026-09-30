@@ -22,11 +22,15 @@ private:
     const std::function<void(int)> m_step;
 };
 
+// An owner's destructor: its focused entry commits while members live.
+void releaseFocus(QWidget &owner);
+
 // Swift's ColorPickerSheet: field, hue strip, preview, entry.
 class ColorPickerSheet : public QWidget {
     Q_OBJECT
 public:
     ColorPickerSheet(EditorSession &session, std::function<void(bool)> finish, QWidget *parent = nullptr);
+    ~ColorPickerSheet() override;
 
 protected:
     void paintEvent(QPaintEvent *event) override;

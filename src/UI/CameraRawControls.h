@@ -14,6 +14,7 @@ class CameraRawControls : public QWidget {
     Q_OBJECT
 public:
     explicit CameraRawControls(EditorSession &session, QWidget *parent = nullptr);
+    ~CameraRawControls() override;
     // Shows the edit as it now stands.
     void synchronize();
     static constexpr int labelWidth = 96;

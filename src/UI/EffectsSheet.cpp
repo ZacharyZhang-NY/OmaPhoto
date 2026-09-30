@@ -282,3 +282,8 @@ void EffectsSheet::synchronize()
             control.field->setText(text);
     }
 }
+
+EffectsSheet::~EffectsSheet()
+{
+    releaseFocus(*this);
+}

@@ -19,6 +19,7 @@ class CameraRawCurveControls : public QWidget {
     Q_OBJECT
 public:
     explicit CameraRawCurveControls(EditorSession &session, QWidget *parent = nullptr);
+    ~CameraRawCurveControls() override;
     void synchronize();
 
 private:
@@ -48,6 +49,7 @@ class CameraRawMixerControls : public QWidget {
     Q_OBJECT
 public:
     explicit CameraRawMixerControls(EditorSession &session, QWidget *parent = nullptr);
+    ~CameraRawMixerControls() override;
     void synchronize();
 
 private:

@@ -1,4 +1,5 @@
 #include "UI/CameraRawColorControls.h"
+#include "UI/ColorPickerSheet.h"
 #include "UI/CameraRawRow.h"
 #include "UI/LayerIcons.h"
 #include <QButtonGroup>
@@ -352,4 +353,9 @@ void CameraRawCurveControls::synchronize()
         row->synchronize();
     m_target->setChecked(edit && edit->rawPanel.targetsCurve);
     m_target->setIcon(QIcon(LayerIcons::pixmap(LayerIcon::scope, 14, palette().color(QPalette::ButtonText), devicePixelRatioF())));
+}
+
+CameraRawCurveControls::~CameraRawCurveControls()
+{
+    releaseFocus(*this);
 }

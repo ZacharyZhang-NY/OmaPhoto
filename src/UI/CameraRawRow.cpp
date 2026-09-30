@@ -89,3 +89,8 @@ bool CameraRawRow::eventFilter(QObject *watched, QEvent *event)
     }
     return QWidget::eventFilter(watched, event);
 }
+
+CameraRawRow::~CameraRawRow()
+{
+    releaseFocus(*this);
+}

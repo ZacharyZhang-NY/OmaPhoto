@@ -5,6 +5,15 @@
 
 // Swift's CameraRawSliderTests.
 namespace {
+// A two-colour track's ends.
+std::pair<QColor, QColor> ends(const CameraRawSliderTrack &track)
+{
+    const std::vector<QColor> colors = track.colors().value();
+    if (colors.size() != 2)
+        throw std::runtime_error("not a two-colour track");
+    return {colors[0], colors[1]};
+}
+
 struct Probe {
     double changed = std::nan("");
     int resets = 0;
@@ -38,16 +47,17 @@ private slots:
     void trackClickValueMatchesTheClickedPosition();
     void aFamilysTracksCentreOnItsHue();
     void aDragKeepsItsKnob();
+    void aReshapeLeavesADragAlone();
 };
 
 void CameraRawSliderTests::colorTracksRunFromTheCoolOrMutedEndToTheWarmOrStrongEnd()
 {
     using Kind = CameraRawSliderTrack::Kind;
-    const auto [cool, warm] = CameraRawSliderTrack{Kind::temperature}.colors().value();
+    const auto [cool, warm] = ends(CameraRawSliderTrack{Kind::temperature});
     QVERIFY(cool.blueF() > warm.blueF());
-    const auto [green, mauve] = CameraRawSliderTrack{Kind::tint}.colors().value();
+    const auto [green, mauve] = ends(CameraRawSliderTrack{Kind::tint});
     QVERIFY(green.greenF() > mauve.greenF());
-    const auto [gray, red] = CameraRawSliderTrack{Kind::chroma}.colors().value();
+    const auto [gray, red] = ends(CameraRawSliderTrack{Kind::chroma});
     QVERIFY(std::abs(gray.redF() - gray.greenF()) < 0.05);
     QVERIFY(red.redF() > red.greenF() + 0.4);
     QVERIFY(!CameraRawSliderTrack{Kind::plain}.colors());
@@ -90,11 +100,11 @@ void CameraRawSliderTests::aFamilysTracksCentreOnItsHue()
 {
     using Kind = CameraRawSliderTrack::Kind;
     // Hue runs 50 degrees either side; red wraps below zero.
-    const auto [below, above] = CameraRawSliderTrack{Kind::hue, 0}.colors().value();
+    const auto [below, above] = ends(CameraRawSliderTrack{Kind::hue, 0});
     QVERIFY(std::abs(below.hueF() * 360 - 310) < 1 && std::abs(above.hueF() * 360 - 50) < 1);
-    const auto [muted, strong] = CameraRawSliderTrack{Kind::saturation, 240}.colors().value();
+    const auto [muted, strong] = ends(CameraRawSliderTrack{Kind::saturation, 240});
     QVERIFY(muted.hsvSaturationF() < 0.05 && std::abs(strong.hueF() * 360 - 240) < 1);
-    const auto [dark, light] = CameraRawSliderTrack{Kind::luminance, 120}.colors().value();
+    const auto [dark, light] = ends(CameraRawSliderTrack{Kind::luminance, 120});
     QVERIFY(dark.valueF() < 0.2 && light.valueF() > 0.9 && std::abs(dark.hueF() * 360 - 120) < 1);
 }
 
@@ -111,6 +121,25 @@ void CameraRawSliderTests::aDragKeepsItsKnob()
     QCOMPARE(probe.slider.shown(), -60.0);
     // Shown values write nothing back.
     QVERIFY(std::isnan(probe.changed));
+}
+
+void CameraRawSliderTests::aReshapeLeavesADragAlone()
+{
+    using Kind = CameraRawSliderTrack::Kind;
+    Probe probe;
+    probe.slider.display(20);
+    probe.slider.setSliderDown(true);
+    // Mid-drag: the new track shows, the knob and value stay.
+    probe.slider.reshape(-50, 50, CameraRawSliderTrack{Kind::spectrum, 90}, 30);
+    QVERIFY(probe.slider.isSliderDown());
+    QCOMPARE(probe.slider.value(), 600);
+    QCOMPARE(probe.slider.track().kind, Kind::spectrum);
+    QVERIFY(std::isnan(probe.changed));
+    probe.slider.setSliderDown(false);
+    // Let go, new bounds place the value anew.
+    probe.slider.reshape(0, 100, CameraRawSliderTrack{Kind::chroma}, 25);
+    QCOMPARE(probe.slider.value(), 250);
+    QCOMPARE(probe.slider.shown(), 25.0);
 }
 
 QTEST_MAIN(CameraRawSliderTests)
