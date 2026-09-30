@@ -3,6 +3,7 @@
 #include "Rendering/EditorCanvas.h"
 #include "UI/FloatingPanel.h"
 #include <QAction>
+#include <QApplication>
 #include <QLineEdit>
 #include <QMenuBar>
 #include <QPointer>
@@ -12,6 +13,8 @@ class CompositorMenus : public QObject {
     Q_OBJECT
 public:
     CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWidget &window);
+    // The panel's hide moves the focus: stop listening first.
+    ~CompositorMenus() override { disconnect(qApp, nullptr, this, nullptr); }
 
     QAction *action(const QString &name) const;
 

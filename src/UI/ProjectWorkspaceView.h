@@ -11,6 +11,7 @@ class ProjectWorkspaceView : public QMainWindow {
     Q_OBJECT
 public:
     explicit ProjectWorkspaceView(ProjectWorkspace &workspace, QWidget *parent = nullptr);
+    ~ProjectWorkspaceView() override;
 
     ContentView *content() const { return m_content; }
     ProjectTabStrip *tabs() const { return m_tabs; }

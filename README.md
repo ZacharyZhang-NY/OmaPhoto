@@ -21,6 +21,8 @@ It is a Linux port of [Compositor](https://github.com/robbietilton/Compositor) b
 - Keep working while a project saves
 - A project another app changes on disk reloads in place; unsaved work is never replaced without asking
 
+The [acceptance run](docs/acceptance.md) checks each of these in the app's own window, with screenshots.
+
 ### Works with AI agents
 
 AI agents and scripts can build and edit projects directly: a `.comp` is a folder of PNG layers and a manifest, and an open project updates live as it's written. See [Writing OmaPhoto projects](docs/writing-comp-files.md) and the [project format](docs/project-format.md).

@@ -47,6 +47,12 @@ ProjectWorkspaceView::ProjectWorkspaceView(ProjectWorkspace &workspace, QWidget 
     synchronize();
 }
 
+// Closing panels commit and notify: stop listening first.
+ProjectWorkspaceView::~ProjectWorkspaceView()
+{
+    disconnect(m_sessionWatch);
+}
+
 void ProjectWorkspaceView::watchFront()
 {
     // Every tab's buttons dim while the front tab is busy.

@@ -42,6 +42,7 @@ class KeyboardShortcutsSheetTests : public QObject {
     Q_OBJECT
 private slots:
     void initTestCase();
+    void theWindowGoesWhileThePanelHoldsTheKeys();
     void cleanup();
     void aRecordedKeyRemapsItsMenuEntryOnSave();
     void recordingWaitsForARealKey();
@@ -180,6 +181,17 @@ void KeyboardShortcutsSheetTests::cancelKeepsWhatWasSaved()
     QTest::keyClick(QApplication::focusWidget() ? QApplication::focusWidget() : &again, Qt::Key_Escape);
     QTRY_VERIFY(!shownPanel());
     QCOMPARE(ShortcutSettings::shared().overrides().size(), 1);
+}
+
+// Hiding the panel moves the focus while the menus go.
+void KeyboardShortcutsSheetTests::theWindowGoesWhileThePanelHoldsTheKeys()
+{
+    auto bar = std::make_unique<Bar>();
+    QWidget &panel = opened(*bar);
+    QVERIFY(QTest::qWaitForWindowActive(&panel));
+    QTRY_COMPARE(QApplication::activeWindow(), &panel);
+    bar.reset();
+    QVERIFY(!shownPanel());
 }
 
 QTEST_MAIN(KeyboardShortcutsSheetTests)
