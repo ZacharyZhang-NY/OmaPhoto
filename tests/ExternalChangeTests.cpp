@@ -1,4 +1,5 @@
 #include "ExternalChangeFixtures.h"
+#include <QBuffer>
 #include <QFutureWatcher>
 
 // A project something else writes while it is open.
@@ -15,6 +16,7 @@ private slots:
     void aBackgroundTabAsksWhenItComesToTheFront();
     void aBusyProjectWaitsThenReloads();
     void closingOrANewCanvasStopsTheWatch();
+    void theGuidesSameSizeRecipeReloads();
     void aNewCanvasDropsAWaitingRecheck();
     void oneCheckRunsAtATime();
     void aCheckWithoutAProjectOrDuringOurSaveEnds();
@@ -332,6 +334,34 @@ void ExternalChangeTests::aCheckWithoutAProjectOrDuringOurSaveEnds()
     idle.resumeExternalChangeCheck();
     QVERIFY(!idle.externalChanges.checking);
     QVERIFY(!idle.externalChanges.pending);
+}
+
+// docs/writing-comp-files.md: a same-size image needs new manifest bytes.
+void ExternalChangeTests::theGuidesSameSizeRecipeReloads()
+{
+    QTemporaryDir root;
+    const QString path = savedProject(root);
+    EditorSession session;
+    const auto controller = opened(session, path);
+    const ImageLayer base = session.document().value().layers[0];
+    const QString file = path + QStringLiteral("/images/") + base.id.toString(QUuid::WithoutBraces).toUpper() + QStringLiteral(".png");
+    const qint64 size = QFileInfo(file).size();
+    QImage blue(8, 6, QImage::Format_RGBA8888);
+    blue.fill(QColor(60, 120, 200));
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    QVERIFY(buffer.open(QIODevice::WriteOnly) && blue.save(&buffer, "PNG"));
+    QCOMPARE(qint64(bytes.size()), size);
+    rewrite(file, bytes);
+    // The same manifest bytes again: nothing is noticed.
+    const QString manifest = path + QStringLiteral("/manifest.json");
+    rewrite(manifest, contents(manifest));
+    settle();
+    QCOMPARE(controller->externalChanges.reloadCount, 0);
+    // Any change to its bytes, even whitespace: reloaded.
+    rewrite(manifest, contents(manifest) + "\n");
+    QTRY_COMPARE_WITH_TIMEOUT(controller->externalChanges.reloadCount, 1, 4000);
+    QCOMPARE(session.document().value().layers[0].asset.value().image().pixelColor(0, 0), QColor(60, 120, 200));
 }
 
 QTEST_MAIN(ExternalChangeTests)

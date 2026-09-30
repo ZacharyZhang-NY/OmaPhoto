@@ -15,6 +15,13 @@ It is a Linux port of [Compositor](https://github.com/robbietilton/Compositor) b
 - Filters: Gaussian and motion blur, noise, lens correction, Content-Aware Fill and Remove Background (U²-Net on ONNX Runtime, offline)
 - Crop, canvas size, image size; PNG and JPEG export
 - Imports JPEG, PNG, TIFF, HEIC, Photoshop files and camera RAW
+- Drag a number's label to scrub its value
+- Keep working while a project saves
+- A project another app changes on disk reloads in place; unsaved work is never replaced without asking
+
+### Works with AI agents
+
+AI agents and scripts can build and edit projects directly: a `.comp` is a folder of PNG layers and a manifest, and an open project updates live as it's written. See [Writing OmaPhoto projects](docs/writing-comp-files.md) and the [project format](docs/project-format.md).
 
 ## Install
 
