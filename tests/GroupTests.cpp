@@ -259,10 +259,10 @@ void GroupTests::projectErrorsCarryTheirMessages()
     QCOMPARE(invalid.version, std::nullopt);
     QCOMPARE(QString(invalid.what()), QString("This is not a valid OmaPhoto project, or its metadata is damaged."));
 
-    const ProjectError version = ProjectError::unsupportedVersion(10);
+    const ProjectError version = ProjectError::unsupportedVersion(11);
     QCOMPARE(version.kind, ProjectError::Kind::version);
-    QCOMPARE(version.version, std::optional<int>(10));
-    QCOMPARE(QString(version.what()), QString("This project uses format version 10. This app supports versions 1–9."));
+    QCOMPARE(version.version, std::optional<int>(11));
+    QCOMPARE(QString(version.what()), QString("This project uses format version 11. This app supports versions 1–10."));
     QVERIFY_THROWS_EXCEPTION(std::logic_error, ProjectError(ProjectError::Kind::version));
 
     const ProjectError missingImage(ProjectError::Kind::missingImage);

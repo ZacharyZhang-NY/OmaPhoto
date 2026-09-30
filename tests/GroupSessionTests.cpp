@@ -217,7 +217,7 @@ void GroupSessionTests::groupsRoundTripAndSurviveImageAndCanvasResize()
     session.addBlankLayer();
     const QUuid child = session.activeLayerID().value();
     const ProjectSnapshot snapshot = session.projectSnapshot().value();
-    QCOMPARE(snapshot.manifest.version, qint64(9));
+    QCOMPARE(snapshot.manifest.version, qint64(10));
     const auto record = [](const ProjectSnapshot &from, QUuid id) {
         for (const ProjectLayerRecord &layer : from.manifest.layers) {
             if (layer.id == id)

@@ -38,7 +38,7 @@ void InlineTextEditor::selectAll()
     if (m_composing) {
         m_lastEdit.reset();
         const QString text = plain().content;
-        settle(text, 0, int(text.size()));
+        settle(text, 0, int(text.size()), {{m_composing->marked, 0, true, false}});
         return;
     }
     m_anchor = 0;
@@ -65,11 +65,15 @@ void InlineTextEditor::change(const QString &text)
     m_redo.clear();
     m_lastEdit.reset();
     const int cursor = range.start + int(text.size());
-    settle(QString(around.content).replace(range.start, range.end - range.start, text), cursor, cursor);
+    std::vector<Step> steps;
+    if (m_composing)
+        steps.push_back({m_composing->marked, 0, true, false});
+    steps.push_back({range, int(text.size())});
+    settle(QString(around.content).replace(range.start, range.end - range.start, text), cursor, cursor, steps);
 }
 
 // The preedit returns to the cursor, as Qt shows it.
-void InlineTextEditor::settle(QString text, int anchor, int cursor)
+void InlineTextEditor::settle(QString text, int anchor, int cursor, std::vector<Step> steps)
 {
     if (m_composing) {
         const TextRange marked = m_composing->marked;
@@ -79,11 +83,12 @@ void InlineTextEditor::settle(QString text, int anchor, int cursor)
         m_composing->anchor = anchor;
         m_composing->marked = {cursor, cursor + int(preedit.size())};
         text.insert(cursor, preedit);
+        steps.push_back({{cursor, cursor}, int(preedit.size()), true, false});
         anchor = cursor = cursor + caret;
     }
     m_anchor = anchor;
     m_position = cursor;
-    publish(text);
+    publish(text, steps);
 }
 
 // Marked text sits in the content, as in NSTextView's storage.
@@ -95,10 +100,14 @@ void InlineTextEditor::inputMethod(const QInputMethodEvent &event)
     // Qt's steps, on the text without the preedit.
     QString text = style().content, shown;
     int cursor = m_position, anchor = m_anchor;
+    const std::optional<TextRange> oldMarked = m_composing ? std::optional(m_composing->marked) : std::nullopt;
+    // The preedit's going moves colours, never history.
+    std::vector<Step> steps;
     if (m_composing) {
         const TextRange marked = m_composing->marked;
         shown = text.mid(marked.start, marked.end - marked.start);
         text.remove(marked.start, marked.end - marked.start);
+        steps.push_back({marked, 0, true, false});
         cursor = marked.start;
         anchor = m_composing->anchor;
     }
@@ -110,6 +119,7 @@ void InlineTextEditor::inputMethod(const QInputMethodEvent &event)
     const bool takes = input && !selected.isEmpty();
     if (takes) {
         text.remove(selected.start, selected.end - selected.start);
+        steps.push_back({selected, 0});
         cursor = selected.start;
     }
     // Where Qt leaves the cursor when nothing commits.
@@ -130,6 +140,11 @@ void InlineTextEditor::inputMethod(const QInputMethodEvent &event)
         m_lastEdit = Edit::typing;
     }
     text.replace(start, end - start, commit);
+    // Over the selection taken, one replacement, as NSTextView's.
+    if (takes && start == selected.start && end == start)
+        steps.back().length = int(commit.size());
+    else if (end > start || !commit.isEmpty())
+        steps.push_back({{start, end}, int(commit.size())});
     cursor = commit.isEmpty() ? std::clamp(after, 0, int(text.size())) : start + int(commit.size());
     if (input)
         anchor = cursor;
@@ -144,14 +159,25 @@ void InlineTextEditor::inputMethod(const QInputMethodEvent &event)
         m_anchor = anchor;
         m_position = cursor;
     } else {
-        compose(preedit, attributes, lands ? Snapshot{text, anchor, cursor} : before, anchor, text, cursor);
+        compose(preedit, attributes, lands ? Snapshot{text, anchor, cursor} : before, anchor, text, steps, cursor);
+        // A lone preedit over the selection replaces it whole.
+        if (takes && commit.isEmpty() && start == end && cursor == selected.start) {
+            steps[steps.size() - 2].runs = false;
+            steps.back() = {selected, int(preedit.size()), true, false};
+        }
     }
-    publish(text);
+    // Swift replaces marked text whole: its colour carries on.
+    if (oldMarked && !takes && start == end && start == oldMarked->start && (preedit.isEmpty() || cursor == start + int(commit.size()))) {
+        steps.front().length = int(commit.size() + preedit.size());
+        for (size_t index = 1; index < steps.size(); ++index)
+            steps[index].runs = false;
+    }
+    publish(text, steps);
 }
 
 // The preedit goes in at the cursor, with Qt's attributes.
 void InlineTextEditor::compose(const QString &preedit, const QList<QInputMethodEvent::Attribute> &attributes, const Snapshot &before, int anchor,
-                               QString &text, int cursor)
+                               QString &text, std::vector<Step> &steps, int cursor)
 {
     const int length = int(preedit.size());
     Composing composing{.marked = {cursor, cursor + length}, .anchor = anchor, .before = before};
@@ -172,6 +198,7 @@ void InlineTextEditor::compose(const QString &preedit, const QList<QInputMethodE
         }
     }
     text.insert(cursor, preedit);
+    steps.push_back({{cursor, cursor}, length, true, false});
     m_anchor = m_position = cursor + caret;
     m_composing = composing;
 }

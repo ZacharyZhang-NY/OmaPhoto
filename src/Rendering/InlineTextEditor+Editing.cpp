@@ -171,24 +171,54 @@ void InlineTextEditor::replace(TextRange range, const QString &text, std::option
     // Swift's shouldChangeTextIn: 100,000 UTF-16 units at most.
     if (content.size() - (range.end - range.start) + text.size() > 100'000)
         return;
+    std::vector<Step> steps;
+    // A preedit left behind stays as text: history gains it.
+    if (m_composing)
+        steps.push_back({{m_composing->marked.start, m_composing->marked.start}, m_composing->marked.end - m_composing->marked.start, false, true});
     if (!edit || edit != m_lastEdit)
         m_undo.push_back(m_composing ? m_composing->before : Snapshot{content, m_anchor, m_position});
     m_redo.clear();
     m_lastEdit = edit;
     m_composing.reset();
     m_anchor = m_position = range.start + int(text.size());
-    publish(QString(content).replace(range.start, range.end - range.start, text));
+    steps.push_back({range, int(text.size())});
+    publish(QString(content).replace(range.start, range.end - range.start, text), steps);
 }
 
 // Swift's textDidChange: the draft takes the text view's string.
-void InlineTextEditor::publish(const QString &content)
+void InlineTextEditor::publish(const QString &content, const std::vector<Step> &steps)
 {
     // An edit ends a drag or resize, like a press.
     release();
     TextDraft draft = m_session.textDraft().value();
+    // The text's length as each step leaves it.
+    QString shaped = draft.style.content;
+    for (const Step &step : steps) {
+        // Each replacement moves the colours, as shouldChangeTextIn does.
+        if (step.runs) {
+            draft.style.content = shaped;
+            draft.style.replaceCharacters({step.replaced.start, step.replaced.end - step.replaced.start}, step.length);
+            shaped.replace(step.replaced.start, step.replaced.end - step.replaced.start, QString(step.length, u' '));
+        }
+        if (step.history && !m_undo.empty())
+            m_undo.back().since.push_back(step);
+    }
     draft.style.content = content;
+    const TextRange range = selection();
+    draft.selection = {range.start, range.end - range.start};
     m_goalX.reset();
     showCaret();
+    m_session.setTextDraft(draft);
+}
+
+void InlineTextEditor::noteSelection()
+{
+    const TextRange range = selection();
+    const TextSpan span{range.start, range.end - range.start};
+    if (!m_session.textDraft() || m_session.textDraft()->id != m_draftID || m_session.textDraft()->selection == span)
+        return;
+    TextDraft draft = m_session.textDraft().value();
+    draft.selection = span;
     m_session.setTextDraft(draft);
 }
 
@@ -202,20 +232,34 @@ void InlineTextEditor::moveTo(int position, bool extend, bool keepGoal)
     m_lastEdit.reset();
     showCaret();
     updateInputMethod();
+    noteSelection();
 }
 
 void InlineTextEditor::restore(std::vector<Snapshot> &from, std::vector<Snapshot> &to)
 {
     if (from.empty())
         return;
-    to.push_back(m_composing ? m_composing->before : Snapshot{style().content, m_anchor, m_position});
     const Snapshot snapshot = from.back();
     from.pop_back();
+    std::vector<Step> steps;
+    // A preedit goes first; it was never history.
+    if (m_composing)
+        steps.push_back({m_composing->marked, 0, true, false});
+    // NSTextView undoes each replacement: the inverses, newest first.
+    std::vector<Step> back;
+    for (auto step = snapshot.since.rbegin(); step != snapshot.since.rend(); ++step)
+        back.push_back({{step->replaced.start, step->replaced.start + step->length}, step->replaced.end - step->replaced.start, true, false});
+    steps.insert(steps.end(), back.begin(), back.end());
+    Snapshot current = m_composing ? m_composing->before : Snapshot{style().content, m_anchor, m_position};
+    for (Step &step : back)
+        step.history = true;
+    current.since = back;
+    to.push_back(current);
     m_lastEdit.reset();
     m_composing.reset();
     m_anchor = snapshot.anchor;
     m_position = snapshot.position;
-    publish(snapshot.content);
+    publish(snapshot.content, steps);
 }
 
 void InlineTextEditor::undo()

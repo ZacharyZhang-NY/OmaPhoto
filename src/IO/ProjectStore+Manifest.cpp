@@ -102,7 +102,25 @@ QSizeF size(const QJsonValue &value)
     return {width, height};
 }
 
-// Synthesized Codable skips defaults: all but the box required.
+// A run's every key is required, as synthesized Codable asks.
+LayerTextColorRun colorRun(const QJsonValue &value)
+{
+    const QJsonObject object = value.toObject();
+    return {integer(object.value("location")), integer(object.value("length")), number(object.value("red")), number(object.value("green")),
+            number(object.value("blue"))};
+}
+
+std::vector<LayerTextColorRun> colorRuns(const QJsonValue &value)
+{
+    if (!value.isArray())
+        refuse();
+    std::vector<LayerTextColorRun> runs;
+    for (const QJsonValue &each : value.toArray())
+        runs.push_back(colorRun(each));
+    return runs;
+}
+
+// Synthesized Codable: all required but the box and runs.
 LayerTextStyle textStyle(const QJsonValue &value)
 {
     const QJsonObject object = value.toObject();
@@ -112,7 +130,7 @@ LayerTextStyle textStyle(const QJsonValue &value)
     return {.content = string(object.value("content")), .fontName = string(object.value("fontName")), .fontSize = number(object.value("fontSize")),
             .red = number(object.value("red")), .green = number(object.value("green")), .blue = number(object.value("blue")),
             .alignment = *alignment, .tracking = number(object.value("tracking")), .leading = number(object.value("leading")),
-            .boxSize = optional(object, "boxSize", size)};
+            .boxSize = optional(object, "boxSize", size), .colorRuns = optional(object, "colorRuns", colorRuns)};
 }
 
 CanvasGuide guide(const QJsonValue &value)
@@ -176,6 +194,12 @@ QJsonObject encoded(const LayerTextStyle &text)
                        {"blue", text.blue}, {"alignment", rawValue(text.alignment)}, {"tracking", text.tracking}, {"leading", text.leading}};
     if (text.boxSize)
         object.insert("boxSize", QJsonArray{text.boxSize->width(), text.boxSize->height()});
+    if (text.colorRuns) {
+        QJsonArray runs;
+        for (const LayerTextColorRun &run : *text.colorRuns)
+            runs.append(QJsonObject{{"location", run.location}, {"length", run.length}, {"red", run.red}, {"green", run.green}, {"blue", run.blue}});
+        object.insert("colorRuns", runs);
+    }
     return object;
 }
 

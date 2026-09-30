@@ -313,7 +313,7 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions_data()
     for (int version = 1; version <= 9; ++version)
         QTest::addRow("plain at version %d", version) << "" << version << fine;
     QTest::newRow("version 0") << "" << 0 << std::optional(ProjectError::Kind::version);
-    QTest::newRow("version 10") << "" << 10 << std::optional(ProjectError::Kind::version);
+    QTest::newRow("version 11") << "" << 11 << std::optional(ProjectError::Kind::version);
     QTest::newRow("another format") << "format" << 7 << invalid;
     QTest::newRow("another colour space") << "colorSpace" << 7 << invalid;
     QTest::newRow("resolution 0.5") << "resolution=0.5" << 7 << invalid;
@@ -366,6 +366,9 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions_data()
     QTest::newRow("an image under another name") << "imageName" << 7 << invalid;
     QTest::newRow("an image named in lower case") << "imageLower" << 7 << invalid;
     QTest::newRow("an active layer that is not there") << "active" << 7 << invalid;
+    QTest::newRow("letters in colours before version 10") << "textRuns" << 9 << invalid;
+    QTest::newRow("letters in colours at version 10") << "textRuns" << 10 << fine;
+    QTest::newRow("one-colour text before version 10") << "text" << 9 << fine;
 }
 
 void ProjectManifestTests::validationFollowsTheFormatsVersions()
@@ -455,7 +458,13 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions()
         image.imageFile = "image.png";
     else if (change == "imageLower")
         image.imageFile = image.id.toString(QUuid::WithoutBraces) + ".png";
-    else if (change == "active")
+    else if (change == "text" || change == "textRuns") {
+        LayerTextStyle style;
+        style.content = QStringLiteral("Ab");
+        if (change == "textRuns")
+            style.colorRuns = std::vector{LayerTextColorRun{1, 1, 1, 0, 0}};
+        image.text = style;
+    } else if (change == "active")
         manifest.activeLayerID = QUuid::createUuid();
     else
         QVERIFY(change.isEmpty());

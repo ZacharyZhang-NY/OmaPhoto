@@ -1,4 +1,5 @@
 #pragma once
+#include "Document/TypeTool.h"
 #include <QColor>
 #include <QString>
 #include <QUuid>
@@ -57,10 +58,10 @@ struct ColorPickerState {
     PickerHSB hsb;
     // Swift's object identity: a new picker opens its panel anew.
     QUuid id = QUuid::createUuid();
-    // The foreground picker over open text: that text, its colour.
+    // The picker over open text: that text, its colours then.
     struct EditedText {
         QUuid draftID;
-        PaletteColor color;
+        LayerTextStyle style;
     };
     std::optional<EditedText> editedText;
     PaletteColor color() const { return hsb.rgb().quantized(); }

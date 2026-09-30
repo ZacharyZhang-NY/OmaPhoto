@@ -80,13 +80,18 @@ private slots:
 void TypedTextCanvasTests::textLooksTheSameWhileEditingAndOnceCommitted_data()
 {
     QTest::addColumn<double>("zoom");
-    QTest::newRow("smooth") << 1.5;
-    QTest::newRow("hard") << 4.0;
+    QTest::addColumn<bool>("coloured");
+    QTest::newRow("smooth") << 1.5 << false;
+    QTest::newRow("hard") << 4.0 << false;
+    // Letters in their own colours: the layer draws them.
+    QTest::newRow("coloured smooth") << 1.5 << true;
+    QTest::newRow("coloured hard") << 4.0 << true;
 }
 
 void TypedTextCanvasTests::textLooksTheSameWhileEditingAndOnceCommitted()
 {
     QFETCH(double, zoom);
+    QFETCH(bool, coloured);
     DrawnText shown;
     shown.session.zoom(zoom);
     shown.canvas->synchronizeDisplay();
@@ -97,6 +102,8 @@ void TypedTextCanvasTests::textLooksTheSameWhileEditingAndOnceCommitted()
         style.content = QStringLiteral("Sharp");
         style.fontSize = 24;
     });
+    if (coloured)
+        shown.session.changeTextStyle([](LayerTextStyle &style) { style.setColor(PaletteColor{0, 1, 0}, {1, 3}); });
     // Unfocused, no caret draws; the frame stays at the edge.
     unfocus(shown);
     const QRect inside = shown.editor().boxTransform().mapRect(QRectF(QPointF(0, 0), shown.editor().logicalSize())).toAlignedRect().adjusted(10, 10, -10, -10);

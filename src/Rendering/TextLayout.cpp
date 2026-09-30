@@ -93,6 +93,17 @@ TextLines::TextLines(const LayerTextStyle &style, QSizeF container)
         const QString paragraph = style.content.mid(range.start, range.end - range.start);
         auto layout = std::make_unique<QTextLayout>(paragraph, font);
         layout->setTextOption(option);
+        // Run letters draw once in their colour, as CoreText's.
+        QList<QTextLayout::FormatRange> runs;
+        for (const LayerTextColorRun &run : style.colorRuns.value_or(std::vector<LayerTextColorRun>())) {
+            const qint64 start = std::max<qint64>(run.location, range.start), end = std::min<qint64>(run.location + run.length, range.end);
+            if (start >= end)
+                continue;
+            QTextCharFormat format;
+            format.setForeground(QColor::fromRgbF(float(run.red), float(run.green), float(run.blue)));
+            runs << QTextLayout::FormatRange{int(start - range.start), int(end - start), format};
+        }
+        layout->setFormats(runs);
         layout->beginLayout();
         const auto laid = [&] {
             const int count = layout->lineCount();

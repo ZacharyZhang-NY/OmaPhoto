@@ -68,8 +68,11 @@ void InlineTextEditor::synchronize(const TextDraft &draft)
     }
     m_shownStyle = style;
     const double padding = LayerTextStyle::padding;
+    // Clear glyphs: the runs' colours belong to the layer beneath.
+    LayerTextStyle clear = style;
+    clear.colorRuns = std::nullopt;
     m_lines = std::make_unique<TextLines>(
-        style, QSizeF(std::max(1.0, m_logicalSize.width() - 2 * padding), std::max(1.0, m_logicalSize.height() - 2 * padding)));
+        clear, QSizeF(std::max(1.0, m_logicalSize.width() - 2 * padding), std::max(1.0, m_logicalSize.height() - 2 * padding)));
     updateInputMethod();
     if (!fresh)
         return;
@@ -168,8 +171,11 @@ void InlineTextEditor::draw(QPainter &painter) const
     m_lines->draw(painter, QPointF(padding, padding), shownSelection(), formats, highlight);
     // The insertion point shows where nothing is selected.
     const bool hidden = m_composing && m_composing->caretHidden;
+    // The caret takes the colour of the letter before it.
+    const PaletteColor before = style().color(m_position > 0 ? m_position - 1 : 0);
+    const QColor caretInk = QColor::fromRgbF(float(before.red), float(before.green), float(before.blue));
     if (const std::optional<QRectF> caret = m_lines->caret(m_position); caret && caretShown() && selection().isEmpty() && !hidden)
-        painter.fillRect(caret->translated(padding, padding), m_composing ? m_composing->caretColour.value_or(ink) : ink);
+        painter.fillRect(caret->translated(padding, padding), m_composing ? m_composing->caretColour.value_or(caretInk) : caretInk);
     painter.restore();
 }
 

@@ -64,10 +64,20 @@ public:
     bool caretShown() const { return m_focused && m_caretShown; }
 
 private:
+    // One replacement: what it took, and the new text's length.
+    struct Step {
+        TextRange replaced;
+        int length;
+        // Moves the colour runs; joins the undo entry's history.
+        bool runs = true;
+        bool history = true;
+    };
     struct Snapshot {
         QString content;
         int anchor;
         int position;
+        // Plain steps from this text to the next state.
+        std::vector<Step> since = {};
     };
     // An input method's preedit, which Qt keeps out of history.
     struct Composing {
@@ -101,8 +111,11 @@ private:
     static TextRange spanning(int anchor, int position);
     TextRange selection() const;
     void replace(TextRange range, const QString &text, std::optional<Edit> edit);
-    void publish(const QString &content);
+    // Swift's shouldChangeTextIn: each step moves the colours.
+    void publish(const QString &content, const std::vector<Step> &steps);
     void moveTo(int position, bool extend, bool keepGoal = false);
+    // Swift's textViewDidChangeSelection: the draft learns the selection.
+    void noteSelection();
     void restore(std::vector<Snapshot> &from, std::vector<Snapshot> &to);
     void changeSpacing(int key, double step);
     bool move(const QKeyEvent &event);
@@ -115,11 +128,11 @@ private:
     void beginResize(int handle, QPointF point);
     void resizeTo(QPointF point);
     void compose(const QString &preedit, const QList<QInputMethodEvent::Attribute> &attributes, const Snapshot &before, int anchor, QString &text,
-                 int cursor);
+                 std::vector<Step> &steps, int cursor);
     TextRange shownSelection() const;
     Snapshot plain() const;
     void change(const QString &text);
-    void settle(QString text, int anchor, int cursor);
+    void settle(QString text, int anchor, int cursor, std::vector<Step> steps);
     bool erase(const QKeyEvent &event);
     int nextCharacter(int position) const;
     int previousCharacter(int position) const;

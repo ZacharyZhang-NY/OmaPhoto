@@ -27,6 +27,8 @@ public:
     void previewEffectColor();
     // The open text draft previews the picker's working colour.
     void previewTextColor();
+    // Paints the open text's selected letters, or all of it.
+    void setDraftTextColor(const PaletteColor &color);
     // Swift writes the picker's hsb in place; here, the session.
     void setColorPickerHSB(const PickerHSB &hsb);
     void sampleIntoColorPicker(QPointF point);
@@ -34,6 +36,7 @@ public:
     std::optional<PaletteColor> sampleCompositeColor(QPointF point) const;
 
 private:
-    void paintText(const PaletteColor &color);
+    // Puts back the open text's colours from the picker's opening.
+    void restoreDraftTextColors(const LayerTextStyle &original);
     void setGradientMapColor(const PaletteColor &color, bool highlights);
     void setVignetteColor(const PaletteColor &color);

@@ -158,7 +158,7 @@ void LiveTextDoubleClickTests::theCaretWaitsAfterTheText()
     shown.session.cancelText();
     shown.session.editActiveText();
     shown.session.cancelText();
-    TextDraft fresh{.documentID = shown.session.document().value().id, .layerID = std::nullopt, .origin = QPointF(20, 200), .style = style};
+    TextDraft fresh{.documentID = shown.session.document().value().id, .layerID = std::nullopt, .origin = QPointF(20, 200), .style = style, .selection = TextSpan()};
     fresh.style.content = QStringLiteral("New");
     shown.session.setTextDraft(fresh);
     QCoreApplication::processEvents();

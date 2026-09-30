@@ -139,7 +139,7 @@ void GuideTests::projectRoundTripAndLegacyRejection()
     session.addGuide(first);
     session.addGuide(second);
     ProjectSnapshot snapshot = session.projectSnapshot().value();
-    QCOMPARE(snapshot.manifest.version, qint64(9));
+    QCOMPARE(snapshot.manifest.version, qint64(10));
     QCOMPARE(snapshot.manifest.guides.value(), (std::vector<CanvasGuide>{first, second}));
     // Swift's keys: an array of id, axis and position.
     const QByteArray json = snapshot.manifest.encoded();

@@ -156,13 +156,8 @@ void EditorSession::setPaletteColor(const PaletteColor &color, bool background)
     } else {
         setForegroundColor(color);
         // Open text follows the swatch; drafts live under Type.
-        if (m_textDraft) {
-            changeTextStyle([&color](LayerTextStyle &style) {
-                style.red = color.red;
-                style.green = color.green;
-                style.blue = color.blue;
-            });
-        }
+        if (m_textDraft)
+            setDraftTextColor(color);
     }
 }
 
@@ -198,7 +193,7 @@ void EditorSession::openColorPicker(bool background)
     ColorPickerState picker({ColorPickerTarget::Kind::palette, background}, paletteColor(background));
     // Open text follows the foreground: it previews, Cancel restores.
     if (!background && m_tool == NavigationTool::type && m_textDraft)
-        picker.editedText = ColorPickerState::EditedText{m_textDraft->id, {m_textDraft->style.red, m_textDraft->style.green, m_textDraft->style.blue}};
+        picker.editedText = ColorPickerState::EditedText{m_textDraft->id, m_textDraft->style};
     m_colorPicker = picker;
     notify();
 }
@@ -207,7 +202,9 @@ PaletteColor EditorSession::typeColor() const
 {
     if (!m_textDraft)
         return foregroundColor();
-    return {m_textDraft->style.red, m_textDraft->style.green, m_textDraft->style.blue};
+    // The first selected letter, else the one before the caret.
+    const TextSpan selection = m_textDraft->selection;
+    return m_textDraft->style.color(selection.length > 0 ? selection.location : std::max<qint64>(0, selection.location - 1));
 }
 
 void EditorSession::openTextColorPicker()
@@ -215,7 +212,10 @@ void EditorSession::openTextColorPicker()
     if (!canEditPalette() || m_colorPicker || m_tool != NavigationTool::type)
         return;
     const std::optional<QUuid> draftID = m_textDraft ? std::optional(m_textDraft->id) : std::nullopt;
-    m_colorPicker = ColorPickerState({ColorPickerTarget::Kind::text, false, draftID}, typeColor());
+    ColorPickerState picker({ColorPickerTarget::Kind::text, false, draftID}, typeColor());
+    if (m_textDraft)
+        picker.editedText = ColorPickerState::EditedText{m_textDraft->id, m_textDraft->style};
+    m_colorPicker = picker;
     notify();
 }
 
@@ -231,12 +231,15 @@ void EditorSession::closeColorPicker(bool commit)
         setPaletteColor(color, picker.target.background);
     } else if (!commit && picker.target.kind == ColorPickerTarget::Kind::palette && picker.editedText && m_tool == NavigationTool::type
                && draftID == picker.editedText->draftID) {
-        paintText(picker.editedText->color);
+        restoreDraftTextColors(picker.editedText->style);
     } else if (picker.target.kind == ColorPickerTarget::Kind::text && m_tool == NavigationTool::type && draftID == picker.target.draftID) {
         // The text previewed the working colour; Cancel puts it back.
         const PaletteColor chosen = commit ? color : picker.original;
         if (draftID) {
-            paintText(chosen);
+            if (commit)
+                setDraftTextColor(chosen);
+            else if (picker.editedText)
+                restoreDraftTextColors(picker.editedText->style);
         } else if (commit) {
             m_textDefaults.red = chosen.red;
             m_textDefaults.green = chosen.green;
@@ -295,16 +298,25 @@ void EditorSession::previewTextColor()
                                              ? std::optional(m_colorPicker->editedText->draftID)
                                              : std::nullopt;
     if (draftID && m_tool == NavigationTool::type && m_textDraft && m_textDraft->id == *draftID)
-        paintText(m_colorPicker->color());
+        setDraftTextColor(m_colorPicker->color());
 }
 
-// The open draft's colour.
-void EditorSession::paintText(const PaletteColor &color)
+void EditorSession::setDraftTextColor(const PaletteColor &color)
 {
-    changeTextStyle([&color](LayerTextStyle &style) {
-        style.red = color.red;
-        style.green = color.green;
-        style.blue = color.blue;
+    if (!m_textDraft)
+        return;
+    const TextSpan selection = m_textDraft->selection;
+    changeTextStyle([&](LayerTextStyle &style) { style.setColor(color, selection); });
+}
+
+void EditorSession::restoreDraftTextColors(const LayerTextStyle &original)
+{
+    changeTextStyle([&original](LayerTextStyle &style) {
+        style.red = original.red;
+        style.green = original.green;
+        style.blue = original.blue;
+        // Retyped since, the runs cannot come back letter for letter.
+        style.colorRuns = original.content == style.content ? original.colorRuns : std::nullopt;
     });
 }
 
