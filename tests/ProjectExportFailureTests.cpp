@@ -23,15 +23,16 @@ private slots:
     void thePanelOpensWithoutCopyingTheSnapshot();
     void aRefusedNameCopiesNoSnapshot();
     void theJPEGRenderTakesTheSnapshotWithoutACopy();
+    void aSnapshotHoldsOneRecordList();
 };
 
 namespace {
-// A thousand layers on four pixels: copies need a megabyte.
+// Two thousand four-pixel layers: a copy needs 3.4 MB.
 ProjectSnapshot manyLayers()
 {
     ProjectSnapshot snapshot{.manifest = {.documentID = QUuid::createUuid(), .width = 2, .height = 2, .activeLayerID = std::nullopt, .layers = {}},
                              .images = {}};
-    for (int index = 0; index < 1024; ++index)
+    for (int index = 0; index < 2048; ++index)
         snapshot.manifest.layers.push_back({.id = QUuid::createUuid(), .name = QStringLiteral("Blank"), .isVisible = true,
                                             .transform = {.origin = {0, 0}, .size = {2, 2}}, .imageFile = std::nullopt});
     snapshot.manifest.activeLayerID = snapshot.manifest.layers.front().id;
@@ -151,14 +152,14 @@ void ProjectExportFailureTests::aPanelsHandOffThatFindsNoMemoryIsExplained()
     QVERIFY(!desk.session.isProjectBusy() && !QFileInfo::exists(folder.filePath("many.png")));
 }
 
-// A copy needs a megabyte; the panel far less.
+// A copy needs 3.4 MB; the panel far less.
 void ProjectExportFailureTests::thePanelOpensWithoutCopyingTheSnapshot()
 {
     Desk desk;
     desk.alerts.replies = {"<cancel>"};
     {
         malloc_trim(0);
-        const AddressSpaceLimit limit(2560ll * 1024);
+        const AddressSpaceLimit limit(5120ll * 1024);
         desk.controller.exportPNG([&desk] { desk.done = true; });
     }
     QTRY_VERIFY(desk.done);
@@ -198,7 +199,7 @@ void ProjectExportFailureTests::theJPEGRenderTakesTheSnapshotWithoutACopy()
     entered.acquire();
     {
         malloc_trim(0);
-        const AddressSpaceLimit limit(2560ll * 1024);
+        const AddressSpaceLimit limit(5120ll * 1024);
         desk.controller.exportJPEG([&desk] { desk.done = true; });
     }
     release.release();
@@ -206,6 +207,15 @@ void ProjectExportFailureTests::theJPEGRenderTakesTheSnapshotWithoutACopy()
     QTest::keyClick(desk.window.findChild<JPEGExportSheet *>(), Qt::Key_Escape);
     QTRY_VERIFY(desk.done);
     QVERIFY(desk.alerts.seen.isEmpty() && !desk.session.isProjectBusy());
+}
+
+// Growing the list would hold 5.1 MB at its peak.
+void ProjectExportFailureTests::aSnapshotHoldsOneRecordList()
+{
+    Desk desk;
+    malloc_trim(0);
+    const AddressSpaceLimit limit(4608ll * 1024);
+    QCOMPARE(desk.session.projectSnapshot().value().manifest.layers.size(), size_t(2048));
 }
 
 int main(int argc, char **argv)

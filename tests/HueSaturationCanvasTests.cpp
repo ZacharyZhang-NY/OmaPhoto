@@ -234,16 +234,21 @@ void HueSaturationCanvasTests::targetingTakesPressesAndDoubleClicksFirst()
     halves.release(QPointF(100, 150));
     halves.session.cancelHueSaturation();
     halves.session.cancelLasso();
-    // Open text: the double click targets, not its words.
+    // Open text keeps Hue/Saturation closed since 1.3.2.
     halves.session.selectTool(NavigationTool::type);
     halves.session.beginText(QPointF(300, 50), true);
     QVERIFY(halves.session.textDraft());
+    halves.session.beginHueSaturation();
+    QVERIFY(!halves.session.hueSaturation());
+    halves.session.cancelText();
+    // The Type tool's double click targets, not its words.
     halves.session.beginHueSaturation();
     halves.session.setHueTargeting(true);
     halves.canvas->synchronizeDisplay();
     QTest::mouseDClick(halves.canvas, Qt::LeftButton, Qt::NoModifier, QPoint(300, 150));
     QCOMPARE(halves.settings().range, ColorRange::greens);
     halves.release(QPointF(300, 150));
+    QVERIFY(!halves.session.textDraft());
     halves.session.cancelHueSaturation();
 }
 

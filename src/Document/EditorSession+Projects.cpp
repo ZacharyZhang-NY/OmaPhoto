@@ -9,6 +9,8 @@ std::optional<ProjectSnapshot> EditorSession::projectSnapshot() const
     ProjectSnapshot snapshot{.manifest = {.resolution = m_document->resolution, .documentID = m_document->id, .width = m_document->width,
                                           .height = m_document->height, .activeLayerID = m_activeLayerID, .layers = {}},
                              .images = {}};
+    // Growing would hold two record lists at once.
+    snapshot.manifest.layers.reserve(m_document->layers.size());
     for (const ImageLayer &layer : m_document->layers) {
         if (layer.asset)
             snapshot.images.insert({layer.id, *layer.asset});

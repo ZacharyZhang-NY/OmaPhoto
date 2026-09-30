@@ -6,15 +6,17 @@ It is a Linux port of [Compositor](https://github.com/robbietilton/Compositor) b
 
 ## What it does
 
-- Layers, folders, masks, clipping masks, blend modes and opacity
-- Selections: marquee, lasso, magic wand, load from a layer, expand and contract
-- Brush, eraser, spot healing, clone stamp, smudge, blur and liquify, gradient, shapes, type
-- Move, transform and distort layers and selections
-- Levels, Curves, Hue/Saturation, Exposure, Gradient Map and Grain, as edits or as adjustment layers
-- Layer effects: stroke, drop shadow, color overlay, inner shadow
-- Filters: Gaussian and motion blur, noise, lens correction, Content-Aware Fill and Remove Background (U²-Net on ONNX Runtime, offline)
-- Crop, canvas size, image size; PNG and JPEG export
-- Imports JPEG, PNG, TIFF, HEIC, Photoshop files and camera RAW
+- Layers, folders, masks, clipping masks, blend modes and opacity; whole layers copy between projects
+- Selections: marquee, lasso, magic wand and its object mode, Select › Subject, load from a layer, feather, expand and contract
+- Brush, eraser, spot healing, clone stamp, smudge, blur and liquify, gradient, shapes, type with colour on selected letters
+- Move, transform and distort layers and selections; rulers, guides, a grid and snapping
+- Levels, Curves, Hue/Saturation, Exposure, Black & White, Color Balance, Gradient Map, Grain, Invert, blur and noise, as edits or as adjustment layers
+- Camera Raw Filter, docked beside the canvas
+- Layer effects: stroke, drop shadow, outer and inner glow, color overlay, inner shadow
+- Filters: Gaussian and motion blur, noise, lens correction, Vignette, Bloom / Glow, Tonal Contrast, Dither, Content-Aware Fill and Remove Background (U²-Net on ONNX Runtime, offline)
+- Crop, trim, canvas size, image size; PNG and JPEG export
+- Imports JPEG, PNG, TIFF, HEIC, SVG, Photoshop files (PSD and PSB) and camera RAW
+- Open Recent, and a Keyboard Shortcuts window
 - Drag a number's label to scrub its value
 - Keep working while a project saves
 - A project another app changes on disk reloads in place; unsaved work is never replaced without asking

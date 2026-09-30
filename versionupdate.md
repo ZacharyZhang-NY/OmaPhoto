@@ -1,43 +1,49 @@
-# OmaPhoto 1.2.3
+# OmaPhoto 1.3.3
 
-OmaPhoto 1.2.3 catches up with Compositor 1.2.3. It follows 1.0.1.
+OmaPhoto 1.3.3 catches up with Compositor 1.3.3. It follows 1.2.3.
 
 ## New tools and commands
 
-- **Camera Raw Filter.** A panel docked beside the canvas. It has a histogram and vectorscope with clipping warnings, and Light, Color and Effects. It adds Curve (parametric and point), Color Mixer (HSL, colour and point colour), Color Grading wheels, Detail, Optics, Geometry (Upright, guides, projection) and Calibration. Eyedroppers and targeted drags work on the canvas.
-- **Camera RAW import** through LibRaw, with a develop sheet.
-- **Photoshop PSD import** with its layers. What cannot convert is listed in a report.
-- **Image > Trim…** cuts away transparent edges, or edges matching the top-left or bottom-right colour.
-- **Magic tool Object mode**, using the U²-Net model.
-- **Select Subject** and feathered selections. Expand and Contract now open amount dialogs.
-- **Rulers, a layout grid and guides**, with Snap To settings in the View menu.
-- **A Keyboard Shortcuts window** for menu, canvas and text-editing shortcuts.
+- **Filter › Dither.** Error diffusion (Atkinson, Floyd–Steinberg), ordered Bayer, halftone dots, lines and diamonds, patterns and ASCII. Chunky pixels, square or round. Black and white, two colours from the picker, or the image's own.
+- **Finishing filters:** Vignette, Bloom / Glow and Tonal Contrast. Vignette also paints across an empty layer.
+- **File › Open Recent**, with Clear Menu.
+- **Reload on change.** A project changed on disk by another program reloads. With unsaved edits it asks first: revert, or keep what you have.
+- **Photoshop:** Large Documents (PSB), files with only a merged image, oversized layers cropped to the canvas, and simple text layers as editable text.
+- **SVG import.**
+- **Whole layers on the clipboard**, within a project and between projects. Ctrl+J duplicates every selected layer, folders included.
+- **A layer context menu** in the Layers panel.
+- **Scrubbing.** Drag a number's title to change it, in the tool bars, the layer opacity, the sheets and the panels.
+- **Crop ratios** 3:4 and 9:16, and a crop that starts at the selection.
 
-## Layers and effects
+## Text
 
-- **Adjustment layers:** Black & White, Color Balance, Invert, Gaussian Blur, Motion Blur and Add Noise join the others. Black & White and Color Balance also work as direct Image adjustments.
-- **Layer effects:** Outer Glow and Inner Glow.
-- **Blend modes:** eleven new ones, Soft Light among them, arranged in Photoshop's groups.
-- Folders keep their contents when duplicated, and folders have their own opacity.
+- Colour only the selected letters of the text being edited. The swatch follows the caret, and the selection stays see-through under the picker.
+- Text being typed shows as the pixels it will commit to.
+- A click places text on its first baseline. The Move tool's double click opens live text.
+- Closing or quitting while text is edited applies it first.
+- Filters, adjustments and Invert wait until text editing ends. Closing the colour picker gives open text the keys back.
 
-## Brushes, text and canvas
+## Layers, masks and panels
 
-- **Brush Smoothing.**
-- Faster text editing. The font menu keeps a fixed width and fills only when opened.
-- Middle-button panning.
-- Auto Select, guides, the grid and snapping keep their settings between sessions.
-- Auto Select picks the layer in front.
-- A new app icon.
+- Masks can be painted anywhere on the canvas. A moved, unlinked mask stays in place under layer effects. Mask thumbnails show a white or black ground, as the canvas treats it.
+- Layer effects stay on screen while text is edited, masks are painted and steps are undone.
+- Coloured slider tracks with double-click reset in Black & White, Color Balance and Hue/Saturation. Filter sliders line up under the widest title.
+- Camera Raw's Color Grading sits under Color and starts open.
+- Image Size keeps print sizes through an invalid resolution.
+- Stepped keyboard zoom and a steady tab strip.
+- Marching ants stay smooth when zoomed out. The document's pixel budget follows the machine's memory.
 
 ## Projects
 
-- OmaPhoto 1.2.3 saves project format 9 and opens formats 1 to 9, as Compositor 1.2.3 does. Projects saved here cannot be reopened in OmaPhoto 1.0.1 or Compositor 1.2.2, even without the new adjustment layers.
+- Editing goes on while a project saves. Saves, reloads and opens wait their turn behind one writer.
+- OmaPhoto 1.3.3 saves project format 10 and opens formats 1 to 10, as Compositor 1.3.3 does. Projects saved here cannot be reopened in OmaPhoto 1.2.3 or Compositor 1.3.1.
+- `docs/writing-comp-files.md` guides AI agents that write projects.
 
 ## Fixes
 
-- Fixed an export crash caused by Qt hash allocations when memory was low.
-- Export failure tests are steady under load.
-- Camera Raw's point-colour preview works, where Compositor's does not. Outer Glow and Inner Glow keep their size in reduced previews.
+- A sheet or Camera Raw group closed while one of its fields held the keys no longer writes into freed memory.
+- Export failure tests are steady: a project snapshot no longer holds two layer lists while it grows.
+- Overlapping writes, and a quit before a write finished, can no longer lose a save.
 
 ## Packages
 
