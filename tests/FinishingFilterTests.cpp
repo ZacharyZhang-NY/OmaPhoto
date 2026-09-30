@@ -213,7 +213,8 @@ void FinishingFilterTests::settingsKeepSwiftsDefaultsAndBounds()
     QCOMPARE(rawValue(FilterKind::vignette), QString("Vignette"));
     QCOMPARE(rawValue(FilterKind::bloomGlow), QString("Bloom / Glow"));
     QCOMPARE(rawValue(FilterKind::tonalContrast), QString("Tonal Contrast"));
-    QVERIFY(allFilterKinds[3] == FilterKind::vignette && allFilterKinds[4] == FilterKind::bloomGlow && allFilterKinds[5] == FilterKind::tonalContrast);
+    QVERIFY(allFilterKinds[3] == FilterKind::vignette && allFilterKinds[4] == FilterKind::bloomGlow && allFilterKinds[5] == FilterKind::dither
+            && allFilterKinds[6] == FilterKind::tonalContrast);
     QVERIFY(!isImageAdjustment(FilterKind::bloomGlow) && !isAutomatic(FilterKind::tonalContrast) && !isAutomatic(FilterKind::vignette));
 }
 

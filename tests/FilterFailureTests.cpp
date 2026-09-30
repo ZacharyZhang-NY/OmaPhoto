@@ -12,6 +12,7 @@ class FilterFailureTests : public QObject {
 private slots:
     void theBlursFailAsAContextWhenTheirRowsFindNoMemory();
     void aTrimThatFindsNoMemoryIsARenderError();
+    void aDitherThatFindsNoMemoryIsARenderError();
 };
 
 void FilterFailureTests::theBlursFailAsAContextWhenTheirRowsFindNoMemory()
@@ -42,6 +43,36 @@ void FilterFailureTests::aTrimThatFindsNoMemoryIsARenderError()
     malloc_trim(0);
     const AddressSpaceLimit limit(16ll * 1024 * 1024);
     QVERIFY_THROWS_EXCEPTION(ExportError, PixelFilter::trimmed(framed, LayerTransform{.origin = {0, 0}, .size = {6000, 4000}}));
+}
+
+void FilterFailureTests::aDitherThatFindsNoMemoryIsARenderError()
+{
+    DitherSettings dither;
+    dither.pixelSize = 1;
+    // Another format: its conversion finds no memory.
+    QImage plain(4000, 4000, QImage::Format_RGB32);
+    plain.fill(Qt::gray);
+    malloc_trim(0);
+    {
+        const AddressSpaceLimit limit(16ll * 1024 * 1024);
+        QVERIFY_THROWS_EXCEPTION(ExportError, dither.apply(plain));
+    }
+    // The 64 MB copy fits; the kernel's planes do not.
+    const QImage premultiplied = plain.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+    plain = QImage();
+    malloc_trim(0);
+    {
+        const AddressSpaceLimit limit(96ll * 1024 * 1024);
+        QVERIFY_THROWS_EXCEPTION(ExportError, dither.apply(premultiplied));
+    }
+    // Chunky pixels dither a small copy: the same limit holds.
+    dither.pixelSize = 8;
+    dither.colors = DitherColors::original;
+    malloc_trim(0);
+    {
+        const AddressSpaceLimit limit(96ll * 1024 * 1024);
+        QCOMPARE(dither.apply(premultiplied).size(), QSize(4000, 4000));
+    }
 }
 
 QTEST_GUILESS_MAIN(FilterFailureTests)

@@ -1,6 +1,7 @@
 #pragma once
 #include "Document/CameraRaw.h"
 #include "Document/Curves.h"
+#include "Document/Dither.h"
 #include "Document/ImageAdjustments.h"
 #include "Document/LayerTransform.h"
 #include "Document/Selection.h"
@@ -16,7 +17,7 @@ struct ImageLayer;
 
 // The Filter and Image menus' filters.
 enum class FilterKind {
-    gaussianBlur, motionBlur, addNoise, vignette, bloomGlow, tonalContrast, lensCorrection, cameraRaw, removeBackground, contentAwareFill, curves,
+    gaussianBlur, motionBlur, addNoise, vignette, bloomGlow, dither, tonalContrast, lensCorrection, cameraRaw, removeBackground, contentAwareFill, curves,
     exposure, gradientMap, grain, blackWhite, colorBalance
 };
 // The menu's title, Swift's rawValue.
@@ -27,7 +28,8 @@ bool isAutomatic(FilterKind kind);
 bool isImageAdjustment(FilterKind kind);
 // Swift's allCases, the menus' order.
 inline constexpr std::array allFilterKinds{FilterKind::gaussianBlur,     FilterKind::motionBlur,       FilterKind::addNoise,
-                                           FilterKind::vignette,         FilterKind::bloomGlow,        FilterKind::tonalContrast,
+                                           FilterKind::vignette,         FilterKind::bloomGlow,        FilterKind::dither,
+                                           FilterKind::tonalContrast,
                                            FilterKind::lensCorrection,   FilterKind::cameraRaw,        FilterKind::removeBackground,
                                            FilterKind::contentAwareFill,
                                            FilterKind::curves,           FilterKind::exposure,         FilterKind::gradientMap,
@@ -74,6 +76,7 @@ struct FilterSettings {
     GrainSettings grain{};
     BlackWhiteSettings blackWhite{};
     ColorBalanceSettings colorBalance{};
+    DitherSettings dither{};
     CameraRawSettings cameraRaw{};
     BackgroundQuality backgroundQuality = BackgroundQuality::basic;
     // How far, in pixels, the mask is pulled onto edges.

@@ -107,6 +107,8 @@ QString ColorPickerTarget::title() const
         return QStringLiteral("Color Picker (%1 Color)").arg(rawValue(effect));
     if (kind == Kind::vignette)
         return QStringLiteral("Color Picker (Vignette Color)");
+    if (kind == Kind::dither)
+        return light ? QStringLiteral("Color Picker (Dither Light Color)") : QStringLiteral("Color Picker (Dither Dark Color)");
     return background ? QStringLiteral("Color Picker (Background Color)") : QStringLiteral("Color Picker (Foreground Color)");
 }
 
@@ -253,6 +255,8 @@ void EditorSession::closeColorPicker(bool commit)
         setGradientMapColor(commit ? color : picker.original, picker.target.highlights);
     } else if (picker.target.kind == ColorPickerTarget::Kind::vignette) {
         setVignetteColor(commit ? color : picker.original);
+    } else if (picker.target.kind == ColorPickerTarget::Kind::dither) {
+        setDitherColor(commit ? color : picker.original, picker.target.light);
     } else if (picker.target.kind == ColorPickerTarget::Kind::effect) {
         const PaletteColor chosen = commit ? color : picker.original;
         changeEffects([&](LayerEffects &effects) { effects.setColor(chosen, picker.target.effect); });
@@ -281,6 +285,33 @@ void EditorSession::openVignetteColorPicker()
     const AdjustmentColor value = m_filterEdit->settings.vignetteColor;
     m_colorPicker = ColorPickerState({ColorPickerTarget::Kind::vignette}, PaletteColor{value.red, value.green, value.blue});
     notify();
+}
+
+void EditorSession::openDitherColorPicker(bool light)
+{
+    // A commit keeps the project busy: no `committing` term.
+    if (!canEditPalette() || m_colorPicker || !m_filterEdit || m_filterEdit->kind != FilterKind::dither)
+        return;
+    const AdjustmentColor value = light ? m_filterEdit->settings.dither.light : m_filterEdit->settings.dither.dark;
+    m_colorPicker = ColorPickerState({ColorPickerTarget::Kind::dither, false, std::nullopt, false, LayerEffectKind{}, light},
+                                     PaletteColor{value.red, value.green, value.blue});
+    notify();
+}
+
+void EditorSession::previewDitherColor()
+{
+    if (m_colorPicker && m_colorPicker->target.kind == ColorPickerTarget::Kind::dither)
+        setDitherColor(m_colorPicker->color(), m_colorPicker->target.light);
+}
+
+// Its picker lives only while its Dither edit is open.
+void EditorSession::setDitherColor(const PaletteColor &color, bool light)
+{
+    FilterSettings settings = m_filterEdit.value().settings;
+    (light ? settings.dither.light : settings.dither.dark) = AdjustmentColor(color);
+    if (settings == m_filterEdit->settings)
+        return;
+    updateFilter(settings, m_filterEdit->preview);
 }
 
 void EditorSession::openEffectColorPicker(LayerEffectKind kind)

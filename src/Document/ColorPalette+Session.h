@@ -21,6 +21,9 @@ public:
     // The picker on the open Vignette's colour, which follows it.
     void openVignetteColorPicker();
     void previewVignetteColor();
+    // The picker on Dither's dark or light colour.
+    void openDitherColorPicker(bool light);
+    void previewDitherColor();
     // The picker on an effect of the open panel.
     void openEffectColorPicker(LayerEffectKind kind);
     // The effect follows the picker's working colour.
@@ -40,3 +43,4 @@ private:
     void restoreDraftTextColors(const LayerTextStyle &original);
     void setGradientMapColor(const PaletteColor &color, bool highlights);
     void setVignetteColor(const PaletteColor &color);
+    void setDitherColor(const PaletteColor &color, bool light);

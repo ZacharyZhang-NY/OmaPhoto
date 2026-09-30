@@ -38,7 +38,7 @@ enum class LayerEffectKind;
 
 // The picker's targets: palette, text, effect, a filter's colour.
 struct ColorPickerTarget {
-    enum class Kind { palette, text, gradientMap, effect, vignette };
+    enum class Kind { palette, text, gradientMap, effect, vignette, dither };
     Kind kind;
     bool background = false;
     std::optional<QUuid> draftID = std::nullopt;
@@ -46,6 +46,8 @@ struct ColorPickerTarget {
     bool highlights = false;
     // An effect's colour: which effect.
     LayerEffectKind effect{};
+    // Dither's Two Colors: the light one, else the dark.
+    bool light = false;
     QString title() const;
     friend bool operator==(const ColorPickerTarget &, const ColorPickerTarget &) = default;
 };

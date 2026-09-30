@@ -180,10 +180,18 @@ void EditorSession::finishFilterPreview()
     }
 }
 
+namespace {
+// A filter's own colours: their pickers go with its panel.
+bool filterColour(ColorPickerTarget::Kind kind)
+{
+    return kind == ColorPickerTarget::Kind::gradientMap || kind == ColorPickerTarget::Kind::vignette || kind == ColorPickerTarget::Kind::dither;
+}
+}
+
 void EditorSession::cancelFilter()
 {
     // A filter colour being picked goes with the panel.
-    if (m_colorPicker && (m_colorPicker->target.kind == ColorPickerTarget::Kind::gradientMap || m_colorPicker->target.kind == ColorPickerTarget::Kind::vignette))
+    if (m_colorPicker && filterColour(m_colorPicker->target.kind))
         closeColorPicker(false);
     if (finishAdjustmentEditing(false) || !m_filterEdit || m_filterEdit->committing)
         return;
@@ -199,7 +207,7 @@ void EditorSession::commitFilter(std::function<void()> done)
         if (done)
             QMetaObject::invokeMethod(this, done, Qt::QueuedConnection);
     };
-    if (m_colorPicker && (m_colorPicker->target.kind == ColorPickerTarget::Kind::gradientMap || m_colorPicker->target.kind == ColorPickerTarget::Kind::vignette))
+    if (m_colorPicker && filterColour(m_colorPicker->target.kind))
         closeColorPicker(true);
     if (finishAdjustmentEditing(true) || !m_filterEdit || m_filterEdit->committing) {
         finish();

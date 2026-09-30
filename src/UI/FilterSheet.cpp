@@ -185,6 +185,7 @@ FilterSheet::FilterSheet(EditorSession &session, QWidget *parent)
         control(QStringLiteral("Amount"), key(&FilterSettings::amount), 0.1, 400, QStringLiteral("%"), 1, true);
         noise();
         break;
+    case FilterKind::dither: dither(); break;
     case FilterKind::vignette:
     case FilterKind::bloomGlow:
     case FilterKind::tonalContrast: finishing(m_session.filterEdit()->kind); break;
@@ -317,12 +318,15 @@ void FilterSheet::synchronize()
         m_pickerColour = picked;
         m_session.previewGradientMapColor();
         m_session.previewVignetteColor();
+        m_session.previewDitherColor();
     }
     if (m_vignetteSwatch)
         m_vignetteSwatch->update();
     const FilterEdit &edit = m_session.filterEdit().value();
     for (Control &control : m_controls)
         showControl(control, edit.settings);
+    for (const auto &follow : m_follows)
+        follow(edit.settings);
     if (m_curves)
         m_curves->synchronize();
     if (m_gradientMap)
@@ -345,8 +349,8 @@ void FilterSheet::synchronize()
     m_error->setVisible(edit.previewError.has_value());
     // An adjustment layer's editor ignores the selection.
     m_limited->setVisible(!m_session.adjustmentOriginal() && m_session.selection());
-    // While the result is made, OK waits and says so.
-    const bool working = edit.committing || edit.preparing;
+    // Slow filters say they work; a quick preview would flicker.
+    const bool working = edit.committing || (edit.preparing && isAutomatic(edit.kind));
     m_spinner->setVisible(working);
     m_activity->setVisible(working);
     m_activity->setText(edit.committing ? QStringLiteral("Applying…") : QStringLiteral("Working…"));

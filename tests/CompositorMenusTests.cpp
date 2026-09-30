@@ -68,7 +68,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     QStringList filters;
     for (QAction *entry : menus[5]->actions())
         filters << entry->text();
-    QCOMPARE(filters, (QStringList{"Gaussian Blur…", "Motion Blur…", "Add Noise…", "Vignette…", "Bloom / Glow…", "Tonal Contrast…", "Lens Correction…", "Camera Raw Filter…", "Remove Background…"}));
+    QCOMPARE(filters, (QStringList{"Gaussian Blur…", "Motion Blur…", "Add Noise…", "Vignette…", "Bloom / Glow…", "Dither…", "Tonal Contrast…", "Lens Correction…", "Camera Raw Filter…", "Remove Background…"}));
     QCOMPARE(menus[6]->actions().size(), 22);
 }
 

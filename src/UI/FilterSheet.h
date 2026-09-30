@@ -7,6 +7,7 @@ class CurvesControls;
 class PickerField;
 class QButtonGroup;
 class QCheckBox;
+class QComboBox;
 class QLabel;
 class QProgressBar;
 class QPushButton;
@@ -75,6 +76,10 @@ private:
     void noise();
     // Vignette's colour and rows, Bloom / Glow's, Tonal Contrast's.
     void finishing(FilterKind kind);
+    // Swift's ditherControls: style, sizes, tones, colours, shape.
+    void dither();
+    // A titled menu of choices: the row and its box.
+    QComboBox *menu(const QString &title, const QString &name, const QString &help);
     // Remove Background's words, Quality, and Advanced's three rows.
     void background();
     // Black & White's six families and Tint; Color Balance's nine.
@@ -101,6 +106,8 @@ private:
     std::vector<std::pair<QCheckBox *, std::function<bool &(FilterSettings &)>>> m_flags;
     // Rows under Swift's `if`: Advanced's, Tint's.
     std::vector<std::pair<QWidget *, std::function<bool(const FilterSettings &)>>> m_shownWhen;
+    // Controls that show the settings as they stand: Dither's menus.
+    std::vector<std::function<void(const FilterSettings &)>> m_follows;
     QCheckBox *const m_preview;
     QLabel *const m_error;
     QLabel *const m_limited;
