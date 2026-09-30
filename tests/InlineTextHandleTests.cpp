@@ -28,6 +28,7 @@ private slots:
     void aLostReleaseEndsAResize();
     void anEditEndsAResize();
     void aSquashedLayerTakesFarDrags();
+    void theIBeamHoldsAcrossTheCanvas();
 };
 
 void InlineTextHandleTests::handlesFollowTheBoxEdges()
@@ -260,6 +261,33 @@ void InlineTextHandleTests::aSquashedLayerTakesFarDrags()
     shown.move(inside + QPointF(0, 1'000'000));
     QCOMPARE(shown.caret(), 3);
     shown.release(inside + QPointF(0, 1'000'000));
+}
+
+// Swift 221d6cc: away from the box, the Type I-beam.
+void InlineTextHandleTests::theIBeamHoldsAcrossTheCanvas()
+{
+    TextCanvas shown;
+    shown.type(QStringLiteral("Hi"));
+    const QSizeF size = shown.editor().logicalSize();
+    QCOMPARE(hovered(shown, at(shown, size.width(), size.height() / 2)), Qt::SizeHorCursor);
+    const QPointF corner(shown.canvas->width() - 3, shown.canvas->height() - 3);
+    QCOMPARE(hovered(shown, corner), Qt::IBeamCursor);
+    QCOMPARE(hovered(shown, QPointF(3, 3)), Qt::IBeamCursor);
+    // After a resize drag, the I-beam again, away from it.
+    const QPointF edge = at(shown, size.width(), size.height() / 2);
+    shown.drag(edge, edge + QPointF(30, 0));
+    QCOMPARE(hovered(shown, corner), Qt::IBeamCursor);
+    // Nothing outside the canvas takes the I-beam: window or sibling.
+    QWidget sibling(&shown.window);
+    QVERIFY(!shown.window.testAttribute(Qt::WA_SetCursor));
+    QCOMPARE(sibling.cursor().shape(), Qt::ArrowCursor);
+    // The canvas owns its cursor: leaving sets none elsewhere.
+    QEvent leave(QEvent::Leave);
+    QApplication::sendEvent(shown.canvas, &leave);
+    QVERIFY(!QGuiApplication::overrideCursor());
+    QVERIFY(!shown.window.testAttribute(Qt::WA_SetCursor));
+    QCOMPARE(sibling.cursor().shape(), Qt::ArrowCursor);
+    QCOMPARE(shown.canvas->cursor().shape(), Qt::IBeamCursor);
 }
 
 QTEST_MAIN(InlineTextHandleTests)

@@ -70,6 +70,7 @@ signals:
     void changed();
 
 private:
+    bool finishTextEditing();
     struct Baked {
         EditorSession::BakedImages images;
         std::optional<QString> failure;

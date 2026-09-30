@@ -210,9 +210,19 @@ std::vector<std::shared_ptr<ProjectTab>> ProjectWorkspace::quitOrder() const
     return order;
 }
 
+// Swift's finishTextEditing: open text is applied before asking.
+bool ProjectWorkspace::finishTextEditing()
+{
+    for (const std::shared_ptr<ProjectTab> &each : quitOrder()) {
+        if (each->session.textDraft() && !each->session.finishText())
+            return false;
+    }
+    return true;
+}
+
 void ProjectWorkspace::confirmQuit(std::function<void(bool)> done)
 {
-    if (!canSwitch()) {
+    if (!finishTextEditing() || !canSwitch()) {
         finish(done, false);
         return;
     }
