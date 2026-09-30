@@ -39,6 +39,7 @@ private:
     double m_width;
     double m_height;
     double m_resolution;
+    double m_lastResolution;
     bool m_locked = true;
     bool m_resample = true;
     QString m_unit = QStringLiteral("Pixels");

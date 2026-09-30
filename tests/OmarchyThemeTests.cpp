@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QLabel>
+#include <QMessageBox>
 #include <QStyle>
 #include <QStyleFactory>
 #include <QTemporaryDir>
@@ -202,6 +203,10 @@ void OmarchyThemeTests::withoutAThemeTheBuiltInDarkApplies()
     QCOMPARE(QApplication::palette().color(QPalette::PlaceholderText), QColor(0x8a, 0x8a, 0x8a));
     QCOMPARE(QApplication::palette().color(QPalette::BrightText), QColor(0xff, 0x9f, 0x0a));
     QCOMPARE(QApplication::style()->objectName(), QString("fusion"));
+    // Swift's d62a132: alerts are dark too.
+    QMessageBox alert(QMessageBox::Warning, QStringLiteral("Title"), QStringLiteral("Text"));
+    QCOMPARE(alert.palette().color(QPalette::Window), QColor(0x24, 0x24, 0x24));
+    QCOMPARE(alert.style()->objectName(), QString("fusion"));
     Swatch swatch;
     QCOMPARE(swatch.pixel(), qRgb(0x24, 0x24, 0x24));
     // A theme appearing later is taken up, unnamed or not.

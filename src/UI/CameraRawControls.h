@@ -23,7 +23,7 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
-    enum class Section { light, color, effects, curve, colorMixer, colorGrading, detail, optics, geometry, calibration };
+    enum class Section { light, color, colorGrading, effects, curve, colorMixer, detail, optics, geometry, calibration };
     struct Group {
         Section section;
         QToolButton *disclosure;

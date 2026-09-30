@@ -171,6 +171,7 @@ add_library(compositor_core STATIC
     src/IO/ProjectDigest.cpp
     src/IO/ProjectStore.cpp
     src/IO/ProjectWatcher.cpp
+    src/IO/RecentProjects.cpp
     src/IO/ProjectStore+Adjustment.cpp
     src/IO/ProjectStore+Effects.cpp
     src/IO/ProjectStore+Manifest.cpp

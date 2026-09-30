@@ -104,6 +104,7 @@ private slots:
     void aTypedNumberAppliesAndIsHeldInRange();
     void altOnALightSliderShowsItsClippingUntilLetGo();
     void eachGroupOpensAndItsEyeHidesItFromThePreview();
+    void eachEyeHidesItsOwnGroup();
     void theScopeSwitchesAndItsTrianglesShowClipping();
     void theReadoutNamesThePixel();
     void whiteBalanceAutoCustomAndTheEyedropper();
@@ -214,11 +215,18 @@ void CameraRawPanelTests::altOnALightSliderShowsItsClippingUntilLetGo()
 void CameraRawPanelTests::eachGroupOpensAndItsEyeHidesItFromThePreview()
 {
     Panel panel;
-    const QStringList groups{"Light", "Color", "Effects", "Curve", "ColorMixer", "ColorGrading", "Detail", "Optics", "Geometry", "Calibration"};
+    // Swift's 7e9afbe: Color Grading under Color, open.
+    const QStringList groups{"Light", "Color", "ColorGrading", "Effects", "Curve", "ColorMixer", "Detail", "Optics", "Geometry", "Calibration"};
+    int above = -1;
+    for (const QString &group : groups) {
+        const int top = panel.child<QToolButton>(group + QStringLiteral("Section")).mapTo(panel.controls.get(), QPoint()).y();
+        QVERIFY2(top > above, qPrintable(group));
+        above = top;
+    }
     for (const QString &group : groups) {
         auto &disclosure = panel.child<QToolButton>(group + QStringLiteral("Section"));
         auto *body = disclosure.parentWidget()->findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly).last();
-        const bool open = group == QLatin1String("Light") || group == QLatin1String("Color");
+        const bool open = group == QLatin1String("Light") || group == QLatin1String("Color") || group == QLatin1String("ColorGrading");
         QCOMPARE(body->isVisible(), open);
         disclosure.click();
         QCOMPARE(body->isVisible(), !open);
@@ -236,6 +244,69 @@ void CameraRawPanelTests::eachGroupOpensAndItsEyeHidesItFromThePreview()
     QVERIFY(!panel.session.filterEdit().value().previewJob().settings.cameraRaw.adjustsLight());
     eye.click();
     QVERIFY(panel.panel().shows.light);
+}
+
+namespace {
+// Undoes the eye test's one adjustment to that group.
+void reset(CameraRawSettings &raw, const QString &eye)
+{
+    if (eye == QLatin1String("ColorGradingEye"))
+        raw.grading.shadows.saturation = 0;
+    else if (eye == QLatin1String("EffectsEye"))
+        raw.clarity = 0;
+    else if (eye == QLatin1String("CurveEye"))
+        raw.curve.shadows = 0;
+    else
+        raw.mixer.hue[0] = 0;
+}
+}
+
+void CameraRawPanelTests::eachEyeHidesItsOwnGroup()
+{
+    Panel panel;
+    FilterSettings adjusted = panel.session.filterEdit().value().settings;
+    adjusted.cameraRaw.grading.shadows.saturation = 20;
+    adjusted.cameraRaw.clarity = 30;
+    adjusted.cameraRaw.curve.shadows = 20;
+    adjusted.cameraRaw.mixer.hue[0] = 20;
+    panel.session.updateFilter(adjusted, true);
+    using Adjusts = bool (*)(const CameraRawSettings &);
+    const std::array<std::tuple<QString, bool CameraRawGroups::*, Adjusts>, 4> eyes{{
+        {QStringLiteral("ColorGradingEye"), &CameraRawGroups::grading, [](const CameraRawSettings &raw) { return raw.grading.adjusts(); }},
+        {QStringLiteral("EffectsEye"), &CameraRawGroups::effects, [](const CameraRawSettings &raw) { return raw.adjustsEffects(); }},
+        {QStringLiteral("CurveEye"), &CameraRawGroups::curve, [](const CameraRawSettings &raw) { return raw.curve.adjusts(); }},
+        {QStringLiteral("ColorMixerEye"), &CameraRawGroups::mixer, [](const CameraRawSettings &raw) { return raw.mixer.adjusts(); }},
+    }};
+    // Alone, each adjustment shows its own eye only.
+    for (const auto &[name, group, adjusts] : eyes) {
+        FilterSettings alone = adjusted;
+        for (const auto &[other, otherGroup, otherAdjusts] : eyes) {
+            if (other != name)
+                reset(alone.cameraRaw, other);
+        }
+        panel.session.updateFilter(alone, true);
+        for (const auto &[other, otherGroup, otherAdjusts] : eyes)
+            QVERIFY2(panel.child<QToolButton>(other).isVisible() == (other == name), qPrintable(name + " " + other));
+        reset(alone.cameraRaw, name);
+        panel.session.updateFilter(alone, true);
+        QVERIFY2(!panel.child<QToolButton>(name).isVisible(), qPrintable(name));
+    }
+    panel.session.updateFilter(adjusted, true);
+    for (const auto &[name, group, adjusts] : eyes) {
+        auto &eye = panel.child<QToolButton>(name);
+        QVERIFY2(eye.isVisible(), qPrintable(name));
+        eye.click();
+        // That group alone leaves the preview.
+        CameraRawGroups expected;
+        expected.*group = false;
+        QVERIFY2(panel.panel().shows == expected, qPrintable(name));
+        const CameraRawSettings previewed = panel.session.filterEdit().value().previewJob().settings.cameraRaw;
+        for (const auto &[other, otherGroup, otherAdjusts] : eyes)
+            QVERIFY2(otherAdjusts(previewed) == (other != name), qPrintable(name + " " + other));
+        eye.click();
+        QVERIFY2(panel.panel().shows == CameraRawGroups(), qPrintable(name));
+        QVERIFY(adjusts(panel.session.filterEdit().value().previewJob().settings.cameraRaw));
+    }
 }
 
 void CameraRawPanelTests::theScopeSwitchesAndItsTrianglesShowClipping()

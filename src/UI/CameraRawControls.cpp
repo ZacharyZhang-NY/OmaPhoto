@@ -21,9 +21,9 @@
 namespace {
 QString title(int section)
 {
-    static const std::array<QString, 10> titles{QStringLiteral("Light"),         QStringLiteral("Color"),  QStringLiteral("Effects"),
-                                               QStringLiteral("Curve"),         QStringLiteral("Color Mixer"), QStringLiteral("Color Grading"),
-                                               QStringLiteral("Detail"),        QStringLiteral("Optics"), QStringLiteral("Geometry"),
+    static const std::array<QString, 10> titles{QStringLiteral("Light"),  QStringLiteral("Color"),       QStringLiteral("Color Grading"),
+                                               QStringLiteral("Effects"), QStringLiteral("Curve"),       QStringLiteral("Color Mixer"),
+                                               QStringLiteral("Detail"),  QStringLiteral("Optics"),      QStringLiteral("Geometry"),
                                                QStringLiteral("Calibration")};
     return titles.at(size_t(section));
 }
@@ -31,8 +31,8 @@ QString title(int section)
 // The group's eye in CameraRawGroups, by section.
 bool &shows(CameraRawGroups &groups, int section)
 {
-    const std::array fields{&CameraRawGroups::light,   &CameraRawGroups::color,  &CameraRawGroups::effects,  &CameraRawGroups::curve,
-                            &CameraRawGroups::mixer,   &CameraRawGroups::grading, &CameraRawGroups::detail,  &CameraRawGroups::optics,
+    const std::array fields{&CameraRawGroups::light,    &CameraRawGroups::color,  &CameraRawGroups::grading, &CameraRawGroups::effects,
+                            &CameraRawGroups::curve,    &CameraRawGroups::mixer,  &CameraRawGroups::detail,  &CameraRawGroups::optics,
                             &CameraRawGroups::geometry, &CameraRawGroups::calibration};
     return groups.*fields.at(size_t(section));
 }
@@ -42,10 +42,10 @@ bool adjusts(const CameraRawSettings &raw, int section)
     switch (section) {
     case 0: return raw.adjustsLight();
     case 1: return raw.adjustsColor();
-    case 2: return raw.adjustsEffects();
-    case 3: return raw.curve.adjusts();
-    case 4: return raw.mixer.adjusts();
-    case 5: return raw.grading.adjusts();
+    case 2: return raw.grading.adjusts();
+    case 3: return raw.adjustsEffects();
+    case 4: return raw.curve.adjusts();
+    case 5: return raw.mixer.adjusts();
     case 6: return raw.detail.adjusts();
     case 7: return raw.optics.adjusts();
     case 8: return raw.geometry.adjusts();
@@ -194,10 +194,10 @@ CameraRawControls::CameraRawControls(EditorSession &session, QWidget *parent)
     groups->setSpacing(12);
     light(group(Section::light, groups));
     color(group(Section::color, groups));
+    group(Section::colorGrading, groups)->addWidget(new CameraRawGradingControls(session));
     effects(group(Section::effects, groups));
     group(Section::curve, groups)->addWidget(new CameraRawCurveControls(session));
     group(Section::colorMixer, groups)->addWidget(new CameraRawMixerControls(session));
-    group(Section::colorGrading, groups)->addWidget(new CameraRawGradingControls(session));
     group(Section::detail, groups)->addWidget(new CameraRawDetailControls(session));
     group(Section::optics, groups)->addWidget(new CameraRawOpticsControls(session));
     group(Section::geometry, groups)->addWidget(new CameraRawGeometryControls(session));
@@ -246,8 +246,8 @@ QVBoxLayout *CameraRawControls::group(Section section, QVBoxLayout *column)
     auto *rows = new QVBoxLayout(body);
     rows->setContentsMargins(18, 0, 0, 0);
     rows->setSpacing(8);
-    // Light and Color open first, Swift's `expanded`.
-    body->setVisible(section == Section::light || section == Section::color);
+    // Light, Color and Color Grading open first, Swift's `expanded`.
+    body->setVisible(section == Section::light || section == Section::color || section == Section::colorGrading);
     connect(disclosure, &QToolButton::clicked, this, [this, body] {
         body->setVisible(body->isHidden());
         synchronize();

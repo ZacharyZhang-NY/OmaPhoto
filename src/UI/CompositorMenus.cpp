@@ -1,4 +1,5 @@
 #include "UI/CompositorMenus.h"
+#include "IO/RecentProjects.h"
 #include "Logging.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/NativeLayerList.h"
@@ -37,6 +38,10 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     QMenu *file = bar.addMenu(QStringLiteral("&File"));
     add(file, QStringLiteral("newCanvas"), QStringLiteral("New Canvas…"), QKeySequence(Qt::CTRL | Qt::Key_N), [this] { projects().newCanvas(); });
     add(file, QStringLiteral("openProject"), QStringLiteral("Open Project…"), QKeySequence(Qt::CTRL | Qt::Key_O), [this] { projects().open(); });
+    QMenu *recent = file->addMenu(QStringLiteral("Open Recent"));
+    recent->menuAction()->setObjectName(QStringLiteral("openRecent"));
+    listRecent(recent);
+    connect(&RecentProjects::shared(), &RecentProjects::changed, this, [this, recent] { listRecent(recent); });
     add(file, QStringLiteral("importImages"), QStringLiteral("Import Images…"), QKeySequence(), [this] { session().setShowsImporter(true); });
     file->addSeparator();
     add(file, QStringLiteral("save"), QStringLiteral("Save"), QKeySequence(Qt::CTRL | Qt::Key_S), [this] { projects().save(); });
@@ -272,6 +277,19 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     watchFront();
 }
 
+void CompositorMenus::listRecent(QMenu *recent)
+{
+    recent->clear();
+    for (const QString &path : RecentProjects::shared().paths())
+        // A name's ampersand is literal, no mnemonic.
+        connect(recent->addAction(ProjectTab::nameWithoutSuffix(path).replace(QLatin1Char('&'), QStringLiteral("&&"))), &QAction::triggered, this, [this, path] { projects().open(path); });
+    recent->addSeparator();
+    QAction *clear = recent->addAction(QStringLiteral("Clear Menu"));
+    clear->setObjectName(QStringLiteral("clearRecent"));
+    clear->setEnabled(!RecentProjects::shared().paths().isEmpty());
+    connect(clear, &QAction::triggered, this, [] { RecentProjects::shared().clear(); });
+}
+
 QAction *CompositorMenus::add(QMenu *menu, const QString &name, const QString &text, const QKeySequence &shortcut, const std::function<void()> &run)
 {
     QAction *made = menu->addAction(text);
@@ -327,6 +345,7 @@ void CompositorMenus::synchronize()
     const bool typing = m_field != nullptr || s.textDraft().has_value();
     action(QStringLiteral("newCanvas"))->setEnabled(p.canStart());
     action(QStringLiteral("openProject"))->setEnabled(p.canStart());
+    action(QStringLiteral("openRecent"))->setEnabled(p.canStart());
     action(QStringLiteral("importImages"))->setEnabled(!s.levels() && !s.showsBusy() && !s.isImporting() && !s.showsNewDocument());
     action(QStringLiteral("save"))->setEnabled(drawn && p.canStart());
     action(QStringLiteral("saveAs"))->setEnabled(drawn && p.canStart());

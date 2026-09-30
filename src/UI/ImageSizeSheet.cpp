@@ -49,7 +49,7 @@ bool physical(const QString &unit)
 
 ImageSizeSheet::ImageSizeSheet(const CanvasDocument &document, std::function<void(std::optional<ImageSizeOptions>)> finish, QWidget *parent)
     : QWidget(parent), m_originalWidth(document.width), m_originalHeight(document.height), m_finish(std::move(finish)),
-      m_width(double(document.width)), m_height(double(document.height)), m_resolution(document.resolution), m_units(new QComboBox(this)),
+      m_width(double(document.width)), m_height(double(document.height)), m_resolution(document.resolution), m_lastResolution(document.resolution), m_units(new QComboBox(this)),
       m_widthField(dimension(true)), m_heightField(dimension(false)), m_lock(new QCheckBox(QStringLiteral("Lock aspect ratio"), this)),
       m_resolutionField(new PickerField([this] {
           bool number = false;
@@ -204,10 +204,11 @@ PickerField *ImageSizeSheet::dimension(bool isWidth)
 // Swift's binding: pixels, or without resampling the resolution.
 void ImageSizeSheet::setDimension(double value, bool isWidth)
 {
-    if (!(std::isfinite(value) && value > 0))
+    // A print size means nothing without a usable resolution.
+    if (!(std::isfinite(value) && value > 0) || !canScrubDimensions())
         return;
     if (!m_resample) {
-        m_resolution = (isWidth ? m_width : m_height) / value * (m_unit == QLatin1String("Centimeters") ? 2.54 : 1);
+        setResolution((isWidth ? m_width : m_height) / value * (m_unit == QLatin1String("Centimeters") ? 2.54 : 1));
         return;
     }
     double pixels = value;
@@ -230,11 +231,15 @@ void ImageSizeSheet::setDimension(double value, bool isWidth)
 
 void ImageSizeSheet::setResolution(double value)
 {
-    const double old = std::exchange(m_resolution, value);
-    if (m_resample && physical(m_unit) && old > 0 && value > 0 && std::isfinite(value)) {
-        m_width *= value / old;
-        m_height *= value / old;
+    m_resolution = value;
+    if (!(std::isfinite(value) && value > 0))
+        return;
+    // Scaled from the last usable one, past any invalid entry.
+    if (m_resample && physical(m_unit)) {
+        m_width *= value / m_lastResolution;
+        m_height *= value / m_lastResolution;
     }
+    m_lastResolution = value;
 }
 
 NumericScrub *ImageSizeSheet::scrub(QLabel *title, bool isWidth)

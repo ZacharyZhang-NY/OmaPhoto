@@ -50,7 +50,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     for (const QMenu *menu : menus)
         titles << menu->title();
     QCOMPARE(titles, (QStringList{"&File", "&Edit", "&View", "&Select", "&Image", "Fil&ter", "&Layer"}));
-    QCOMPARE(menus[0]->actions().size(), 11);
+    QCOMPARE(menus[0]->actions().size(), 12);
     QCOMPARE(menus[1]->actions().size(), 13);
     QCOMPARE(menus[2]->actions().size(), 16);
     QCOMPARE(menus[3]->actions().size(), 10);
@@ -76,7 +76,8 @@ void CompositorMenusTests::fileEntriesFollowTheControllersGate()
 {
     QTemporaryDir folder;
     Bar bar;
-    QVERIFY(bar.action("newCanvas").isEnabled() && bar.action("openProject").isEnabled() && bar.action("closeProject").isEnabled());
+    QVERIFY(bar.action("newCanvas").isEnabled() && bar.action("openProject").isEnabled() && bar.action("openRecent").isEnabled()
+            && bar.action("closeProject").isEnabled());
     QVERIFY(bar.action("importImages").isEnabled());
     // Nothing to save without a canvas.
     QVERIFY(!bar.action("save").isEnabled() && !bar.action("saveAs").isEnabled());
@@ -84,26 +85,30 @@ void CompositorMenusTests::fileEntriesFollowTheControllersGate()
     QVERIFY(bar.action("save").isEnabled() && bar.action("saveAs").isEnabled());
     // Busy holds the file entries; a sheet holds Import.
     bar.session().setIsProjectBusy(true);
-    QVERIFY(!bar.action("newCanvas").isEnabled() && !bar.action("openProject").isEnabled() && !bar.action("save").isEnabled()
+    QVERIFY(!bar.action("newCanvas").isEnabled() && !bar.action("openProject").isEnabled() && !bar.action("openRecent").isEnabled()
+            && !bar.action("save").isEnabled()
             && !bar.action("saveAs").isEnabled() && !bar.action("closeProject").isEnabled());
     QVERIFY(bar.action("importImages").isEnabled());
     QTRY_VERIFY(!bar.action("importImages").isEnabled());
     bar.session().setIsProjectBusy(false);
     bar.session().setShowsNewDocument(true);
-    QVERIFY(!bar.action("importImages").isEnabled() && !bar.action("newCanvas").isEnabled());
+    QVERIFY(!bar.action("importImages").isEnabled() && !bar.action("newCanvas").isEnabled() && !bar.action("openRecent").isEnabled());
     bar.session().setShowsNewDocument(false);
+    QVERIFY(bar.action("openRecent").isEnabled());
     // Importing alone holds Import as well.
     bar.session().setIsImporting(true);
-    QVERIFY(!bar.action("importImages").isEnabled());
+    QVERIFY(!bar.action("importImages").isEnabled() && !bar.action("openProject").isEnabled() && !bar.action("openRecent").isEnabled());
     bar.session().setIsImporting(false);
-    QVERIFY(bar.action("importImages").isEnabled());
+    QVERIFY(bar.action("importImages").isEnabled() && bar.action("openRecent").isEnabled());
     // The entries do what the toolbar and the controller do.
     bar.action("newCanvas").trigger();
     QCOMPARE(int(bar.workspace.tabs().size()), 2);
     bar.workspace.select(bar.workspace.tabs()[0]->id);
     bar.action("importImages").trigger();
     QVERIFY(bar.session().showsImporter());
+    QVERIFY(!bar.action("openRecent").isEnabled());
     bar.session().setShowsImporter(false);
+    QVERIFY(bar.action("openRecent").isEnabled());
     DialogDesk desk;
     desk.replies = {folder.filePath("Saved.comp")};
     bar.action("save").trigger();
@@ -119,8 +124,14 @@ void CompositorMenusTests::fileEntriesFollowTheControllersGate()
     QTRY_COMPARE(bar.session().projectPath(), std::optional(folder.filePath("Copy.comp")));
     QCOMPARE(desk.seen.size(), 2);
     desk.replies = {"<cancel>"};
+    // The workspace's panel holds Open Recent until answered.
+    desk.note = [&] { return QStringLiteral("managing=%1 recent=%2").arg(bar.workspace.isManaging()).arg(bar.action("openRecent").isEnabled()); };
     bar.action("openProject").trigger();
     QTRY_COMPARE(desk.seen.size(), 3);
+    QVERIFY2(desk.seen[2].endsWith("|managing=1 recent=0"), qPrintable(desk.seen[2]));
+    desk.note = nullptr;
+    QTRY_VERIFY(!bar.workspace.isManaging());
+    QVERIFY(bar.action("openRecent").isEnabled());
     // Close Project closes this tab, not the window.
     bar.window.show();
     bar.action("closeProject").trigger();

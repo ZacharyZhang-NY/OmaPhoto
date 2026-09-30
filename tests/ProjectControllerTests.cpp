@@ -246,11 +246,11 @@ void ProjectControllerTests::aCompletionNeverRunsInsideTheCall()
     int calls = 0;
     controller.save(false, [&](bool) { calls += 1; });
     controller.confirmQuit([&](bool) { calls += 1; });
-    controller.open(QString("/nowhere.comp"), [&](bool) { calls += 1; });
-    QCOMPARE(calls, 0);
     DialogDesk desk;
     desk.replies = {"OK"};
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("^Couldn’t open the project: .+"));
+    controller.open(QString("/nowhere.comp"), [&](bool) { calls += 1; });
+    QCOMPARE(calls, 0);
     QTRY_COMPARE(calls, 3);
 }
 

@@ -1,10 +1,12 @@
 #include "IO/ProjectController.h"
+#include "IO/RecentProjects.h"
 #include "Document/ProjectWorkspace.h"
 #include "IO/ProjectStore.h"
 #include "Logging.h"
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTimer>
@@ -187,6 +189,7 @@ void ProjectController::write(const Prepared &prepared, std::function<void(bool)
         session.history.markSaved(revision);
         session.setProjectPath(destination);
         m_saveGeneration += 1;
+        RecentProjects::shared().note(destination);
         rememberProjectDigest(destination, [this, destination, landed] {
             watchProject(destination);
             externalChanges.saving = false;
@@ -241,6 +244,12 @@ void ProjectController::open(std::optional<QString> path, std::function<void(boo
         // A folder's trailing slash would leave it without a name.
         while (source.endsWith(QLatin1Char('/')))
             source.chop(1);
+        // A listed project deleted since: name it, not its manifest.
+        if (!QFileInfo::exists(source)) {
+            RecentProjects::shared().refresh();
+            refuse(QStringLiteral("The file “%1” couldn’t be opened because there is no such file.").arg(QFileInfo(source).fileName()));
+            return;
+        }
         // A write in flight lands first: no read mid-save.
         finishWriting([this, end, refuse, source] {
             // Validated first: a corrupt project never discards the live document.
@@ -258,6 +267,7 @@ void ProjectController::open(std::optional<QString> path, std::function<void(boo
                     // Saving in the confirmation can replace the opened file.
                     if (m_saveGeneration == previousSave || !samePlace(session.projectPath(), source)) {
                         session.installProject(*first.snapshot, source);
+                        RecentProjects::shared().note(source);
                         rememberProjectDigest(source, [this, source, end] {
                             watchProject(source);
                             end(true);
@@ -270,6 +280,7 @@ void ProjectController::open(std::optional<QString> path, std::function<void(boo
                             return;
                         }
                         session.installProject(*again.snapshot, source);
+                        RecentProjects::shared().note(source);
                         rememberProjectDigest(source, [this, source, end] {
                             watchProject(source);
                             end(true);
@@ -380,6 +391,11 @@ void ProjectController::showError(const QString &title, const QString &message, 
     alert->setIcon(QMessageBox::Warning);
     alert->setText(title);
     alert->setInformativeText(message);
+    // A file's name is read literally, never as markup.
+    auto *words = alert->findChild<QLabel *>(QStringLiteral("qt_msgbox_informativelabel"));
+    if (!words)
+        throw std::logic_error("the alert has no informative label");
+    words->setTextFormat(Qt::PlainText);
     alert->addButton(QStringLiteral("OK"), QMessageBox::AcceptRole);
     connect(alert, &QDialog::finished, this, std::move(then));
     alert->open();

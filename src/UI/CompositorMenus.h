@@ -23,6 +23,7 @@ private:
     void watchFront();
     EditorSession &session() const { return m_workspace.current().session; }
     ProjectController &projects() const { return m_workspace.current().controller; }
+    void listRecent(QMenu *recent);
     QAction *add(QMenu *menu, const QString &name, const QString &text, const QKeySequence &shortcut, const std::function<void()> &run);
 
     // Each entry's own key, remapped from ShortcutSettings.

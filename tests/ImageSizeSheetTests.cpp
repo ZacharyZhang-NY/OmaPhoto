@@ -16,6 +16,7 @@ private slots:
     void theSheetShowsTheCanvas();
     void pixelsFollowUnitsAndTheLock();
     void aNewResolutionKeepsThePrintSize();
+    void aDocumentsOwnResolutionIsTheLastUsable();
     void withoutResamplingOnlyTheResolutionMoves();
     void anInvalidSizeRestsResize();
     void returnWithoutTypingKeepsTheNumbers();
@@ -24,11 +25,18 @@ private slots:
 };
 
 namespace {
+CanvasDocument document(int width, int height, double resolution)
+{
+    CanvasDocument made{width, height};
+    made.resolution = resolution;
+    return made;
+}
+
 struct Sheet {
     std::optional<std::optional<ImageSizeOptions>> answer;
     ImageSizeSheet sheet;
-    explicit Sheet(int width = 1200, int height = 800)
-        : sheet(CanvasDocument{width, height}, [this](std::optional<ImageSizeOptions> options) { answer = options; })
+    explicit Sheet(int width = 1200, int height = 800, double resolution = 72)
+        : sheet(document(width, height, resolution), [this](std::optional<ImageSizeOptions> options) { answer = options; })
     {
         sheet.show();
     }
@@ -152,16 +160,99 @@ void ImageSizeSheetTests::aNewResolutionKeepsThePrintSize()
     QCOMPARE(shown.result(), QString("Result: 2,400 × 1,600 pixels"));
     shown.find<QPushButton>("imageResize").click();
     QCOMPARE(shown.answer.value().value().resolution, 300.0);
-    // Zero changes nothing but the resolution, which is refused.
+    // Swift's 555417e: zero and below keep 8 by 5.333 inches.
     shown.unit("Inches");
+    QCOMPARE(shown.shown("imageWidth"), QString("8"));
     shown.type("imageResolution", "0");
     QCOMPARE(shown.result(), QStringLiteral("Use 1–30,000 pixels per side, up to %1 megapixels, and 1–9,600 pixels/inch.").arg(DocumentLimits::maxSurfaceMegapixels()));
+    // A size typed meanwhile is ignored.
+    shown.type("imageWidth", "2");
+    shown.type("imageResolution", "-5");
+    shown.type("imageHeight", "3");
     shown.type("imageResolution", "150");
-    QCOMPARE(shown.result(), QString("Result: 2,400 × 1,600 pixels"));
+    QCOMPARE(shown.result(), QString("Result: 1,200 × 800 pixels"));
+    QCOMPARE(shown.shown("imageWidth"), QString("8"));
     // Centimetres keep the print size alike.
     shown.unit("Centimeters");
+    shown.type("imageResolution", "0");
     shown.type("imageResolution", "300");
-    QCOMPARE(shown.result(), QString("Result: 4,800 × 3,200 pixels"));
+    QCOMPARE(shown.result(), QString("Result: 2,400 × 1,600 pixels"));
+}
+
+void ImageSizeSheetTests::aDocumentsOwnResolutionIsTheLastUsable()
+{
+    for (const QString &unit : {QStringLiteral("Inches"), QStringLiteral("Centimeters")}) {
+        Sheet shown(1200, 800, 300);
+        shown.unit(unit);
+        shown.type("imageResolution", "0");
+        shown.type("imageWidth", "1");
+        shown.type("imageResolution", "-5");
+        shown.type("imageResolution", "150");
+        QCOMPARE(shown.result(), QString("Result: 600 × 400 pixels"));
+    }
+    // Pixels and Percent need no resolution: those edits apply.
+    for (const auto &[unit, width] : {std::pair(QStringLiteral("Pixels"), QStringLiteral("600")), std::pair(QStringLiteral("Percent"), QStringLiteral("50"))}) {
+        Sheet shown(1200, 800, 300);
+        shown.unit(unit);
+        shown.type("imageResolution", "0");
+        shown.type("imageWidth", width);
+        shown.type("imageResolution", "150");
+        QCOMPARE(shown.result(), QString("Result: 600 × 400 pixels"));
+    }
+    // Infinity is no usable resolution either.
+    for (const QString &unit : {QStringLiteral("Inches"), QStringLiteral("Centimeters")}) {
+        Sheet shown(1200, 800, 300);
+        shown.unit(unit);
+        shown.type("imageResolution", "inf");
+        QVERIFY(!shown.find<QPushButton>("imageResize").isEnabled());
+        shown.type("imageWidth", "1");
+        shown.type("imageResolution", "150");
+        QCOMPARE(shown.result(), QString("Result: 600 × 400 pixels"));
+        shown.find<QPushButton>("imageResize").click();
+        const ImageSizeOptions options = shown.answer.value().value();
+        QVERIFY(options.width == 600 && options.height == 400 && options.resolution == 150);
+    }
+    // Without resampling, print sizes wait for a usable resolution too.
+    for (const QString &unit : {QStringLiteral("Inches"), QStringLiteral("Centimeters")}) {
+        for (const QString &invalid : {QStringLiteral("0"), QStringLiteral("-5"), QStringLiteral("inf")}) {
+            Sheet held(1200, 800, 300);
+            held.unit(unit);
+            held.find<QCheckBox>("imageResample").click();
+            held.type("imageResolution", invalid);
+            const QString shownResolution = held.shown("imageResolution");
+            held.type("imageWidth", "1");
+            held.type("imageHeight", "2");
+            QCOMPARE(held.shown("imageResolution"), shownResolution);
+            QVERIFY(!held.find<QPushButton>("imageResize").isEnabled());
+            held.type("imageResolution", "150");
+            QCOMPARE(held.result(), QString("Result: 1,200 × 800 pixels"));
+            held.find<QCheckBox>("imageResample").click();
+            held.type("imageResolution", "300");
+            QCOMPARE(held.result(), QString("Result: 2,400 × 1,600 pixels"));
+        }
+    }
+    // Any finite positive resolution counts, even past Resize's range.
+    for (const QString &unit : {QStringLiteral("Inches"), QStringLiteral("Centimeters")}) {
+        Sheet low(12, 8, 300);
+        low.type("imageResolution", "0.5");
+        low.unit(unit);
+        low.type("imageResolution", "150");
+        QCOMPARE(low.result(), QString("Result: 3,600 × 2,400 pixels"));
+        Sheet high(300, 200, 300);
+        high.type("imageResolution", "12000");
+        high.unit(unit);
+        high.type("imageResolution", "6000");
+        QCOMPARE(high.result(), QString("Result: 150 × 100 pixels"));
+    }
+    // Without resampling the pixels stay, across the toggle.
+    Sheet shown(1200, 800, 300);
+    shown.type("imageResolution", "0");
+    shown.find<QCheckBox>("imageResample").click();
+    shown.type("imageResolution", "150");
+    QCOMPARE(shown.result(), QString("Result: 1,200 × 800 pixels"));
+    shown.find<QCheckBox>("imageResample").click();
+    shown.type("imageResolution", "300");
+    QCOMPARE(shown.result(), QString("Result: 2,400 × 1,600 pixels"));
 }
 
 void ImageSizeSheetTests::withoutResamplingOnlyTheResolutionMoves()
@@ -195,6 +286,13 @@ void ImageSizeSheetTests::withoutResamplingOnlyTheResolutionMoves()
     QCOMPARE(shown.units(), (QStringList{"Pixels", "Percent", "Inches", "Centimeters"}));
     QCOMPARE(shown.find<QComboBox>("imageUnits").currentText(), QString("Centimeters"));
     QVERIFY(shown.find<QCheckBox>("imageLocked").isEnabled());
+    // A print-size edit updates the last usable resolution.
+    shown.find<QCheckBox>("imageResample").click();
+    shown.type("imageHeight", "25.4");
+    QCOMPARE(shown.shown("imageResolution"), QString("80"));
+    shown.find<QCheckBox>("imageResample").click();
+    shown.type("imageResolution", "160");
+    QCOMPARE(shown.result(), QString("Result: 2,400 × 1,600 pixels"));
 }
 
 void ImageSizeSheetTests::anInvalidSizeRestsResize()
