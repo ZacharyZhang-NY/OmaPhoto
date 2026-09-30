@@ -32,7 +32,8 @@ bool EditorSession::canAdjust(bool allowingEmpty) const
 {
     const std::optional<ImageLayer> layer = activeLayer();
     const std::optional<DocumentSelection> current = selection();
-    return !m_levels && !m_filterEdit && m_document && layer && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_pixelMove && !m_renamingLayerID && !m_showsNewDocument
+    // Open text is drawn by its editor: previews would lie.
+    return !m_levels && !m_filterEdit && !m_textDraft && m_document && layer && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_pixelMove && !m_renamingLayerID && !m_showsNewDocument
         && !m_showsImporter && m_selectedLayerIDs.size() == 1 && !layer->isGroup && !m_isMaskSelected && (layer->asset || allowingEmpty)
         && m_document->effectiveVisibleIDs().contains(layer->id) && !(current && current->isEmpty());
 }

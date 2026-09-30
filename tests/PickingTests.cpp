@@ -1,4 +1,5 @@
 #include "EyedropperFixtures.h"
+#include <QLineEdit>
 
 // Picking beside tools, the open picker and lost releases.
 class PickingTests : public QObject {
@@ -13,6 +14,7 @@ private slots:
     void aLostReleaseEndsTheSampling();
     void theInlineEditorStandsAsideForThePicker();
     void aPolygonalLassoWaitsForThePicker();
+    void openTextTakesTheKeysBackFromThePicker();
 };
 
 void PickingTests::altPicksUnderTheBrushSpotHealingAndTheGradient()
@@ -273,6 +275,72 @@ void PickingTests::aPolygonalLassoWaitsForThePicker()
     QCOMPARE(shown.session.colorPicker().value().color().hex(), QString("FF0000"));
     QCOMPARE(shown.session.lassoDraft().value(), draft);
     shown.session.closeColorPicker(false);
+}
+
+void PickingTests::openTextTakesTheKeysBackFromThePicker()
+{
+    // Swift's 810c88a: closing either picker returns the keys to text.
+    Picking shown;
+    QObject::connect(&shown.session, &EditorSession::changed, shown.canvas, [&shown] {
+        shown.canvas->consumeFocusRequest(shown.session.canvasFocusRequest());
+        shown.canvas->synchronizeDisplay();
+    });
+    auto *field = new QLineEdit(&shown.window);
+    field->setGeometry(0, 0, 10, 10);
+    field->show();
+    shown.tool(NavigationTool::type);
+    QString typed;
+    for (const bool existing : {false, true}) {
+        if (existing) {
+            QVERIFY(shown.session.finishText());
+            shown.session.editActiveText();
+            QVERIFY(shown.session.textDraft().value().layerID.has_value());
+        } else {
+            beginTextAt(shown.session, QPointF(20, 30));
+        }
+        // The foreground, the background, the Type bar's.
+        for (const int picker : {0, 1, 2}) {
+            for (const bool commit : {false, true}) {
+                picker == 2 ? shown.session.openTextColorPicker() : shown.session.openColorPicker(picker == 1);
+                QVERIFY(shown.session.colorPicker().has_value());
+                field->setFocus();
+                QTRY_VERIFY(field->hasFocus());
+                const int requests = shown.session.canvasFocusRequest();
+                shown.session.closeColorPicker(commit);
+                QCOMPARE(shown.session.canvasFocusRequest(), requests + 1);
+                QTRY_VERIFY(shown.canvas->hasFocus());
+                QTest::keyClicks(shown.canvas, QStringLiteral("a"));
+                typed += u'a';
+            }
+        }
+        QCOMPARE(shown.session.textDraft().value().style.content, typed);
+    }
+    // Ctrl+Return reaches the text: it applies.
+    QTest::keyClick(shown.canvas, Qt::Key_Return, Qt::ControlModifier);
+    QVERIFY(!shown.session.textDraft());
+    QCOMPARE(shown.session.activeLayer().value().liveText().value().style.content, QString(12, u'a'));
+    // Any focus request hands open text the keys.
+    shown.session.editActiveText();
+    field->setFocus();
+    QTRY_VERIFY(field->hasFocus());
+    shown.session.requestCanvasFocus();
+    QTRY_VERIFY(shown.canvas->hasFocus());
+    // No open text: a closed picker asks nothing, field kept.
+    QVERIFY(shown.session.finishText());
+    QTRY_VERIFY(shown.canvas->hasFocus());
+    for (const int picker : {0, 1, 2}) {
+        for (const bool commit : {false, true}) {
+            field->setFocus();
+            QTRY_VERIFY(field->hasFocus());
+            const int requests = shown.session.canvasFocusRequest();
+            picker == 2 ? shown.session.openTextColorPicker() : shown.session.openColorPicker(picker == 1);
+            QVERIFY(shown.session.colorPicker().has_value());
+            shown.session.closeColorPicker(commit);
+            QCOMPARE(shown.session.canvasFocusRequest(), requests);
+            QTest::qWait(20);
+            QVERIFY(field->hasFocus());
+        }
+    }
 }
 
 QTEST_MAIN(PickingTests)

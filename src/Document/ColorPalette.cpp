@@ -257,6 +257,9 @@ void EditorSession::closeColorPicker(bool commit)
         const PaletteColor chosen = commit ? color : picker.original;
         changeEffects([&](LayerEffects &effects) { effects.setColor(chosen, picker.target.effect); });
     }
+    // Sampling took the keys from open text: they go back.
+    if (m_textDraft)
+        ++m_canvasFocusRequest;
     notify();
 }
 

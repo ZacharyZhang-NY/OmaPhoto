@@ -89,9 +89,9 @@ void CanvasView::consumeFocusRequest(int request)
     if (request == m_lastFocusRequest)
         return;
     m_lastFocusRequest = request;
-    // An open draft leaves the keys where they are.
+    // Open text takes the keys back too, after the picker.
     QMetaObject::invokeMethod(this, [this] {
-        if (!QApplication::activeModalWidget() && !m_session.textDraft())
+        if (!QApplication::activeModalWidget())
             setFocus(Qt::OtherFocusReason);
     }, Qt::QueuedConnection);
 }

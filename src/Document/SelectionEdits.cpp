@@ -122,7 +122,7 @@ void EditorSession::deleteLayerOrMask()
 bool EditorSession::canInvert() const
 {
     const std::optional<ImageLayer> layer = activeLayer();
-    if (!m_document || !layer || m_isProjectBusy || m_isImporting || m_brushStroke || m_pixelMove || m_renamingLayerID || m_showsNewDocument || m_showsImporter
+    if (!m_document || m_textDraft || !layer || m_isProjectBusy || m_isImporting || m_brushStroke || m_pixelMove || m_renamingLayerID || m_showsNewDocument || m_showsImporter
         || m_selectedLayerIDs.size() != 1 || (layer->isGroup && !m_isMaskSelected) || !m_document->effectiveVisibleIDs().contains(layer->id))
         return false;
     const std::optional<DocumentSelection> current = selection();

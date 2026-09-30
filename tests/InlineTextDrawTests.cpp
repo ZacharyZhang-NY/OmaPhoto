@@ -1,5 +1,6 @@
 #include "MenuFixtures.h"
 #include "InlineTextDrawFixtures.h"
+#include <QDialog>
 #include <QClipboard>
 #include <QElapsedTimer>
 #include <QAction>
@@ -216,14 +217,45 @@ void InlineTextDrawTests::aFreshDraftTakesTheKeysButSparesAField()
     QTRY_VERIFY(button->hasFocus());
     beginTextAt(shown.session, QPointF(20, 30));
     QTRY_VERIFY(shown.canvas->hasFocus());
-    // A focus request leaves open text's keys alone.
+    // Swift's 810c88a: a focus request hands open text the keys.
     button->setFocus();
     QTRY_VERIFY(button->hasFocus());
     shown.canvas->consumeFocusRequest(7);
-    QTest::qWait(50);
-    QVERIFY(button->hasFocus());
-    shown.session.cancelText();
+    QTRY_VERIFY(shown.canvas->hasFocus());
+    button->setFocus();
+    QTRY_VERIFY(button->hasFocus());
+    // A modal dialog keeps the keys, text open or not.
+    QDialog dialog(&shown.window);
+    dialog.open();
+    QTRY_VERIFY(dialog.isVisible());
     shown.canvas->consumeFocusRequest(8);
+    QTest::qWait(50);
+    QVERIFY(!shown.canvas->hasFocus());
+    dialog.close();
+    shown.window.activateWindow();
+    QVERIFY(QTest::qWaitForWindowActive(&shown.window));
+    QTest::qWait(50);
+    QVERIFY(button->hasFocus() && !shown.canvas->hasFocus());
+    // A panel's field keeps the keys; the canvas waits.
+    QDialog panel(&shown.window, Qt::Tool);
+    auto *entry = new QLineEdit(&panel);
+    panel.show();
+    panel.activateWindow();
+    QVERIFY(QTest::qWaitForWindowActive(&panel));
+    entry->setFocus();
+    QTRY_VERIFY(entry->hasFocus());
+    shown.canvas->consumeFocusRequest(9);
+    QTest::qWait(50);
+    QCOMPARE(QApplication::activeWindow(), &panel);
+    QTest::keyClicks(entry, QStringLiteral("panel"));
+    QCOMPARE(entry->text(), QString("panel"));
+    QVERIFY(entry->hasFocus());
+    panel.hide();
+    shown.window.activateWindow();
+    QVERIFY(QTest::qWaitForWindowActive(&shown.window));
+    QTRY_VERIFY(shown.canvas->hasFocus());
+    shown.session.cancelText();
+    shown.canvas->consumeFocusRequest(10);
     QTRY_VERIFY(shown.canvas->hasFocus());
 }
 
