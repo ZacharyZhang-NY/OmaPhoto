@@ -43,7 +43,7 @@ curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scri
 
 Each DEB names its Ubuntu release's libraries, so other Ubuntu releases and Debian build from source (below).
 
-Fedora:
+Fedora 43 or 44:
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/ZacharyZhang-NY/OmaPhoto/main/scripts/install/fedora.sh && bash fedora.sh

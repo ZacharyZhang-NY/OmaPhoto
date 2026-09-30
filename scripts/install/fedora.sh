@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
-# Installs OmaPhoto's latest RPM on Fedora.
+# Installs OmaPhoto's latest RPM on Fedora 43 or 44.
 set -euo pipefail
 base=https://github.com/ZacharyZhang-NY/OmaPhoto/releases/latest/download
-package=omaphoto.x86_64.rpm
 . /etc/os-release
+release=
 case " ${ID:-} ${ID_LIKE:-} " in
-*" fedora "*) ;;
+*" fedora "*) release=${VERSION_ID:-} ;;
+esac
+# Each RPM names its release's LibRaw.
+case "$release" in
+43 | 44) ;;
 *)
-    echo "This script is for Fedora; this system is ${PRETTY_NAME:-unknown}." >&2
+    echo "This script is for Fedora 43 or 44; this system is ${PRETTY_NAME:-unknown}." >&2
     exit 1
     ;;
 esac
+package=omaphoto-fc${release}.x86_64.rpm
 if [ "$(uname -m)" != x86_64 ]; then
     echo "OmaPhoto's packages are built for x86_64 alone." >&2
     exit 1

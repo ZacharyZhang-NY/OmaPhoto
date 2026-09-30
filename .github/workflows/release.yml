@@ -44,19 +44,23 @@ jobs:
   rpm:
     needs: version
     runs-on: ubuntu-24.04
+    # One RPM per Fedora release: each names its own LibRaw.
+    strategy:
+      matrix:
+        release: [43, 44]
     steps:
       - uses: actions/checkout@v7
-      - run: docker build -t omaphoto-fedora scripts/distro/fedora
+      - run: docker build -t omaphoto-fedora --build-arg RELEASE=${{ matrix.release }} scripts/distro/fedora
       - run: |
           docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/src" -w /src omaphoto-fedora sh -c '
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
               -DOMAPHOTO_BUNDLE_ORT=ON -DOMAPHOTO_MODEL=/usr/local/share/omaphoto/u2net.onnx &&
             cmake --build build --target omaphoto && cd build && cpack -G RPM'
-          mv build/omaphoto-*.x86_64.rpm omaphoto.x86_64.rpm
+          mv build/omaphoto-*.x86_64.rpm omaphoto-fc${{ matrix.release }}.x86_64.rpm
       - uses: actions/upload-artifact@v7
         with:
-          name: rpm
-          path: omaphoto.x86_64.rpm
+          name: rpm-fc${{ matrix.release }}
+          path: omaphoto-fc${{ matrix.release }}.x86_64.rpm
   arch:
     needs: version
     runs-on: ubuntu-24.04
@@ -83,7 +87,7 @@ jobs:
           merge-multiple: true
           path: packages
       - working-directory: packages
-        run: sha256sum omaphoto-noble_amd64.deb omaphoto-resolute_amd64.deb omaphoto.x86_64.rpm omaphoto-x86_64.pkg.tar.zst > SHA256SUMS
+        run: sha256sum omaphoto-noble_amd64.deb omaphoto-resolute_amd64.deb omaphoto-fc43.x86_64.rpm omaphoto-fc44.x86_64.rpm omaphoto-x86_64.pkg.tar.zst > SHA256SUMS
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |

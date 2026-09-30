@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Builds and tests the app in one distribution's own container.
 set -euo pipefail
-distro=${1:?"usage: distro-check.sh arch|fedora|nixos|resolute"}
+distro=${1:?"usage: distro-check.sh arch|fedora|fedora44|nixos|resolute"}
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/.." && pwd)
 # Ubuntu 26.04 is the dev image on another base.
 if [ "$distro" = resolute ]; then
     docker build -t omaphoto-resolute --build-arg BASE=ubuntu:26.04 -f "$repo/Dockerfile.dev" "$here"
+elif [ "$distro" = fedora44 ]; then
+    docker build -t omaphoto-fedora44 --build-arg RELEASE=44 "$here/distro/fedora"
 else
     docker build -t "omaphoto-$distro" "$here/distro/$distro"
 fi
