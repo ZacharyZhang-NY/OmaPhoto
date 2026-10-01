@@ -281,10 +281,11 @@ QImage BrushStroke::clonePixels(qint64 key, const Tile &tile)
     if (!m_clone)
         return QImage();
     const int width = int(tile.rect.width()), height = int(tile.rect.height());
-    // Tile pixels to clone pixels: grid, document, then offset.
-    const QTransform toWhole = QTransform::fromTranslate(tile.rect.left(), tile.rect.top()) * pixelToDocument
-        * QTransform::fromTranslate(m_clone->offset.width(), m_clone->offset.height());
-    // Swift's clonePiece: the part under the tile, cut once.
+    // Tile to sample pixels; each tile's piece is cut once.
+    const QRectF &placed = m_clone->placed;
+    const QTransform toWhole = QTransform::fromTranslate(tile.rect.left(), tile.rect.top()) * (m_clone->inGrid ? QTransform() : pixelToDocument)
+        * QTransform::fromTranslate(-placed.left(), -placed.top())
+        * QTransform::fromScale(m_clone->image.width() / placed.width(), m_clone->image.height() / placed.height());
     if (!m_clonePieces.contains(key)) {
         const QRect part =
             toWhole.mapRect(QRectF(0, 0, width, height)).adjusted(-2, -2, 2, 2).toAlignedRect().intersected(m_clone->image.rect());

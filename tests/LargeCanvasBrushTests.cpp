@@ -126,10 +126,15 @@ void LargeCanvasBrushTests::blurPiecesMatchTheWhole()
     BrushSettings settings = session.brushSettings();
     settings.blurRadius = 12;
     session.setBrushSettings(settings);
-    const BrushStroke::Clone blur = session.blurSample(session.document().value(), mask).value();
+    const ImageLayer layer = session.activeLayer().value();
+    const std::unique_ptr<BrushStroke> stroke =
+        mask ? std::make_unique<BrushStroke>(layer, true, settings, QSizeF(600, 600)) : session.makeRasterEdit(layer, settings);
+    const BrushStroke::Clone blur = session.blurSample(*stroke).value();
     const QImage whole = blur.render(blur.image.rect());
-    QCOMPARE(whole.size(), QSize(600, 600));
-    for (const QRect part : {QRect(0, 0, 256, 256), QRect(250, 300, 260, 180), QRect(500, 530, 100, 70)}) {
+    // The sample reaches three sigmas past the layer.
+    QCOMPARE(whole.size(), QSize(672, 672));
+    const int width = blur.image.width(), height = blur.image.height();
+    for (const QRect part : {QRect(0, 0, 256, 256), QRect(250, 300, 260, 180), QRect(width - 100, height - 70, 100, 70)}) {
         const QImage piece = blur.render(part);
         QCOMPARE(piece.size(), part.size());
         QCOMPARE(piece, whole.copy(part));
@@ -144,7 +149,7 @@ void LargeCanvasBrushTests::piecesAreCutOnceWhereTheBrushReaches()
     const ImageLayer layer(ImportedImage(image, image, QStringLiteral("Red")), QPointF(0, 0));
     BrushStroke stroke(layer, false, brush(20, 1, 0, 0, 0), QSizeF(1000, 1000));
     std::vector<QRect> parts;
-    stroke.setClone(BrushStroke::Clone{image, QSizeF(0, 0), [&](const QRect &part) {
+    stroke.setClone(BrushStroke::Clone{image, QRectF(0, 0, 1000, 1000), false, [&](const QRect &part) {
                                            parts.push_back(part);
                                            return image.copy(part);
                                        }});
@@ -174,7 +179,7 @@ void LargeCanvasBrushTests::piecesAreCutOnceWhereTheBrushReaches()
     QImage blue = BrushRaster::context(200, 200, false);
     blue.fill(Qt::blue);
     parts.clear();
-    past.setClone(BrushStroke::Clone{blue, QSizeF(0, 0), [&](const QRect &part) {
+    past.setClone(BrushStroke::Clone{blue, QRectF(0, 0, 200, 200), false, [&](const QRect &part) {
                                          parts.push_back(part);
                                          return blue.copy(part);
                                      }});

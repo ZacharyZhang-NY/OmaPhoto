@@ -3,7 +3,9 @@
 #include "UI/ToolHeaderStyle.h"
 #include <QCheckBox>
 #include <QComboBox>
+#include <QGraphicsOpacityEffect>
 #include <QLineEdit>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QToolButton>
@@ -80,4 +82,9 @@ private:
     QComboBox *const m_sampling;
     QPushButton *const m_cancel;
     QPushButton *const m_apply;
+    // Cancel and Apply, seen only while an edit waits.
+    QWidget *const m_pendingButtons;
+    QGraphicsOpacityEffect *const m_fade;
+    QPropertyAnimation *const m_fadeIn;
+    bool m_pending = false;
 };

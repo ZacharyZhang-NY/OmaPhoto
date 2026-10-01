@@ -121,17 +121,22 @@ void SelectMenuTests::selectAllInAFieldIsTheFields()
     QVERIFY(!bar.session().selection().has_value());
     QTest::keyClick(editor, Qt::Key_Escape);
     QTRY_VERIFY(!bar.session().renamingLayerID().has_value());
-    // The list holds the keys: its rows, as Swift's table.
+    // The list holds the keys: the canvas, never every layer.
     bar.session().addBlankLayer();
     NativeLayerList *list = bar.window.findChild<NativeLayerList *>();
     list->setFocus();
     QTRY_VERIFY(list->hasFocus());
-    const std::vector<ImageLayer> &layers = bar.session().document().value().layers;
-    bar.action("selectAll").trigger();
-    QCOMPARE(bar.session().selectedLayerIDs(), (QSet<QUuid>{layers[0].id, layers[1].id}));
-    QCOMPARE(bar.session().activeLayerID(), std::optional(layers[1].id));
-    QVERIFY(!bar.session().selection().has_value());
-    // Elsewhere it selects the canvas.
+    const QSet<QUuid> selected = bar.session().selectedLayerIDs();
+    const std::optional<QUuid> active = bar.session().activeLayerID();
+    QCOMPARE(selected.size(), 1);
+    QTest::keyClick(list, Qt::Key_A, Qt::ControlModifier);
+    QCOMPARE(bar.session().selection().value().path.boundingRect(), QRectF(0, 0, 50, 50));
+    QCOMPARE(bar.session().history.undoName(), QString("Select All"));
+    QCOMPARE(bar.session().selectedLayerIDs(), selected);
+    QCOMPARE(bar.session().activeLayerID(), active);
+    QVERIFY(list->hasFocus());
+    // Elsewhere it selects the canvas too.
+    bar.session().deselect();
     bar.window.findChild<CanvasView *>()->setFocus();
     QTRY_VERIFY(!list->hasFocus());
     bar.action("selectAll").trigger();

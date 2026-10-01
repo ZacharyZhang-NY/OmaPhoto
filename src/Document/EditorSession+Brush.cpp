@@ -37,6 +37,27 @@ bool EditorSession::canPaint() const
         && (m_isMaskSelected || !layer->adjustment);
 }
 
+std::optional<QString> EditorSession::paintRefusal() const
+{
+    const std::optional<ImageLayer> layer = activeLayer();
+    if (!canEditLayers() || !layer || canPaint())
+        return std::nullopt;
+    if (m_selectedLayerIDs.size() > 1)
+        return QStringLiteral("Several layers are selected. Select just one to paint on it.");
+    if (layer->isGroup && !m_isMaskSelected)
+        return QStringLiteral("“%1” is a folder, which has no pixels of its own. Paint on a layer inside it, or on the folder’s mask.").arg(layer->name);
+    if (!m_document->effectiveVisibleIDs().contains(layer->id))
+        return QStringLiteral("“%1” is hidden, or inside a hidden folder. Show it to paint on it.").arg(layer->name);
+    if (m_isMaskSelected && !(layer->mask && layer->mask->isEnabled))
+        return QStringLiteral("The layer mask is turned off. Shift-click its thumbnail to turn it on, then paint.");
+    if (!m_isMaskSelected && layer->adjustment)
+        return QStringLiteral("“%1” is an adjustment layer, with no pixels to paint. Paint on its mask instead.").arg(layer->name);
+    const std::optional<DocumentSelection> current = selection();
+    if (current && current->isEmpty())
+        return QStringLiteral("Nothing is selected, so there’s nowhere to paint. Choose Select › Deselect (Ctrl+D) to paint anywhere.");
+    return std::nullopt;
+}
+
 // A tiled raster edit of pixels or mask, within budget.
 std::unique_ptr<BrushStroke> EditorSession::makeRasterEdit(const ImageLayer &layer, const BrushSettings &settings, bool growsMask) const
 {
@@ -74,27 +95,20 @@ void EditorSession::beginBrush(QPointF point)
     }
     // Spot Healing and Clone Stamp rework pixels, never a mask.
     const bool paintsMasks = m_tool == NavigationTool::brush || m_tool == NavigationTool::blur;
-    if ((!paintsMasks && (!isBrushTool(m_tool) || m_isMaskSelected)) || !canPaint())
+    if (!paintsMasks && (!isBrushTool(m_tool) || m_isMaskSelected))
         return;
+    if (!canPaint()) {
+        setBrushError(paintRefusal());
+        return;
+    }
     const ImageLayer layer = activeLayer().value();
-    std::optional<BrushStroke::Clone> clone;
+    std::optional<QSizeF> sourceOffset;
     if (m_tool == NavigationTool::cloneStamp) {
-        const std::optional<QSizeF> offset = cloneStrokeOffset(point);
-        if (!offset) {
+        sourceOffset = cloneStrokeOffset(point);
+        if (!sourceOffset) {
             setBrushError(QStringLiteral("Alt-click where Clone Stamp should copy from first."));
             return;
         }
-        const std::optional<QImage> image = cloneSample(m_document.value());
-        if (!image)
-            return;
-        m_cloneOffset = offset;
-        clone = BrushStroke::Clone{*image, *offset, {}};
-    }
-    // Blur paints a softened copy of the layer, in place.
-    if (m_tool == NavigationTool::blur) {
-        clone = blurSample(m_document.value(), m_isMaskSelected);
-        if (!clone)
-            return;
     }
     finishOpacityEdit();
     try {
@@ -107,9 +121,21 @@ void EditorSession::beginBrush(QPointF point)
             settings.green = settings.red;
             settings.blue = settings.red;
         }
-        m_brushStroke = makeRasterEdit(layer, settings, m_tool == NavigationTool::brush);
-        m_brushStroke->setClone(clone);
-        m_brushStroke->isBlur = m_tool == NavigationTool::blur;
+        std::unique_ptr<BrushStroke> stroke = makeRasterEdit(layer, settings, m_tool == NavigationTool::brush);
+        if (sourceOffset) {
+            stroke->setClone(cloneSample(m_document.value(), *stroke, *sourceOffset));
+            if (!stroke->clone())
+                return;
+            m_cloneOffset = sourceOffset;
+        }
+        // Blur paints a softened copy of the layer, in place.
+        if (m_tool == NavigationTool::blur) {
+            stroke->setClone(blurSample(*stroke));
+            if (!stroke->clone())
+                return;
+        }
+        stroke->isBlur = m_tool == NavigationTool::blur;
+        m_brushStroke = std::move(stroke);
         m_brushStroke->append(point);
         m_brushAnchor = point;
         m_brushPointer = point;

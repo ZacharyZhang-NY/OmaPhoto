@@ -85,7 +85,15 @@ bool CanvasView::moveSelectionTool(QPointF point, Qt::KeyboardModifiers modifier
 {
     if (m_pixelDragStart && m_session.document()) {
         const QPointF pixel = m_session.viewport.documentPoint(point, m_session.document()->size());
-        m_session.movePixels(QSizeF(pixel.x() - m_pixelDragStart->x(), pixel.y() - m_pixelDragStart->y()));
+        QSizeF offset(pixel.x() - m_pixelDragStart->x(), pixel.y() - m_pixelDragStart->y());
+        // Shift keeps the pixels on a line, the longer way.
+        if (modifiers.testFlag(Qt::ShiftModifier)) {
+            if (std::abs(offset.width()) >= std::abs(offset.height()))
+                offset.setHeight(0);
+            else
+                offset.setWidth(0);
+        }
+        m_session.movePixels(offset);
         updateCursor();
         synchronizeDisplay();
         return true;

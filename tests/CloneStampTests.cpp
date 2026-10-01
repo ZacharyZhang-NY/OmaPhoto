@@ -68,6 +68,7 @@ private slots:
     void theActiveLayerAloneOrEveryVisibleLayerIsSampled();
     void aMaskIsNeverCloned();
     void aScaledLayerSamplesThroughItsGrid();
+    void aGridCloneIsScaledOntoItsPlace();
     void aLayerBetweenPixelsSamplesTheFraction();
     void aQuarterPixelWeighsItsNeighbours();
     void opacityAndTheSelectionLimitTheClone();
@@ -249,7 +250,7 @@ void CloneStampTests::aScaledLayerSamplesThroughItsGrid()
     ImageLayer layer(ImportedImage(clear, clear, QStringLiteral("Scaled")), QPointF(0, 0));
     layer.transform.size = QSizeF(40, 20);
     BrushStroke paint(layer, false, brush(30, 1, 0, 0, 0), QSizeF(80, 20));
-    paint.setClone(BrushStroke::Clone{edged(80, 20, 31), QSizeF(10, 0), {}});
+    paint.setClone(documentClone(edged(80, 20, 31), QSizeF(10, 0)));
     paint.append(QPointF(21, 10));
     const QImage tile = paint.patches().at(0).image;
     // Grid pixel 10 sits at document 21, sampling 31.
@@ -258,13 +259,25 @@ void CloneStampTests::aScaledLayerSamplesThroughItsGrid()
     QCOMPARE(pixel(tile, 11, 5), bluePixel);
 }
 
+void CloneStampTests::aGridCloneIsScaledOntoItsPlace()
+{
+    // Half as many pixels as their place: each spans two.
+    ImageLayer layer(QStringLiteral("Blank"), QSizeF(40, 20));
+    BrushStroke paint(layer, false, brush(20, 1, 0, 0, 0), QSizeF(40, 20));
+    paint.setClone(BrushStroke::Clone{edged(20, 10, 10), QRectF(0, 0, 40, 20), true, {}});
+    paint.append(QPointF(15, 10));
+    const QImage tile = paint.patches().at(0).image;
+    QCOMPARE(pixel(tile, 17, 10), redPixel);
+    QCOMPARE(pixel(tile, 22, 10), bluePixel);
+}
+
 void CloneStampTests::aLayerBetweenPixelsSamplesTheFraction()
 {
     // Half a pixel right: each grid centre falls between two.
     ImageLayer layer(QStringLiteral("Blank"), QSizeF(40, 20));
     layer.transform.origin = QPointF(0.5, 0);
     BrushStroke paint(layer, false, brush(20, 1, 0, 0, 0), QSizeF(80, 20));
-    paint.setClone(BrushStroke::Clone{edged(80, 20, 31), QSizeF(3, 0), {}});
+    paint.setClone(documentClone(edged(80, 20, 31), QSizeF(3, 0)));
     paint.append(QPointF(28, 10));
     const QPointF centre = paint.pixelToDocument.map(QPointF(28.5, 10.5));
     QCOMPARE(centre, QPointF(28, 10.5));
@@ -279,7 +292,7 @@ void CloneStampTests::aLayerBetweenPixelsSamplesTheFraction()
     QImage rows = BrushRaster::context(40, 40, false);
     rows.fill(QColor(255, 0, 0));
     QPainter(&rows).fillRect(QRect(0, 12, 40, 28), QColor(0, 0, 255));
-    down.setClone(BrushStroke::Clone{rows, QSizeF(0, 0), {}});
+    down.setClone(documentClone(rows, QSizeF(0, 0)));
     down.append(QPointF(20, 12));
     const QImage lowTile = down.patches().at(0).image;
     const int row = int(std::floor(down.pixelToDocument.inverted().map(QPointF(20, 12)).y()));
@@ -297,7 +310,7 @@ void CloneStampTests::aQuarterPixelWeighsItsNeighbours()
         return std::abs(pixel[0] - red) <= 2 && pixel[1] == 0 && std::abs(pixel[2] - blue) <= 2 && pixel[3] == 255;
     };
     BrushStroke across(layer, false, brush(20, 1, 0, 0, 0), QSizeF(80, 40));
-    across.setClone(BrushStroke::Clone{edged(80, 40, 31), QSizeF(0, 0), {}});
+    across.setClone(documentClone(edged(80, 40, 31), QSizeF(0, 0)));
     across.append(QPointF(31, 12));
     QCOMPARE(across.pixelToDocument.map(QPointF(31.5, 12.5)), QPointF(30.75, 12.25));
     const std::vector<int> mixed = pixel(across.patches().at(0).image, 31, 12);
@@ -307,7 +320,7 @@ void CloneStampTests::aQuarterPixelWeighsItsNeighbours()
     rows.fill(QColor(255, 0, 0));
     QPainter(&rows).fillRect(QRect(0, 12, 80, 28), QColor(0, 0, 255));
     BrushStroke down(layer, false, brush(20, 1, 0, 0, 0), QSizeF(80, 40));
-    down.setClone(BrushStroke::Clone{rows, QSizeF(0, 0), {}});
+    down.setClone(documentClone(rows, QSizeF(0, 0)));
     down.append(QPointF(20, 12));
     const std::vector<int> stacked = pixel(down.patches().at(0).image, 20, 12);
     QVERIFY2(near(stacked, 64, 191), qPrintable(QString("%1 %2").arg(stacked[0]).arg(stacked[2])));
@@ -321,7 +334,7 @@ void CloneStampTests::opacityAndTheSelectionLimitTheClone()
     over.fill(QColor(255, 0, 0));
     BrushStroke half(ImageLayer(ImportedImage(under, under, QStringLiteral("Blue")), QPointF(0, 0)), false, brush(10, 1, 0, 0, 0, 0.5),
                      QSizeF(40, 20));
-    half.setClone(BrushStroke::Clone{over, QSizeF(0, 0), {}});
+    half.setClone(documentClone(over, QSizeF(0, 0)));
     half.append(QPointF(10, 10));
     // Each byte is rounded once: 127.5 and 127.5 make 128.
     QCOMPARE(pixel(half.patches().at(0).image, 10, 10), (std::vector<int>{128, 0, 128, 255}));
@@ -337,7 +350,7 @@ void CloneStampTests::opacityAndTheSelectionLimitTheClone()
         painter.setCompositionMode(QPainter::CompositionMode_Clear);
         painter.fillRect(QRect(0, 0, 40, 5), Qt::transparent);
     }
-    bounded.setClone(BrushStroke::Clone{sample, QSizeF(0, 0), {}});
+    bounded.setClone(documentClone(sample, QSizeF(0, 0)));
     bounded.append(QPointF(10, 8));
     const QImage tile = bounded.patches().at(0).image;
     QCOMPARE(pixel(tile, 8, 8), redPixel);

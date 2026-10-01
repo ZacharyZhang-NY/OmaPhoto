@@ -35,8 +35,13 @@ void EditorSession::setGradientSettings(const GradientSettings &settings)
 void EditorSession::beginGradient(QPointF point)
 {
     const std::optional<ImageLayer> layer = activeLayer();
-    if (m_tool != NavigationTool::gradient || !(canPaint() || m_gradientEdit) || !layer)
+    if (m_tool != NavigationTool::gradient || !layer)
         return;
+    // Swift explains only past this guard, where nothing refuses.
+    if (!canPaint() && !m_gradientEdit) {
+        setBrushError(paintRefusal());
+        return;
+    }
     // A new line on this target replaces the pending one.
     if (m_gradientEdit && m_gradientEdit->raster->layer.id == layer->id && m_gradientEdit->raster->isMask == m_isMaskSelected) {
         m_gradientEdit->start = point;

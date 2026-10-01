@@ -55,7 +55,9 @@ private slots:
     void clearEdgesFadeAndClampedEdgesHold();
     void grayBlursAndBadInputIsRefused();
     void theSampleFollowsTheRadius();
-    void aMaskSampleKeepsItsEdgeToneAndPlacement();
+    void theSampleIsInTheLayersOwnPixels();
+    void aHugeLayersSampleIsMadeCoarser();
+    void aMaskSampleKeepsItsEdgeTone();
     void aBlurStrokeSoftensUnderTheBrushAsOneStep();
     void aBlurStrokeSoftensAMask();
     void aMaskBetweenPixelsTakesTheFraction();
@@ -127,29 +129,129 @@ void BlurToolTests::grayBlursAndBadInputIsRefused()
     QVERIFY_THROWS_EXCEPTION(std::logic_error, PixelAdjust::gaussianBlur(step.convertToFormat(QImage::Format_RGB32), 2, true));
 }
 
+// The expected sharp sample: `image` at `margin` in.
+QImage framed(const QImage &image, QSizeF size, int margin, bool mask, int tone = 0, double fit = 1)
+{
+    QImage context = BrushRaster::context(int(std::ceil((size.width() + 2 * margin) * fit)), int(std::ceil((size.height() + 2 * margin) * fit)), mask);
+    if (mask)
+        context.fill(tone);
+    QPainter painter(&context);
+    BrushRaster::draw(image, QRectF(margin * fit, margin * fit, size.width() * fit, size.height() * fit), painter);
+    painter.end();
+    return context;
+}
+
+// The expected softened sample, blurred whole.
+QImage sampled(const QImage &image, QSizeF size, int margin, double sigma, bool mask, int tone = 0, double fit = 1)
+{
+    return PixelAdjust::gaussianBlur(framed(image, size, margin, mask, tone, fit), sigma * fit, mask);
+}
+
+// The sample softened whole, through its pieces' function.
+QImage soft(const BrushStroke::Clone &sample)
+{
+    return sample.render(sample.image.rect());
+}
+
 void BlurToolTests::theSampleFollowsTheRadius()
 {
     EditorSession session;
-    blurring(session, BrushSettings{.diameter = 60});
-    const CanvasDocument document = session.document().value();
+    blurring(session, BrushSettings{.diameter = 60, .blurRadius = 6});
     const QImage sharp = edge(60, 40);
-    // The bar's Radius, within 0.5 and 50, whatever the size.
-    for (const auto &[radius, sigma] : {std::pair(6.0, 6.0), std::pair(0.1, 0.5), std::pair(90.0, 50.0)}) {
+    // The Radius, from 0.5, at most half the layer's side.
+    for (const auto &[radius, sigma] : {std::pair(6.0, 6.0), std::pair(0.1, 0.5), std::pair(90.0, 30.0)}) {
         BrushSettings settings = session.brushSettings();
         settings.blurRadius = radius;
-        settings.diameter = 3 * radius;
+        settings.diameter = radius < 10 ? 90 : 5;
         session.setBrushSettings(settings);
-        const BrushStroke::Clone sample = session.blurSample(document).value();
-        QCOMPARE(sample.image, sharp);
-        QCOMPARE(sample.render(sharp.rect()), PixelAdjust::gaussianBlur(sharp, sigma, false));
+        const std::unique_ptr<BrushStroke> stroke = session.makeRasterEdit(session.activeLayer().value(), settings);
+        const BrushStroke::Clone sample = session.blurSample(*stroke).value();
+        const int margin = int(std::ceil(3 * sigma));
+        QCOMPARE(sample.image, framed(sharp, QSizeF(60, 40), margin, false));
+        QCOMPARE(soft(sample), sampled(sharp, QSizeF(60, 40), margin, sigma, false));
+        QCOMPARE(sample.placed, QRectF(-margin, -margin, 60 + 2 * margin, 40 + 2 * margin));
+        QVERIFY(sample.inGrid);
     }
-    // No layer, nothing to soften.
-    session.selectLayer(std::nullopt);
-    QVERIFY(!session.blurSample(document));
-    QVERIFY(!session.blurSample(document, true));
+    // On a wide layer, the Radius stops at 50.
+    EditorSession wide;
+    wide.createDocument(400, 300);
+    const QImage broad = edge(400, 300);
+    wide.insert(ImportedImage(broad, broad, QStringLiteral("Edge")));
+    wide.setBrushSettings(BrushSettings{.diameter = 60, .blurRadius = 80});
+    const std::unique_ptr<BrushStroke> broadStroke = wide.makeRasterEdit(wide.activeLayer().value(), wide.brushSettings());
+    QCOMPARE(wide.blurSample(*broadStroke).value().placed, QRectF(-150, -150, 700, 600));
+    // A blank layer or missing mask has nothing to soften.
+    session.addBlankLayer();
+    const BrushSettings settings = session.brushSettings();
+    QVERIFY(!session.blurSample(*session.makeRasterEdit(session.activeLayer().value(), settings)));
+    QVERIFY(!session.blurSample(BrushStroke(session.activeLayer().value(), true, settings, QSizeF(60, 40))));
+    // So a Blur stroke there never begins.
+    session.beginBrush(QPointF(30, 20));
+    QVERIFY(!session.brushStroke());
 }
 
-void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
+void BlurToolTests::theSampleIsInTheLayersOwnPixels()
+{
+    // Twice as fine as the canvas: the softening doubles.
+    EditorSession session;
+    blurring(session, BrushSettings{.diameter = 20, .blurRadius = 2});
+    const QImage fine = edge(120, 80);
+    session.insert(ImportedImage(fine, fine, QStringLiteral("Fine")));
+    const QUuid id = session.activeLayerID().value();
+    rewrite(session, [&](ProjectSnapshot &snapshot) { record(snapshot, id).transform = LayerTransform{.origin = {0, 0}, .size = {60, 40}}; });
+    const BrushSettings settings = session.brushSettings();
+    BrushStroke stroke(session.activeLayer().value(), false, settings, QSizeF(60, 40));
+    QCOMPARE(stroke.sourceRect, QRectF(0, 0, 120, 80));
+    BrushStroke::Clone sample = session.blurSample(stroke).value();
+    QCOMPARE(soft(sample), sampled(fine, QSizeF(120, 80), 12, 4, false));
+    QCOMPARE(sample.placed, QRectF(-12, -12, 144, 104));
+    // Turned, the softening is the same in its own pixels.
+    rewrite(session, [&](ProjectSnapshot &snapshot) { record(snapshot, id).transform.rotation = 45; });
+    BrushStroke turned(session.activeLayer().value(), false, settings, QSizeF(60, 40));
+    sample = session.blurSample(turned).value();
+    QCOMPARE(soft(sample), sampled(fine, QSizeF(120, 80), 12, 4, false));
+    QCOMPARE(sample.placed, turned.sourceRect.adjusted(-12, -12, 12, 12));
+    // A tiny layer caps the softening at half its side.
+    session.setBrushSettings(BrushSettings{.diameter = 60, .blurRadius = 6});
+    QImage tiny = BrushRaster::context(4, 2, false);
+    tiny.fill(Qt::red);
+    BrushStroke small(ImageLayer(ImportedImage(tiny, tiny, QStringLiteral("Tiny")), QPointF(10, 10)), false, settings, QSizeF(60, 40));
+    sample = session.blurSample(small).value();
+    QCOMPARE(soft(sample), sampled(tiny, QSizeF(4, 2), 6, 2, false));
+    QCOMPARE(sample.placed, small.sourceRect.adjusted(-6, -6, 6, 6));
+}
+
+void BlurToolTests::aHugeLayersSampleIsMadeCoarser()
+{
+    // Sixteen million pixels at most, or four canvases.
+    EditorSession session;
+    session.createDocument(100, 100);
+    const QImage huge = edge(4200, 3900);
+    session.insert(ImportedImage(huge, huge, QStringLiteral("Huge")));
+    const QUuid id = session.activeLayerID().value();
+    rewrite(session, [&](ProjectSnapshot &snapshot) { record(snapshot, id).transform = LayerTransform{.origin = {0, 0}, .size = {420, 390}}; });
+    session.setBrushSettings(BrushSettings{.diameter = 15, .blurRadius = 1.5});
+    const BrushSettings settings = session.brushSettings();
+    BrushStroke stroke(session.activeLayer().value(), false, settings, QSizeF(100, 100));
+    QCOMPARE(stroke.sourceRect.size(), QSizeF(4200, 3900));
+    // A tenth as large: softening 15, margin 45.
+    const BrushStroke::Clone sample = session.blurSample(stroke).value();
+    QCOMPARE(sample.placed, stroke.sourceRect.adjusted(-45, -45, 45, 45));
+    const double fit = std::sqrt(16'000'000.0 / (4290.0 * 3990.0));
+    QCOMPARE(sample.image.size(), QSize(4148, 3858));
+    QCOMPARE(soft(sample), sampled(huge, QSizeF(4200, 3900), 45, 15, false, 0, fit));
+    // A larger canvas lifts the budget: four of them.
+    EditorSession roomy;
+    roomy.createDocument(2100, 2100);
+    roomy.insert(ImportedImage(huge, huge, QStringLiteral("Huge")));
+    const QUuid roomyID = roomy.activeLayerID().value();
+    rewrite(roomy, [&](ProjectSnapshot &snapshot) { record(snapshot, roomyID).transform = LayerTransform{.origin = {0, 0}, .size = {420, 390}}; });
+    roomy.setBrushSettings(settings);
+    BrushStroke whole(roomy.activeLayer().value(), false, settings, QSizeF(2100, 2100));
+    QCOMPARE(roomy.blurSample(whole).value().image.size(), QSize(4290, 3990));
+}
+
+void BlurToolTests::aMaskSampleKeepsItsEdgeTone()
 {
     EditorSession session;
     blurring(session, BrushSettings{.diameter = 20, .blurRadius = 2});
@@ -157,7 +259,7 @@ void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
     // A white mask with a black bar, placed mid-layer.
     QImage mask(20, 20, QImage::Format_Grayscale8);
     mask.fill(255);
-    for (int y = 0; y < 20; ++y)
+    for (int y = 2; y < 18; ++y)
         for (int x = 8; x < 12; ++x)
             mask.scanLine(y)[x] = 0;
     rewrite(session, [&](ProjectSnapshot &snapshot) {
@@ -165,36 +267,18 @@ void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
         record(snapshot, id).maskPlacement = LayerTransform{.origin = {20, 10}, .size = {20, 20}};
         record(snapshot, id).maskLinked = false;
     });
-    const BrushStroke::Clone clone = session.blurSample(session.document().value(), true).value();
-    const QImage sample = clone.render(clone.image.rect());
-    QCOMPARE(sample.format(), QImage::Format_Grayscale8);
-    QImage expected(60, 40, QImage::Format_Grayscale8);
+    BrushStroke stroke(session.activeLayer().value(), true, session.brushSettings(), QSizeF(60, 40));
+    const BrushStroke::Clone sample = session.blurSample(stroke).value();
+    QCOMPARE(sample.image.format(), QImage::Format_Grayscale8);
     // Past its pixels the mask keeps its edge's tone: white.
-    expected.fill(255);
-    QPainter painter(&expected);
-    painter.drawImage(QRectF(20, 10, 20, 20), mask);
-    painter.end();
-    QCOMPARE(sample, PixelAdjust::gaussianBlur(expected, 2, true));
-    QVERIFY(sample.constScanLine(20)[30] < 128 && sample.constScanLine(2)[2] == 255);
-    // Turned, the black box turns with the mask.
-    EditorSession turned;
-    turned.createDocument(100, 60);
-    const QImage wide = edge(100, 60);
-    turned.insert(ImportedImage(wide, wide, QStringLiteral("Edge")));
-    const QUuid wideID = turned.activeLayerID().value();
-    QImage white(40, 40, QImage::Format_Grayscale8);
-    white.fill(255);
-    rewrite(turned, [&](ProjectSnapshot &snapshot) {
-        setMask(snapshot, wideID, LayerMask::assetFrom(white));
-        record(snapshot, wideID).maskPlacement = LayerTransform{.origin = {30, 10}, .size = {40, 40}, .rotation = 30};
-        record(snapshot, wideID).maskLinked = false;
-    });
-    turned.setBrushSettings(BrushSettings{.diameter = 5, .blurRadius = 1.5});
-    const BrushStroke::Clone sharp = turned.blurSample(turned.document().value(), true).value();
-    const QImage soft = sharp.render(sharp.image.rect());
-    // Past the true box, inside one turned the other way.
-    QVERIFY2(soft.constScanLine(36)[73] > 240, qPrintable(QString::number(soft.constScanLine(36)[73])));
-    QVERIFY2(soft.constScanLine(24)[27] > 240, qPrintable(QString::number(soft.constScanLine(24)[27])));
+    QCOMPARE(soft(sample), sampled(mask, QSizeF(20, 20), 6, 2, true, 255));
+    QCOMPARE(sample.placed, QRectF(-6, -6, 32, 32));
+    QVERIFY(soft(sample).constScanLine(16)[16] < 128 && soft(sample).constScanLine(1)[1] == 255);
+    // A black edge keeps black past it.
+    mask.fill(0);
+    rewrite(session, [&](ProjectSnapshot &snapshot) { setMask(snapshot, id, LayerMask::assetFrom(mask)); });
+    BrushStroke black(session.activeLayer().value(), true, session.brushSettings(), QSizeF(60, 40));
+    QCOMPARE(soft(session.blurSample(black).value()), sampled(mask, QSizeF(20, 20), 6, 2, true, 0));
 }
 
 void BlurToolTests::aBlurStrokeSoftensUnderTheBrushAsOneStep()
@@ -265,7 +349,7 @@ void BlurToolTests::aMaskBetweenPixelsTakesTheFraction()
     for (int y = 0; y < 20; ++y)
         for (int x = 0; x < 80; ++x)
             steps.scanLine(y)[x] = x < 21 ? 0 : 200;
-    paint.setClone(BrushStroke::Clone{steps, QSizeF(0, 0), {}});
+    paint.setClone(documentClone(steps, QSizeF(0, 0)));
     paint.isBlur = true;
     paint.append(QPointF(21, 10));
     const QImage tile = paint.patches().at(0).image;
@@ -285,7 +369,7 @@ void BlurToolTests::aMaskPastTheCanvasEdgeKeepsItsTone()
     white.fill(255);
     layer.mask = LayerMask(LayerMask::assetFrom(white));
     BrushStroke paint(layer, true, brush(6, 1, 1, 1, 1), QSizeF(20, 20));
-    paint.setClone(BrushStroke::Clone{white, QSizeF(0, 0), {}});
+    paint.setClone(documentClone(white, QSizeF(0, 0)));
     paint.isBlur = true;
     paint.append(QPointF(0, 10));
     const QImage tile = paint.patches().at(0).image;
@@ -296,7 +380,7 @@ void BlurToolTests::aMaskPastTheCanvasEdgeKeepsItsTone()
     black.fill(0);
     layer.mask = LayerMask(LayerMask::assetFrom(black));
     BrushStroke over(layer, true, brush(6, 1, 1, 1, 1), QSizeF(20, 20));
-    over.setClone(BrushStroke::Clone{white, QSizeF(0, 0), {}});
+    over.setClone(documentClone(white, QSizeF(0, 0)));
     over.isBlur = true;
     over.append(QPointF(0, 10));
     QCOMPARE(int(over.patches().at(0).image.constScanLine(10)[0]), 128);

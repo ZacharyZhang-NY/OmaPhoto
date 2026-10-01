@@ -229,8 +229,7 @@ void EditorSession::beginWarp(QPointF point)
 {
     const std::optional<ImageLayer> layer = activeLayer();
     if (!canPaint() || m_isMaskSelected || !layer || !layer->asset || !m_document) {
-        if (m_isMaskSelected)
-            setBrushError(QStringLiteral("Smudge and Liquify work on a layer's pixels, not its mask."));
+        setBrushError(m_isMaskSelected ? std::optional(QStringLiteral("Smudge and Liquify work on a layer's pixels, not its mask.")) : paintRefusal());
         return;
     }
     finishOpacityEdit();
@@ -268,7 +267,7 @@ void EditorSession::finishWarp()
                 settings.hardness = 1;
                 settings.opacity = 1;
                 const std::unique_ptr<BrushStroke> stroke = makeRasterEdit(current, settings);
-                stroke->setClone(BrushStroke::Clone{warp->image(), QSizeF(0, 0), {}});
+                stroke->setClone(BrushStroke::Clone{warp->image(), QRectF(QPointF(0, 0), warp->image().size()), false, {}});
                 stroke->replacesWithClone = true;
                 stroke->editName = rawValue(warp->mode);
                 // A point every twentieth of the tip covers every dab.

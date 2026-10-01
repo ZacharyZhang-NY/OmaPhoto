@@ -261,13 +261,3 @@ void NativeLayerList::changeEvent(QEvent *event)
     if (event->type() == QEvent::PaletteChange)
         QMetaObject::invokeMethod(this, &NativeLayerList::update, Qt::QueuedConnection);
 }
-
-void NativeLayerList::selectAllRows()
-{
-    if (m_rows.empty())
-        return;
-    QSet<QUuid> ids;
-    for (const ImageLayer &row : m_rows)
-        ids.insert(row.id);
-    m_session.selectLayers(ids, m_rows.front().id);
-}

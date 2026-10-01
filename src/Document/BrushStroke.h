@@ -109,10 +109,11 @@ public:
     qint64 pixelLimit = DocumentLimits::documentPixelBudget();
     // Limits every edit to the document selection; nil when none.
     std::optional<SelectionClip> selectionClip;
-    // Clone Stamp: a document-sized image, and each point's offset.
+    // Painted through the tip, placed: document or `inGrid` pixels.
     struct Clone {
         QImage image;
-        QSizeF offset;
+        QRectF placed;
+        bool inGrid;
         // Makes a part of `image`: Blur softens piece by piece.
         std::function<QImage(const QRect &)> render;
     };
@@ -152,6 +153,8 @@ public:
     QRectF committedBounds() const;
     LayerTransform committedTransform() const;
     LayerTransform transform(const QRectF &bounds) const;
+    // `rect` shifted to copy from `offset` document pixels away.
+    QRectF gridRect(const QRectF &rect, QSizeF offset) const;
     // Spot Healing's end: the painted spot rebuilt from around it.
     void heal();
     PaintSnapshot paintSnapshot() const;
