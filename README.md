@@ -63,6 +63,24 @@ Or add `github:ZacharyZhang-NY/OmaPhoto/<tag>`, a release tag, as a flake input 
 
 The packages themselves sit on the [releases page](https://github.com/ZacharyZhang-NY/OmaPhoto/releases).
 
+### Garbled cursors on NVIDIA with Hyprland
+
+On NVIDIA with Hyprland at a fractional scale, the cursors OmaPhoto draws itself, such as those of the selection tools, the wand, the eyedropper, zoom and moving layers, can show garbled or cut off. Theme cursors render correctly. The fault lies in the hardware cursor path (reported upstream as [Hyprland #16413](https://github.com/hyprwm/Hyprland/issues/16413)). Software cursors avoid it.
+
+Current Hyprland and Omarchy read `~/.config/hypr/hyprland.lua`; Omarchy users can put the line in `~/.config/hypr/looknfeel.lua`:
+
+```lua
+hl.config({ cursor = { no_hardware_cursors = 1 } })
+```
+
+An older setup that reads `~/.config/hypr/hyprland.conf` takes:
+
+```
+cursor {
+    no_hardware_cursors = 1
+}
+```
+
 ## Build from source
 
 The build runs in Docker, so the host needs only Docker:
