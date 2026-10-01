@@ -56,7 +56,7 @@ void LayerRenderer::draw(const QImage &image, const LayerTransform &transform, Q
     const double device = deviceScale(context);
     const Reduced source = reduced(image, width, device, transform.sampling);
     const InterpolationQuality quality = interpolation(
-        transform.sampling, width * device / std::max(1, image.width()) * (1 << source.level));
+        transform.sampling, width * device / std::max(1, image.width()) * (1 << source.level), transform.radians() == 0);
     const QRectF bounds(-width / 2, -height / 2, width, height);
     QTransform placement;
     placement.translate(center.x(), center.y());
@@ -294,9 +294,9 @@ void LayerRenderer::drawCoverage(const QImage &image, const LayerTransform &tran
     context.restore();
 }
 
-InterpolationQuality LayerRenderer::interpolation(LayerSampling sampling, double finalFactor)
+InterpolationQuality LayerRenderer::interpolation(LayerSampling sampling, double finalFactor, bool upright)
 {
-    if (sampling == LayerSampling::nearest)
+    if (sampling == LayerSampling::nearest || (upright && std::abs(finalFactor - 1) < 0.001))
         return InterpolationQuality::none;
     return finalFactor <= 1 ? InterpolationQuality::low : quality(sampling);
 }

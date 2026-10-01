@@ -150,7 +150,8 @@ void withFrame(int pixelWidth, int pixelHeight, const QRectF &painted, const QRe
         return;
     const double device = LayerRenderer::deviceScale(context);
     const int level = transform.sampling == LayerSampling::nearest ? 0 : DownsampleCache::level(width * device / pixelWidth);
-    const InterpolationQuality quality = LayerRenderer::interpolation(transform.sampling, width * device / pixelWidth * (1 << level));
+    const InterpolationQuality quality = LayerRenderer::interpolation(transform.sampling, width * device / pixelWidth * (1 << level),
+                                                                         transform.radians() == 0);
     QTransform placement;
     placement.translate(center.x(), center.y());
     placement.rotateRadians(transform.radians());

@@ -107,12 +107,31 @@ void AdjustmentSurfaceTests::pastItsPixelBudgetNothingIsDrawn()
 {
     QImage surface = BrushRaster::context(8, 8, false);
     QPainter painter(&surface);
-    // The budget counts device pixels: 64 here, not 16 units.
+    // 64 device pixels; past that 16 units; past that, none.
     painter.scale(2, 2);
     bool called = false;
     QTest::ignoreMessage(QtWarningMsg, "an adjustment surface passes its pixel budget: QSize(8, 8)");
-    AdjustmentSurface::draw(painter, [&](QPainter &) { called = true; }, 0, 63);
+    AdjustmentSurface::draw(painter, [&](QPainter &) { called = true; }, 0, 15);
     QVERIFY(!called);
+    QSize allocated;
+    AdjustmentSurface::draw(painter, [&](QPainter &target) {
+        allocated = QSize(target.device()->width(), target.device()->height());
+        target.fillRect(QRectF(0, 0, 2, 4), Qt::blue);
+        target.fillRect(QRectF(2, 0, 2, 4), Qt::green);
+    }, 0, 63);
+    QCOMPARE(allocated, QSize(4, 4));
+    // A device pixel at a quarter: one pixel, not none.
+    painter.save();
+    painter.scale(2, 2);
+    painter.setClipRect(QRectF(0, 0, 0.25, 1));
+    allocated = QSize();
+    AdjustmentSurface::draw(painter, [&](QPainter &target) { allocated = QSize(target.device()->width(), target.device()->height()); }, 0, 3);
+    painter.restore();
+    QCOMPARE(allocated, QSize(1, 1));
+    // Enlarged smoothly: the seam between blue and green blends.
+    QCOMPARE(surface.pixel(0, 0), qRgba(0, 0, 255, 255));
+    QCOMPARE(surface.pixel(7, 0), qRgba(0, 255, 0, 255));
+    QVERIFY(qBlue(surface.pixel(4, 0)) > 0 && qBlue(surface.pixel(4, 0)) < 255);
     AdjustmentSurface::draw(painter, [&](QPainter &target) {
         called = true;
         target.fillRect(QRectF(0, 0, 4, 4), Qt::red);

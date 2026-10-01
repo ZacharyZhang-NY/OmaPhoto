@@ -295,6 +295,14 @@ void BlurNoiseAdjustmentTests::noiseStaysOneFieldAcrossRegions()
     QImage expected = gray.copy();
     noise_add_at(expected.bits(), 8, 8, size_t(expected.bytesPerLine()), 50, 0, 0, 3, 20, 40);
     QCOMPARE(noise.apply(gray, QRectF(10, 20, 4, 4)), expected);
+    // Each axis by its own scale (Compositor 1.4).
+    expected = gray.copy();
+    noise_add_at(expected.bits(), 8, 8, size_t(expected.bytesPerLine()), 50, 0, 0, 3, 20, 10);
+    QCOMPARE(noise.apply(gray, QRectF(10, 20, 4, 16)), expected);
+    // A region under a unit wide counts as one.
+    expected = gray.copy();
+    noise_add_at(expected.bits(), 8, 8, size_t(expected.bytesPerLine()), 50, 0, 0, 3, 8, 16);
+    QCOMPARE(noise.apply(gray, QRectF(1, 2, 0.5, 0.5)), expected);
     // A negative origin floors, as Swift rounds down.
     expected = gray.copy();
     noise_add_at(expected.bits(), 8, 8, size_t(expected.bytesPerLine()), 50, 0, 0, 3, -11, -21);

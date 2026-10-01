@@ -272,7 +272,6 @@ void FilterEdit::grow(const QRectF &extent)
 void FilterEdit::prepare(const ImportedImage &source, const LayerTransform &placed)
 {
     const QSize size = source.size();
-    ++previewSourceVersion;
     mapping = BrushRaster::pixelToDocument(placed, size.width(), size.height());
     // Noise, grain and dither preview whole: enlarged, they look coarse.
     const bool whole = kind == FilterKind::addNoise || kind == FilterKind::grain || kind == FilterKind::dither || kind == FilterKind::contentAwareFill

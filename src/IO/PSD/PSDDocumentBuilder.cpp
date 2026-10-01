@@ -1,6 +1,10 @@
 #include "IO/PSD/PSDDocumentBuilder.h"
 #include "Document/PixelAdjust.h"
 #include "IO/ProjectStore.h"
+#include "Document/BrushStroke.h"
+#include "IO/ImageExporter.h"
+#include "Logging.h"
+#include <QPainter>
 
 namespace {
 ImportedImage imported(const QImage &image, const QString &name)
@@ -114,7 +118,10 @@ PSDImport PSDDocumentBuilder::makeImport(const PSDDocument &document, const std:
         ImageLayer layer = layerFor(record, canvas, assets, typed);
         if (record.mask) {
             try {
-                layer.mask = LayerMask(LayerMask::assetFrom(*record.mask), record.maskEnabled, std::nullopt, record.maskLinked);
+                const std::optional<QImage> placed = maskOnLayerGrid(*record.mask, record, layer, canvas);
+                if (!placed)
+                    throw ExportError(ExportError::Kind::render);
+                layer.mask = LayerMask(LayerMask::assetFrom(*placed), record.maskEnabled, std::nullopt, record.maskLinked);
             } catch (const std::runtime_error &) {
                 // Swift's `try?`: a mask that fails is reported, not fatal.
                 conversions.push_back(PSDConversion{.layerName = record.name,
@@ -146,4 +153,29 @@ PSDImport PSDDocumentBuilder::makeImport(const PSDDocument &document, const std:
         }
     }
     return PSDImport{document.width, document.height, document.resolution, std::move(layers), std::move(conversions)};
+}
+
+std::optional<QImage> PSDDocumentBuilder::maskOnLayerGrid(const QImage &patch, const PSDRecord &record, const ImageLayer &layer, QSizeF canvas)
+{
+    const QSizeF grid = layer.asset ? QSizeF(layer.asset->size()) : canvas;
+    const QRectF placed(layer.transform.origin, layer.transform.size);
+    if (grid.width() < 1 || grid.height() < 1 || !(placed.width() > 0) || !(placed.height() > 0) || !(record.maskBounds.width() > 0)
+        || !(record.maskBounds.height() > 0))
+        return patch;
+    const double scaleX = grid.width() / placed.width(), scaleY = grid.height() / placed.height();
+    const QRectF rect((record.maskBounds.left() - placed.left()) * scaleX, (record.maskBounds.top() - placed.top()) * scaleY,
+                      record.maskBounds.width() * scaleX, record.maskBounds.height() * scaleY);
+    const int width = int(grid.width()), height = int(grid.height());
+    // Already the layer's grid: nothing to place.
+    if (rect.toAlignedRect() == QRect(0, 0, width, height) && patch.size() == QSize(width, height))
+        return patch;
+    QImage context(width, height, QImage::Format_Grayscale8);
+    if (context.isNull()) {
+        qCWarning(lcIO) << "a PSD layer mask could not be placed on its layer:" << QSize(width, height);
+        return std::nullopt;
+    }
+    context.fill(uint(record.maskDefault));
+    QPainter painter(&context);
+    BrushRaster::draw(patch, rect, painter);
+    return context;
 }

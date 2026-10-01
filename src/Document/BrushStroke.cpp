@@ -3,6 +3,7 @@
 #include "IO/ImageExporter.h"
 #include <QtConcurrent>
 #include <cmath>
+#include <cstring>
 #include <numeric>
 #include <stdexcept>
 
@@ -26,6 +27,37 @@ QImage BrushRaster::context(int width, int height, bool mask)
         throw ExportError(ExportError::Kind::render);
     surface.fill(0);
     return surface;
+}
+
+QImage BrushRaster::copy(const QImage &image)
+{
+    QImage result = context(image.width(), image.height(), false);
+    if (image.format() != QImage::Format_RGBA8888_Premultiplied) {
+        QPainter painter(&result);
+        draw(image, QRectF(0, 0, image.width(), image.height()), painter);
+        return result;
+    }
+    for (int y = 0; y < image.height(); ++y)
+        std::memcpy(result.scanLine(y), image.constScanLine(y), size_t(image.width()) * 4);
+    return result;
+}
+
+void BrushRaster::inBands(qsizetype count, const std::function<void(qsizetype, qsizetype)> &body)
+{
+    const int bands = count < 250'000 ? 1 : QThread::idealThreadCount() * 2;
+    const qsizetype size = (count + bands - 1) / bands;
+    try {
+        std::vector<int> indices(static_cast<size_t>(bands));
+        std::iota(indices.begin(), indices.end(), 0);
+        PoolMap::blocking(indices, [&](int band) {
+            const qsizetype start = band * size;
+            if (start < count)
+                body(start, std::min(size, count - start));
+        });
+    } catch (const std::bad_alloc &) {
+        // Out of memory fails as a context would.
+        throw ExportError(ExportError::Kind::render);
+    }
 }
 
 void BrushRaster::draw(const QImage &image, const QRectF &rect, QPainter &context, const QRectF &source)

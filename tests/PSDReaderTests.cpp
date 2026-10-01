@@ -167,6 +167,7 @@ void PSDReaderTests::maskFlagsAndMasksFromRenderedPixels()
         Record record = pixels();
         record.mask = QRect(1, 1, 3, 1);
         record.maskFlags = flags;
+        record.maskDefault = flags == 1 ? 0 : 255;
         record.channels.push_back({-2, QByteArray("\0\0\x10\x20\x30", 5)});
         records.push_back(record);
     }
@@ -178,12 +179,22 @@ void PSDReaderTests::maskFlagsAndMasksFromRenderedPixels()
     QVERIFY(document.layers[1].maskEnabled && !document.layers[1].maskLinked);
     QVERIFY(!document.layers[2].maskEnabled && document.layers[2].maskLinked);
     QVERIFY(!document.layers[3].mask);
+    QCOMPARE(document.layers[0].maskBounds, QRectF(1, 1, 3, 1));
+    QVERIFY(document.layers[0].maskDefault == 255 && document.layers[1].maskDefault == 0);
     const PSDImport imported = PSDDocumentBuilder::makeImport(document);
+    // On the layer's grid, the default round it.
+    const QImage placed = imported.layers[0].mask.value().asset.image();
+    QCOMPARE(placed.size(), QSize(2, 2));
+    QVERIFY(placed.constScanLine(0)[0] == 255 && placed.constScanLine(0)[1] == 255);
+    QVERIFY(placed.constScanLine(1)[0] == 255 && placed.constScanLine(1)[1] == 0x10);
+    QCOMPARE(imported.layers[1].mask.value().asset.image().constScanLine(1)[0], uchar(0));
     QVERIFY(imported.layers[1].mask.value().isEnabled && !imported.layers[1].mask.value().isLinked);
     QVERIFY(!imported.layers[2].mask.value().isEnabled);
     // A mask that is not gray is reported, left off.
     PSDDocument coloured = document;
-    coloured.layers[0].mask = PSDFixture::colorImage(3, 1, 1, 1, 1);
+    // Already the layer's grid, so nothing converts it.
+    coloured.layers[0].mask = PSDFixture::colorImage(2, 2, 1, 1, 1);
+    coloured.layers[0].maskBounds = QRectF(0, 0, 2, 2);
     const PSDImport skipped = PSDDocumentBuilder::makeImport(coloured);
     QVERIFY(!skipped.layers[0].mask);
     QCOMPARE(messages(skipped), std::vector<QString>{"Layer: The layer mask couldn’t be converted to 8-bit grayscale and was skipped."});
@@ -317,8 +328,8 @@ void PSDReaderTests::levelsCurvesAndHueParse()
     levels.bytes(QByteArray(292 - levels.data.size(), '\0'));
     const LayerAdjustment level = PSDAdjustments::parse({{"levl", levels.data}}).value();
     QVERIFY(level.kind == AdjustmentKind::levels);
-    QCOMPARE(level.levels.ranges[0], (LevelRange{10, 2, 240, 5, 250}));
-    QCOMPARE(level.levels.ranges[3], (LevelRange{13, 515 / 256.0, 243, 8, 253}));
+    QCOMPARE(level.levels.ranges[0], (LevelRange{10, 5.12, 240, 5, 250}));
+    QCOMPARE(level.levels.ranges[3], (LevelRange{13, 5.15, 243, 8, 253}));
     QVERIFY(!PSDAdjustments::parse({{"levl", levels.data.left(291)}}));
     PSDFixture::Buffer curves;
     curves.u8(0);
@@ -354,12 +365,12 @@ void PSDReaderTests::levelsCurvesAndHueParse()
     QVERIFY(shift.kind == AdjustmentKind::hsv);
     const HueSaturationSettings settings = shift.hsvSettings.value();
     QVERIFY(settings.colorize);
+    // Colorize's own values; the Master's go unread.
     QCOMPARE(settings.adjustments.at(ColorRange::master), (RangeAdjustment{30, -20, 10}));
-    QCOMPARE(settings.adjustments.at(ColorRange::reds), (RangeAdjustment{-5, 40, 0}));
-    QVERIFY(!settings.adjustments.contains(ColorRange::yellows));
+    QVERIFY(!settings.adjustments.contains(ColorRange::reds));
     // `hue2` comes before `hue `.
     PSDFixture::Buffer plain;
-    plain.u32(0);
+    plain.bytes(QByteArray(16, '\0'));
     QVERIFY(!PSDAdjustments::parse({{"hue2", plain.data}, {"hue ", hue.data}}).value().hsvSettings.value().colorize);
     QVERIFY(!PSDAdjustments::parse({{"hue ", QByteArray("\0\0\1", 3)}}));
     QVERIFY(!PSDAdjustments::parse({{"expA", hue.data}}));

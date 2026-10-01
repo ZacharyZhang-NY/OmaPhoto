@@ -75,7 +75,8 @@ struct CanvasDocument {
 
     QSizeF size() const { return QSizeF(width, height); }
     static std::optional<int> validDimension(const QString &value);
-    std::vector<LayerHierarchy::Entry> hierarchyEntries() const;
+    // Drawing order and what shows (LayerOrder), kept between asks.
+    LayerOrder::Result hierarchy() const;
     QSet<QUuid> effectiveVisibleIDs() const;
     QHash<QUuid, double> effectiveOpacities() const;
     std::vector<ImageLayer> renderLayers() const;

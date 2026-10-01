@@ -1,6 +1,7 @@
 #include "IO/PSD/PSDReader.h"
 #include <QtEndian>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 quint16 u16(const QByteArray &data, qsizetype at)
@@ -12,21 +13,23 @@ qint16 i16(const QByteArray &data, qsizetype at)
 {
     return qFromBigEndian<qint16>(data.constData() + at);
 }
+}
 
-std::optional<LayerAdjustment> levels(const QByteArray &data)
+std::optional<LayerAdjustment> PSDAdjustments::levels(const QByteArray &data)
 {
     if (data.size() < 292)
         return std::nullopt;
     LevelsSettings settings;
     for (int channel = 0; channel < 4; ++channel) {
         const qsizetype base = 2 + channel * 10;
-        settings.ranges[size_t(channel)] = LevelRange{double(u16(data, base)), double(u16(data, base + 8)) / 256, double(u16(data, base + 2)),
+        settings.ranges[size_t(channel)] = LevelRange{double(u16(data, base)), double(u16(data, base + 8)) / 100, double(u16(data, base + 2)),
                                                       double(u16(data, base + 4)), double(u16(data, base + 6))}
                                                .normalized();
     }
     return LayerAdjustment{.kind = AdjustmentKind::levels, .levels = settings};
 }
 
+namespace {
 std::optional<LayerAdjustment> curves(const QByteArray &data)
 {
     if (data.size() < 5)
@@ -66,21 +69,32 @@ std::optional<LayerAdjustment> curves(const QByteArray &data)
         return std::nullopt;
     return LayerAdjustment{.kind = AdjustmentKind::curves, .curves = settings};
 }
+}
 
-std::optional<LayerAdjustment> hue(const QByteArray &data)
+std::optional<LayerAdjustment> PSDAdjustments::hue(const QByteArray &data)
 {
-    if (data.size() < 4)
+    if (data.size() < 16)
         return std::nullopt;
-    HueSaturationSettings settings(0, 0, 0, data[2] != 0);
-    qsizetype at = 4;
-    for (const ColorRange range : allColorRanges) {
-        if (at + 6 > data.size())
+    const bool colorize = data[2] != 0;
+    HueSaturationSettings settings(0, 0, 0, colorize);
+    const auto values = [&data](qsizetype at) { return RangeAdjustment{double(i16(data, at)), double(i16(data, at + 2)), double(i16(data, at + 4))}; };
+    // Colorize has values of its own; else the Master's.
+    settings.adjustments[ColorRange::master] = values(colorize ? 4 : 10);
+    if (colorize)
+        return LayerAdjustment{.kind = AdjustmentKind::hsv, .hsvSettings = settings};
+    qsizetype at = 16;
+    for (const ColorRange range : colorRanges) {
+        if (at + 14 > data.size())
             break;
-        settings.adjustments[range] = RangeAdjustment{double(i16(data, at)), double(i16(data, at + 2)), double(i16(data, at + 4))};
-        at += 6;
+        const auto degrees = [&data](qsizetype from) {
+            const double value = std::fmod(double(i16(data, from)), 360);
+            return value < 0 ? value + 360 : value;
+        };
+        settings.bands[range] = HueBand{degrees(at), degrees(at + 2), degrees(at + 4), degrees(at + 6)};
+        settings.adjustments[range] = values(at + 8);
+        at += 14;
     }
     return LayerAdjustment{.kind = AdjustmentKind::hsv, .hsvSettings = settings};
-}
 }
 
 std::optional<LayerAdjustment> PSDAdjustments::parse(const std::map<QString, QByteArray> &extra)

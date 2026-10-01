@@ -34,6 +34,8 @@ class FilterTests : public QObject {
     Q_OBJECT
 private slots:
     void gaussianBlurSoftensTheEdgesIntoRoomMadeForItAsOneUndoStep();
+    void growingABlurKeepsThePreviewUpUntilTheNextOne();
+    void aMaskKeepsItsPlaceUnderAPreview();
     void motionBlurStreaksAlongItsAngleCounterclockwiseFromHorizontal();
     void addNoiseChangesColorButNeverAlphaAndMonochromaticKeepsGrays();
     void removeDistortionBendsAboutTheCenterAndOnlyPincushionCorrectionOpensTheCorners();
@@ -68,6 +70,56 @@ void FilterTests::gaussianBlurSoftensTheEdgesIntoRoomMadeForItAsOneUndoStep()
     QCOMPARE(alpha(19), 144);
     QCOMPARE(alpha(20), 111);
     QCOMPARE(alpha(27), 1);
+}
+
+// The last preview stays where made until replaced.
+void FilterTests::growingABlurKeepsThePreviewUpUntilTheNextOne()
+{
+    EditorSession session;
+    session.createDocument(40, 20);
+    QImage image = BrushRaster::context(40, 20, false);
+    QPainter(&image).fillRect(0, 0, 20, 20, Qt::white);
+    session.insert(ImportedImage(image, image, QStringLiteral("Half")));
+    const ImageLayer layer = session.activeLayer().value();
+    session.beginFilter(FilterKind::gaussianBlur);
+    session.updateFilter(FilterSettings{.radius = 2}, true);
+    QVERIFY(QTest::qWaitFor([&] { return !session.filterEdit().value().preparing; }, 20000));
+    const QImage first = session.filterEdit().value().previewImage(layer.id).value();
+    const LayerTransform firstPlace = session.displayedTransform(session.activeLayer().value());
+    QVERIFY(firstPlace.size.width() > 40);
+    QCOMPARE(session.displayedMaskPlacement(session.activeLayer().value()), std::nullopt);
+    session.updateFilter(FilterSettings{.radius = 12}, true);
+    QCOMPARE(session.filterEdit().value().previewImage(layer.id).value().cacheKey(), first.cacheKey());
+    QCOMPARE(session.displayedTransform(session.activeLayer().value()), firstPlace);
+    QVERIFY(QTest::qWaitFor([&] { return !session.filterEdit().value().preparing; }, 20000));
+    const QImage second = session.filterEdit().value().previewImage(layer.id).value();
+    QVERIFY(second.cacheKey() != first.cacheKey());
+    QVERIFY(session.displayedTransform(session.activeLayer().value()).size.width() > firstPlace.size.width());
+    session.cancelFilter();
+}
+
+// A covering mask covers; on a grown preview, old bounds.
+void FilterTests::aMaskKeepsItsPlaceUnderAPreview()
+{
+    EditorSession session;
+    session.createDocument(40, 20);
+    QImage image = BrushRaster::context(40, 20, false);
+    image.fill(Qt::white);
+    session.insert(ImportedImage(image, image, QStringLiteral("White")));
+    session.addLayerMask();
+    const ImageLayer layer = session.activeLayer().value();
+    session.selectLayerTarget(layer.id, false);
+    session.beginFilter(FilterKind::addNoise);
+    QVERIFY(QTest::qWaitFor([&] { return !session.filterEdit().value().preparing; }, 20000));
+    QVERIFY(session.filterEdit().value().previewImage(layer.id));
+    QCOMPARE(session.displayedMaskPlacement(layer), std::nullopt);
+    QCOMPARE(session.displayedTransform(layer), layer.transform);
+    session.cancelFilter();
+    session.beginFilter(FilterKind::gaussianBlur);
+    QVERIFY(QTest::qWaitFor([&] { return !session.filterEdit().value().preparing; }, 20000));
+    QCOMPARE(session.displayedMaskPlacement(layer), std::optional(layer.transform));
+    QVERIFY(session.displayedTransform(layer).size.width() > 40);
+    session.cancelFilter();
 }
 
 void FilterTests::motionBlurStreaksAlongItsAngleCounterclockwiseFromHorizontal()

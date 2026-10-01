@@ -83,12 +83,12 @@ void HueSaturationFailureTests::failuresReachTheSessionsError()
 
 void HueSaturationFailureTests::theFilterFailsAsAContextWhenMemoryRunsOut()
 {
-    // One pixel wide: its row list asks as its pixels.
+    // Its copy asks 64 MB, past the limit.
     QImage tall(1, 16'000'000, QImage::Format_RGBA8888_Premultiplied);
     tall.fill(Qt::red);
     const HueSaturationJob job{tall, HueSaturationSettings(120), std::nullopt, QTransform(), false};
     malloc_trim(0);
-    const AddressSpaceLimit limit(80ll * 1024 * 1024);
+    const AddressSpaceLimit limit(16ll * 1024 * 1024);
     QVERIFY_THROWS_EXCEPTION(ExportError, HueSaturationFilter::run(job));
 }
 

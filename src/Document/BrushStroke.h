@@ -44,6 +44,10 @@ struct BrushSettings {
 // Shared raster drawing; coverage is copied without color conversion.
 namespace BrushRaster {
 QImage context(int width, int height, bool mask);
+// A colour context holding `image`; its own layout copies bytewise.
+QImage copy(const QImage &image);
+// Runs `body` over `count` pixels, band by band: start, length.
+void inBands(qsizetype count, const std::function<void(qsizetype, qsizetype)> &body);
 // Copies `image`, or its `source` part, into `rect`.
 void draw(const QImage &image, const QRectF &rect, QPainter &context, const QRectF &source = QRectF());
 // A solid colour through gray coverage, and a clip, 1:1.

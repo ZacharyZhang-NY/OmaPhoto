@@ -80,10 +80,6 @@ void EditorSession::updateFilter(const FilterSettings &settings, bool preview)
     if (FilterEdit::blurMargin(edit.kind, edit.settings) > edit.grownMargin) {
         try {
             edit.growForBlur();
-            edit.preparedPreview.reset();
-            // A waiting job moves to the grid its version names.
-            if (edit.pending)
-                edit.pending = edit.previewJob();
         } catch (const ProjectError &error) {
             setBrushError(QString::fromUtf8(error.what()));
         } catch (const ExportError &error) {
@@ -111,6 +107,7 @@ void EditorSession::updateFilter(const FilterSettings &settings, bool preview)
         return;
     }
     edit.pending = edit.previewJob();
+    edit.pendingTransform = edit.grownTransform;
     renderFilterPreview();
 }
 
@@ -127,22 +124,22 @@ void EditorSession::renderFilterPreview()
         const FilterJob job = *std::exchange(edit.pending, std::nullopt);
         m_filterPreviewFor = edit.id;
         m_filterRendering = true;
-        m_filterPreview.setFuture(QtConcurrent::run([job, version = edit.previewSourceVersion]() -> Filtered {
+        m_filterPreview.setFuture(QtConcurrent::run([job, placement = edit.pendingTransform]() -> Filtered {
             try {
                 if (job.kind == FilterKind::cameraRaw) {
                     auto [image, scope] = CameraRawScope::preview(job);
-                    return Filtered{std::move(image), std::nullopt, job.settings, std::move(scope), version};
+                    return Filtered{std::move(image), std::nullopt, job.settings, std::move(scope), placement};
                 }
-                return Filtered{PixelFilter::run(job), std::nullopt, job.settings, std::nullopt, version};
+                return Filtered{PixelFilter::run(job), std::nullopt, job.settings, std::nullopt, placement};
             } catch (const ContentFillError &error) {
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, placement};
             } catch (const SubjectRemovalError &error) {
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, placement};
             } catch (const ExportError &error) {
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, placement};
             } catch (const ProjectError &error) {
                 // Settings past their bounds: Black & White, Color Balance.
-                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, version};
+                return Filtered{std::nullopt, QString::fromUtf8(error.what()), job.settings, std::nullopt, placement};
             }
         }));
     }
@@ -153,18 +150,17 @@ void EditorSession::finishFilterPreview()
 {
     m_filterRendering = false;
     const Filtered result = m_filterPreview.result();
-    // A cancelled edit takes nothing; an older grid renders again.
-    if (m_filterEdit && m_filterEdit->id == m_filterPreviewFor && result.sourceVersion != m_filterEdit->previewSourceVersion) {
-        m_filterEdit->preparing = false;
-        notify();
-    } else if (m_filterEdit && m_filterEdit->id == m_filterPreviewFor) {
+    // A cancelled edit takes nothing.
+    if (m_filterEdit && m_filterEdit->id == m_filterPreviewFor) {
         FilterEdit &edit = *m_filterEdit;
         edit.preparing = false;
         edit.previewError = result.failure;
         if (result.scope)
             edit.rawPanel.scope = result.scope;
+        // Made before the layer grew, it shows there till replaced.
         if (edit.preview || isAutomatic(edit.kind)) {
             edit.preparedPreview = result.image;
+            edit.preparedTransform = result.placement;
             edit.preparedSettings = result.settings;
             ++m_brushRevision;
         }

@@ -242,7 +242,8 @@ QImage LayerAdjustment::apply(const QImage &image, std::optional<QRectF> region,
         FilterJob job{filterKind(kind).value(), image, settings, scale, std::nullopt, QTransform(), resolvedNoiseSeed()};
         // Swift's region origin, counted in the image's own pixels.
         if (region)
-            job.noiseOrigin = region->topLeft() * (image.width() / region->width());
+            job.noiseOrigin = QPointF(region->left() * image.width() / std::max(1.0, region->width()),
+                                      region->top() * image.height() / std::max(1.0, region->height()));
         return PixelFilter::run(job);
     }
     case AdjustmentKind::invert: return PixelInvert::run(PixelInvert::Job{image, false, QTransform(), std::nullopt});
