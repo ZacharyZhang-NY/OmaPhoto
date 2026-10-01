@@ -30,7 +30,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         {"newCanvas", "Ctrl+N"}, {"openProject", "Ctrl+O"}, {"importImages", ""}, {"save", "Ctrl+S"}, {"saveAs", "Ctrl+Shift+S"},
         {"exportPNG", "Ctrl+Shift+E"}, {"exportJPEG", "Ctrl+Alt+Shift+S"},
         {"closeProject", "Ctrl+W"}, {"undo", "Ctrl+Z"}, {"redo", "Ctrl+Shift+Z"}, {"fit", "Ctrl+0"}, {"actualPixels", "Ctrl+1"},
-        {"zoomIn", "Ctrl+="}, {"zoomOut", "Ctrl+-"}, {"pixelGrid", ""}, {"snap", ""}, {"showGrid", "Ctrl+'"}, {"showGuides", "Ctrl+;"}, {"showRulers", "Ctrl+R"}, {"snapEnabled", "Ctrl+Shift+;"}, {"snapToGuides", ""}, {"snapToGrid", ""}, {"snapToLayers", ""}, {"snapToDocumentBounds", ""}, {"lockGuides", "Ctrl+Alt+;"}, {"clearGuides", ""}, {"transformControls", "Ctrl+H"}, {"transformLayer", "Ctrl+T"},
+        {"zoomIn", "Ctrl+="}, {"zoomOut", "Ctrl+-"}, {"pixelGrid", ""}, {"snap", ""}, {"showGrid", "Ctrl+'"}, {"showGuides", "Ctrl+;"}, {"gridSettings", ""}, {"showRulers", "Ctrl+R"}, {"snapEnabled", "Ctrl+Shift+;"}, {"snapToGuides", ""}, {"snapToGrid", ""}, {"snapToLayers", ""}, {"snapToDocumentBounds", ""}, {"lockGuides", "Ctrl+Alt+;"}, {"clearGuides", ""}, {"transformControls", "Ctrl+H"}, {"transformLayer", "Ctrl+T"},
         {"layerViaCopy", "Ctrl+J"}, {"cut", "Ctrl+X"}, {"copy", "Ctrl+C"}, {"copyMerged", "Ctrl+Shift+C"}, {"paste", "Ctrl+V"}, {"keyboardShortcuts", ""}, {"fillForeground", "Alt+Backspace"}, {"fillBackground", "Ctrl+Backspace"}, {"clearSelectionPixels", ""}, {"contentAwareFill", "Shift+Backspace"}, {"clippingMask", "Ctrl+Alt+G"}, {"groupLayers", "Ctrl+G"},
         {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
         {"mergeLayers", "Ctrl+E"}, {"flipHorizontal", ""}, {"flipVertical", ""}, {"deleteLayer", ""},
@@ -52,7 +52,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     QCOMPARE(titles, (QStringList{"&File", "&Edit", "&View", "&Select", "&Image", "Fil&ter", "&Layer"}));
     QCOMPARE(menus[0]->actions().size(), 12);
     QCOMPARE(menus[1]->actions().size(), 13);
-    QCOMPARE(menus[2]->actions().size(), 16);
+    QCOMPARE(menus[2]->actions().size(), 17);
     QCOMPARE(menus[3]->actions().size(), 11);
     // Swift 1.3.4's Color Range… follows Subject.
     const QList<QAction *> select = menus[3]->actions();

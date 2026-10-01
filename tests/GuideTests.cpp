@@ -294,14 +294,16 @@ void GuideTests::snapTargetsFollowViewMenu()
 
 void GuideTests::layoutGridLinesIncludeMajorsAndSubdivisions()
 {
-    const std::vector<double> lines = LayoutGrid::lines(64);
+    const LayoutGrid grid;
+    const std::vector<double> lines = grid.lines(64);
     QCOMPARE(int(lines.size()), 9);
     QVERIFY(lines.front() == 0 && lines.back() == 64 && lines[1] == 8);
-    QVERIFY(LayoutGrid::isMajor(0) && LayoutGrid::isMajor(64) && LayoutGrid::isMajor(128) && !LayoutGrid::isMajor(8));
-    QVERIFY(LayoutGrid::isMajor(63.6) && !LayoutGrid::isMajor(63.4));
-    QCOMPARE(LayoutGrid::lines(-1), std::vector<double>{0});
-    QCOMPARE(LayoutGrid::lines(7.9), std::vector<double>{0});
-    QCOMPARE(int(LayoutGrid::lines(20).size()), 3);
+    QVERIFY(grid.isMajor(0) && grid.isMajor(64) && grid.isMajor(128) && !grid.isMajor(8));
+    QVERIFY(grid.isMajor(63.6) && !grid.isMajor(63.4));
+    QCOMPARE(grid.lines(-1), std::vector<double>{0});
+    QCOMPARE(grid.lines(qQNaN()), std::vector<double>{0});
+    QCOMPARE(grid.lines(7.9), std::vector<double>{0});
+    QCOMPARE(int(grid.lines(20).size()), 3);
 }
 
 void GuideTests::aDragCreatesMovesAndDeletesGuides()

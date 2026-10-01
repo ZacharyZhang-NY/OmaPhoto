@@ -188,7 +188,6 @@ public:
     int brushRevision() const { return m_brushRevision; }
     // Selected pixels on the move, from a Ctrl-drag or Ctrl-arrow.
     const PixelMove *pixelMove() const { return m_pixelMove.get(); }
-
     // The one filter open; its sheet shows while it lasts.
     const std::optional<FilterEdit> &filterEdit() const { return m_filterEdit; }
     // The last committed filter's settings, where the next one starts.
@@ -212,7 +211,6 @@ public:
     void setEffectsEditingOriginal(std::optional<LayerEffects> original);
     // The effect chosen in the list; see selectedEffect.
     const std::optional<LayerEffectSelection> &effectSelection() const { return m_effectSelection; }
-
     bool isModified() const { return history.isModified(); }
     bool canUseHistory() const;
     // Undo's first press discards a pending gradient.
@@ -223,7 +221,6 @@ public:
     // A transaction that nests; a whole gesture is one entry.
     void beginEdit(const QString &name);
     void endEdit();
-
     bool canEditLayers() const;
     void addBlankLayer();
     void deleteLayer(QUuid id);
@@ -367,6 +364,8 @@ private:
     bool m_snappingEnabled = true;
     // The layout grid starts off; guides show; rulers hide.
     bool m_showsGrid = ToolDefaults::boolean(QStringLiteral("grid"), false);
+    LayoutGrid m_layoutGrid = LayoutGrid::stored();
+    GridAppearance m_gridAppearance = GridAppearance::stored();
     bool m_showsGuides = ToolDefaults::boolean(QStringLiteral("guides"), true);
     bool m_showsRulers = ToolDefaults::boolean(QStringLiteral("rulers"), false);
     bool m_snapEnabled = ToolDefaults::boolean(QStringLiteral("snap"), true);

@@ -40,6 +40,8 @@ public:
     void receive(const QList<QUrl> &urls, std::optional<QPointF> point = std::nullopt, std::function<void()> done = {});
     // Swift's sheets over the window; resizes off the UI thread.
     void canvasSize(std::function<void()> done = {});
+    // View > Grid Settings…: no step; Cancel puts back.
+    void gridSettings(std::function<void()> done = {});
     void imageSize(std::function<void()> done = {});
     void trim(std::function<void()> done = {});
     void exportPNG(std::function<void()> done = {});

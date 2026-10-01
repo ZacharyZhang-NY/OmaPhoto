@@ -4,6 +4,7 @@
 #include "UI/ColorPaletteControls.h"
 #include "UI/ColorPickerSheet+Dialog.h"
 #include "UI/ColorPickerSheet.h"
+#include "UI/GridSettingsSheet.h"
 #include <QComboBox>
 #include "UI/ImageSizeSheet.h"
 #include <QDialog>
@@ -19,6 +20,7 @@ private slots:
     void theImageSizeSheetScalesThePixelsAsOneStep();
     void aResizeThatFailsIsExplained();
     void theSheetsColourOpensTheAppsPickerOverIt();
+    void gridSettingsPreviewsThenKeepsOrPutsBack();
 };
 
 namespace {
@@ -192,6 +194,45 @@ void ProjectResizeTests::theSheetsColourOpensTheAppsPickerOverIt()
     const ImageLayer bottom = desk.session.document().value().layers.front();
     QCOMPARE(bottom.asset.value().image().pixelColor(0, 25), QColor(0, 0, 255));
     QVERIFY(!desk.session.isProjectBusy());
+}
+
+void ProjectResizeTests::gridSettingsPreviewsThenKeepsOrPutsBack()
+{
+    Desk desk;
+    QVERIFY(!desk.session.showsGrid() && !desk.session.isProjectBusy());
+    const int steps = desk.session.history.undoCount();
+    desk.controller.gridSettings(desk.finished());
+    // The grid shows while the sheet is open; nothing busy.
+    QVERIFY(desk.session.showsGrid() && !desk.session.isProjectBusy());
+    QVERIFY(desk.dialog().windowTitle() == "Grid" && desk.dialog().windowModality() == Qt::WindowModal);
+    auto &preset = *desk.dialog().findChild<QComboBox *>(QStringLiteral("gridPreset"));
+    preset.setCurrentIndex(7);
+    emit preset.activated(7);
+    QCOMPARE(desk.session.gridAppearance().preset, GridAppearance::Preset::cyan);
+    // Another sheet waits for this one.
+    bool refused = false;
+    desk.controller.gridSettings([&refused] { refused = true; });
+    QTRY_VERIFY(refused);
+    QCOMPARE(desk.window.findChildren<GridSettingsSheet *>().size(), 1);
+    // Cancel puts back the look and the hidden grid.
+    QTest::keyClick(&desk.dialog(), Qt::Key_Escape);
+    QTRY_VERIFY(desk.done);
+    QVERIFY(desk.session.gridAppearance() == GridAppearance() && !desk.session.showsGrid() && desk.session.history.undoCount() == steps);
+    QTRY_VERIFY(!desk.window.findChild<QDialog *>());
+    // OK keeps what was set, shown grid or not.
+    desk.session.setShowsGrid(true);
+    desk.controller.gridSettings(desk.finished());
+    auto &again = *desk.dialog().findChild<QComboBox *>(QStringLiteral("gridPreset"));
+    again.setCurrentIndex(7);
+    emit again.activated(7);
+    desk.type("gridSpacing", "100");
+    QTRY_VERIFY(desk.done);
+    QVERIFY(desk.session.layoutGrid() == LayoutGrid(100, 8) && desk.session.showsGrid());
+    QCOMPARE(desk.session.gridAppearance().preset, GridAppearance::Preset::cyan);
+    // Without a window, nothing opens.
+    desk.controller.window = nullptr;
+    desk.controller.gridSettings(desk.finished());
+    QTRY_VERIFY(desk.done);
 }
 
 QTEST_MAIN(ProjectResizeTests)

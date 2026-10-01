@@ -1,5 +1,6 @@
 #include "MenuFixtures.h"
 #include "Rendering/EditorCanvas.h"
+#include "UI/GridSettingsSheet.h"
 #include <QLineEdit>
 
 // The View menu: zoom, the pixel grid and Snap.
@@ -9,6 +10,7 @@ private slots:
     void viewEntriesZoomTheFrontSession();
     void thePixelGridEntryTogglesTheSession();
     void guideEntriesFollowTheSession();
+    void gridSettingsOpensItsSheet();
 };
 
 void ViewMenuTests::viewEntriesZoomTheFrontSession()
@@ -116,6 +118,26 @@ void ViewMenuTests::guideEntriesFollowTheSession()
     bar.action("clearGuides").trigger();
     QVERIFY(bar.session().document().value().guides.empty());
     QVERIFY(!bar.action("clearGuides").isEnabled());
+}
+
+void ViewMenuTests::gridSettingsOpensItsSheet()
+{
+    Bar bar;
+    QAction &entry = bar.action("gridSettings");
+    QVERIFY(entry.text() == "Grid Settings…" && !entry.isCheckable() && !entry.isEnabled());
+    // Swift's place: after the Show submenu, before Rulers.
+    const QList<QAction *> view = qobject_cast<QMenu *>(entry.parent())->actions();
+    const qsizetype at = view.indexOf(&entry);
+    QVERIFY(view[at - 1]->menu() && view[at - 1]->menu()->title() == "Show" && view[at + 1] == &bar.action("showRulers"));
+    bar.session().createDocument(20, 20);
+    QVERIFY(entry.isEnabled());
+    bar.window.show();
+    entry.trigger();
+    QTRY_VERIFY(bar.window.findChild<GridSettingsSheet *>());
+    QVERIFY(bar.session().showsGrid());
+    QTest::keyClick(bar.window.findChild<GridSettingsSheet *>(), Qt::Key_Escape);
+    QTRY_VERIFY(!bar.window.findChild<GridSettingsSheet *>());
+    QVERIFY(!bar.session().showsGrid());
 }
 
 QTEST_MAIN(ViewMenuTests)

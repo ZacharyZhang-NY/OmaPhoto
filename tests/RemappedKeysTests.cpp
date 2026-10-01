@@ -2,6 +2,7 @@
 #include "UI/CanvasSizeSheet.h"
 #include "UI/ColorPickerSheet.h"
 #include "UI/ColorRangeSheet.h"
+#include "UI/GridSettingsSheet.h"
 #include "UI/EffectsSheet.h"
 #include "UI/FilterSheet.h"
 #include "UI/HueSaturationSheet.h"
@@ -227,6 +228,7 @@ void RemappedKeysTests::everySheetBindsSwiftsKeys()
     session.insert(ImportedImage(red, red, "Red"));
     const CanvasDocument canvas = session.document().value();
     QCOMPARE(keys(CanvasSizeSheet(canvas, session, [](std::optional<CanvasSizeOptions>) {})), both);
+    QCOMPARE(keys(GridSettingsSheet(session, LayoutGrid(), GridAppearance(), [](const GridSettingsSheet::Settings &) {}, [](std::optional<GridSettingsSheet::Settings>) {})), both);
     QCOMPARE(keys(ImageSizeSheet(canvas, [](std::optional<ImageSizeOptions>) {})), both);
     QCOMPARE(keys(TrimSheet([](std::optional<TrimOptions>) {})), both);
     // Export JPEG also takes the View menu's four zoom keys.

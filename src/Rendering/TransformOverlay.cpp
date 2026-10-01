@@ -364,42 +364,54 @@ void TransformOverlay::drawTransformHandles(QPainter &context, const QPalette &p
     context.restore();
 }
 
-// The layout grid: solid majors, dotted subdivisions when roomy.
+// The layout grid: majors in the chosen style, dotted subdivisions.
 void TransformOverlay::drawLayoutGrid(QPainter &context) const
 {
     const std::optional<CanvasDocument> &document = m_session.document();
     if (!m_session.showsGrid() || !document)
         return;
+    const LayoutGrid &grid = m_session.layoutGrid();
+    const GridAppearance &appearance = m_session.gridAppearance();
     const QSizeF size = document->size();
     const QTransform map = documentToView();
     const double hairline = 1 / std::max(m_session.viewport.backingScale, 1.0);
     const auto lines = [&](bool majors) {
         QPainterPath path;
-        for (const double x : LayoutGrid::lines(size.width())) {
-            if (LayoutGrid::isMajor(x) == majors) {
+        for (const double x : grid.lines(size.width())) {
+            if (grid.isMajor(x) == majors) {
                 path.moveTo(map.map(QPointF(x, 0)));
                 path.lineTo(map.map(QPointF(x, size.height())));
             }
         }
-        for (const double y : LayoutGrid::lines(size.height())) {
-            if (LayoutGrid::isMajor(y) == majors) {
+        for (const double y : grid.lines(size.height())) {
+            if (grid.isMajor(y) == majors) {
                 path.moveTo(map.map(QPointF(0, y)));
                 path.lineTo(map.map(QPointF(size.width(), y)));
             }
         }
         return path;
     };
+    // Points on and off, counted in pen widths for Qt.
+    const auto pen = [&](double alpha, const std::vector<double> &pattern) {
+        QColor colour = appearance.color().color();
+        colour.setAlphaF(float(alpha));
+        QPen line(colour, hairline, Qt::SolidLine, Qt::FlatCap);
+        if (!pattern.empty()) {
+            QList<qreal> widths;
+            for (const double points : pattern)
+                widths.append(points / hairline);
+            line.setDashPattern(widths);
+        }
+        return line;
+    };
     context.save();
     context.setRenderHint(QPainter::Antialiasing, true);
     context.setBrush(Qt::NoBrush);
-    if (LayoutGrid::step * m_session.viewport.pointsPerPixel() >= 4) {
-        QPen dotted(QColor::fromRgbF(0.55, 0.55, 0.55, 0.28), hairline, Qt::CustomDashLine, Qt::FlatCap);
-        // One point on, two off: Qt counts in pen widths.
-        dotted.setDashPattern({1 / hairline, 2 / hairline});
-        context.setPen(dotted);
+    if (grid.step() * m_session.viewport.pointsPerPixel() >= 4) {
+        context.setPen(pen(appearance.subdivisionAlpha(), {1, 2}));
         context.drawPath(lines(false));
     }
-    context.setPen(QPen(QColor::fromRgbF(0.7, 0.7, 0.7, 0.45), hairline, Qt::SolidLine, Qt::FlatCap));
+    context.setPen(pen(appearance.majorAlpha(), dashes(appearance.style)));
     context.drawPath(lines(true));
     context.restore();
 }

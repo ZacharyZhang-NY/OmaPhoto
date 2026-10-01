@@ -4,8 +4,11 @@
 #include "IO/ImageResizer.h"
 #include "IO/ProjectController.h"
 #include "UI/CanvasSizeSheet.h"
+#include "UI/GridSettingsSheet.h"
 #include "UI/ImageSizeSheet.h"
 #include "UI/TrimSheet.h"
+#include "Logging.h"
+#include <QApplication>
 #include <QDialog>
 #include <QFutureWatcher>
 #include <QVBoxLayout>
@@ -42,6 +45,42 @@ void ProjectController::canvasSize(std::function<void()> done)
                               : std::function<std::optional<ProjectSnapshot>(const ProjectSnapshot &)>(),
                       [this](const ProjectSnapshot &resized) { session.applyDocumentSize(resized, QStringLiteral("Canvas Size")); },
                       QStringLiteral("Couldn’t change canvas size"), done);
+    });
+    dialog->open();
+}
+
+// The grid shows, changing, while the sheet is open.
+void ProjectController::gridSettings(std::function<void()> done)
+{
+    if (!window || QApplication::activeModalWidget()) {
+        if (done)
+            QMetaObject::invokeMethod(this, done, Qt::QueuedConnection);
+        return;
+    }
+    const LayoutGrid grid = session.layoutGrid();
+    const GridAppearance appearance = session.gridAppearance();
+    const bool shown = session.showsGrid();
+    session.setShowsGrid(true);
+    QDialog *dialog = sheet(QStringLiteral("Grid"));
+    auto chosen = std::make_shared<std::optional<GridSettingsSheet::Settings>>();
+    dialog->layout()->addWidget(new GridSettingsSheet(
+        session, grid, appearance,
+        [this](const GridSettingsSheet::Settings &settings) {
+            session.setLayoutGrid(settings.first);
+            session.setGridAppearance(settings.second);
+        },
+        [dialog, chosen](std::optional<GridSettingsSheet::Settings> settings) {
+            *chosen = settings;
+            dialog->done(settings ? QDialog::Accepted : QDialog::Rejected);
+        },
+        dialog));
+    connect(dialog, &QDialog::finished, this, [this, chosen, grid, appearance, shown, done] {
+        session.setShowsGrid(shown);
+        session.setLayoutGrid(*chosen ? (*chosen)->first : grid);
+        session.setGridAppearance(*chosen ? (*chosen)->second : appearance);
+        qCInfo(lcIO) << "grid settings" << (*chosen ? "kept" : "cancelled");
+        if (done)
+            QMetaObject::invokeMethod(this, done, Qt::QueuedConnection);
     });
     dialog->open();
 }

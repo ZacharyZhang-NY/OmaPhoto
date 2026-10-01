@@ -412,6 +412,8 @@ private:
     // The grid and guides as drawn: a change redraws.
     struct GuidesShown {
         bool grid;
+        LayoutGrid layout;
+        GridAppearance appearance;
         bool guides;
         std::vector<CanvasGuide> lines;
         friend bool operator==(const GuidesShown &, const GuidesShown &) = default;

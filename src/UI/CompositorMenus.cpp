@@ -162,6 +162,7 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
            &EditorSession::setShowsGrid);
     toggle(show, QStringLiteral("showGuides"), QStringLiteral("Guides"), QKeySequence(Qt::CTRL | Qt::Key_Semicolon), &EditorSession::showsGuides,
            &EditorSession::setShowsGuides);
+    add(view, QStringLiteral("gridSettings"), QStringLiteral("Grid Settings…"), QKeySequence(), [this] { projects().gridSettings(); });
     toggle(view, QStringLiteral("showRulers"), QStringLiteral("Rulers"), QKeySequence(Qt::CTRL | Qt::Key_R), &EditorSession::showsRulers,
            &EditorSession::setShowsRulers);
     view->addSeparator();
@@ -373,6 +374,7 @@ void CompositorMenus::synchronize()
         action(QString::fromLatin1(name))->setEnabled(opened);
     }
     action(QStringLiteral("clearGuides"))->setEnabled(s.canClearGuides());
+    action(QStringLiteral("gridSettings"))->setEnabled(opened);
     action(QStringLiteral("transformControls"))->setChecked(s.showsTransformControls());
     action(QStringLiteral("transformControls"))->setEnabled(s.tool() == NavigationTool::move && s.document().has_value());
     const bool selected = s.selection().has_value();

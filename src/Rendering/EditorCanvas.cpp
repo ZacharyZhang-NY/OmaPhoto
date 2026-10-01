@@ -161,7 +161,7 @@ bool CanvasView::synchronizeDisplay()
         updateCursor();
     }
     // The grid and guides redraw the view, as Swift's observation.
-    if (const GuidesShown lines{m_session.showsGrid(), m_session.showsGuides(), m_session.displayedGuides()}; m_displayedGuideLines != lines) {
+    if (const GuidesShown lines{m_session.showsGrid(), m_session.layoutGrid(), m_session.gridAppearance(), m_session.showsGuides(), m_session.displayedGuides()}; m_displayedGuideLines != lines) {
         update();
         m_displayedGuideLines = lines;
     }

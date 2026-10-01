@@ -5,6 +5,11 @@ public:
     static constexpr double guideHitDistance = 5;
     bool showsGrid() const { return m_showsGrid; }
     void setShowsGrid(bool shows);
+    // View > Grid Settings…: the person's, kept across launches.
+    const LayoutGrid &layoutGrid() const { return m_layoutGrid; }
+    void setLayoutGrid(const LayoutGrid &grid);
+    const GridAppearance &gridAppearance() const { return m_gridAppearance; }
+    void setGridAppearance(const GridAppearance &appearance);
     bool showsGuides() const { return m_showsGuides; }
     void setShowsGuides(bool shows);
     bool showsRulers() const { return m_showsRulers; }

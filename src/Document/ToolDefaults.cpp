@@ -31,3 +31,34 @@ void ToolDefaults::set(bool value, const QString &key)
     if (enabled)
         QSettings().setValue(prefix + key, value);
 }
+
+int ToolDefaults::integer(const QString &key, int fallback)
+{
+    if (!enabled)
+        return fallback;
+    const QString stored = QSettings().value(prefix + key).toString();
+    bool number = false;
+    const int value = stored.toInt(&number);
+    if (number)
+        return value;
+    if (!stored.isEmpty())
+        qCWarning(lcApp).noquote() << "ignoring the tool setting" << key << "of" << stored;
+    return fallback;
+}
+
+void ToolDefaults::set(int value, const QString &key)
+{
+    if (enabled)
+        QSettings().setValue(prefix + key, value);
+}
+
+QString ToolDefaults::text(const QString &key)
+{
+    return enabled ? QSettings().value(prefix + key).toString() : QString();
+}
+
+void ToolDefaults::set(const QString &value, const QString &key)
+{
+    if (enabled)
+        QSettings().setValue(prefix + key, value);
+}

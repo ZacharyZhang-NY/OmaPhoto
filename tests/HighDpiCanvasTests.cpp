@@ -44,6 +44,7 @@ private slots:
     void theCanvasDrawsDevicePixels();
     void levelsEyedroppersDrawDevicePixels();
     void theJPEGPreviewCountsDevicePixels();
+    void gridDashesAreScreenPoints();
 };
 
 void HighDpiCanvasTests::theScreenScalesByTwo()
@@ -191,6 +192,39 @@ void HighDpiCanvasTests::theJPEGPreviewCountsDevicePixels()
     preview.setZoom(1);
     QCoreApplication::processEvents();
     QCOMPARE(preview.horizontalScrollBar()->maximum(), int(std::ceil(600 - preview.viewport()->width())));
+}
+
+void HighDpiCanvasTests::gridDashesAreScreenPoints()
+{
+    EditorSession session;
+    session.createDocument(100, 100);
+    QWidget window;
+    auto *canvas = new CanvasView(session, &window);
+    window.resize(100, 100);
+    canvas->setGeometry(0, 0, 100, 100);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QTRY_COMPARE(session.viewport.backingScale, 2.0);
+    session.zoom(1);
+    const QImage bare = canvas->grab().toImage();
+    session.setShowsGrid(true);
+    session.setLayoutGrid(LayoutGrid(50, 1));
+    GridAppearance dashed;
+    dashed.preset = GridAppearance::Preset::black;
+    dashed.opacity = 100;
+    dashed.style = GridAppearance::Style::dashedLines;
+    session.setGridAppearance(dashed);
+    canvas->synchronizeDisplay();
+    const QImage drawn = canvas->grab().toImage();
+    // Four points on is eight device rows, not four.
+    const int column = int(std::round(session.viewport.viewPoint(QPointF(50, 0), QSizeF(100, 100)).x() * 2));
+    int run = 0, longest = 0;
+    for (int y = 4; y < 180; ++y) {
+        const bool inked = std::abs(qGray(drawn.pixel(column, y)) - qGray(bare.pixel(column, y))) + std::abs(qGray(drawn.pixel(column - 1, y)) - qGray(bare.pixel(column - 1, y))) > 20;
+        run = inked ? run + 1 : 0;
+        longest = std::max(longest, run);
+    }
+    QVERIFY2(longest >= 7 && longest <= 9, qPrintable(QString::number(longest)));
 }
 
 int main(int argc, char **argv)

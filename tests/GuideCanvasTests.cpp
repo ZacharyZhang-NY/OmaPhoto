@@ -55,6 +55,7 @@ private slots:
     void moveToolDragsAGuideAndRulerDropDeletesIt();
     void rulerStepUsesNicePixelIntervals();
     void guidesAndTheGridDrawOverTheCanvas();
+    void theGridDrawsItsSettings();
     void theCursorKeysAndLostReleasesEndADrag();
     void theRulersFrameTheCanvasAndDragOutGuides();
 };
@@ -165,6 +166,84 @@ void GuideCanvasTests::guidesAndTheGridDrawOverTheCanvas()
     const int major64 = int(std::floor(shown.at(64, 150).x()));
     const QColor between = quarter.pixelColor(shown.at(40, 150).toPoint());
     QVERIFY(quarter.pixelColor(major64, 150) != between || quarter.pixelColor(major64 - 1, 150) != between);
+}
+
+// Swift 1.3.5's Grid Settings: spacing, colour, opacity, style.
+void GuideCanvasTests::theGridDrawsItsSettings()
+{
+    GuideCanvas shown;
+    const QImage bare = shown.canvas->grab().toImage();
+    shown.session.setShowsGrid(true);
+    // What a line adds to its two columns, by channel.
+    const auto ink = [&](double x, int y, int channel) {
+        const QImage drawn = shown.canvas->grab().toImage();
+        int sum = 0;
+        for (int column = int(shown.at(x, 0).x()) - 1; column <= int(shown.at(x, 0).x()); ++column) {
+            const QPoint at(column, int(shown.at(0, y).y()));
+            const QRgb seen = drawn.pixel(at), was = bare.pixel(at);
+            sum += channel == 0 ? qRed(seen) - qRed(was) : qGreen(seen) - qGreen(was);
+        }
+        return sum;
+    };
+    // Rows 1 to 35 along a line: # inked.
+    const auto pattern = [&](double x) {
+        QString rows;
+        for (int y = 1; y <= 35; ++y)
+            rows += std::abs(ink(x, y, 1)) > 2 ? QLatin1Char('#') : QLatin1Char('.');
+        return rows;
+    };
+    const auto rowsInked = [&](double x) {
+        int rows = 0;
+        // Row 0 holds the top major: rows 1 to 35.
+        for (int y = 1; y <= 35; ++y)
+            rows += std::abs(ink(x, y, 1)) > 2;
+        return rows;
+    };
+    // Majors at 100, dotted halves at 50, none at 64.
+    int paints = 0;
+    Painted counter(paints);
+    QTest::qWait(50);
+    shown.canvas->installEventFilter(&counter);
+    shown.session.setLayoutGrid(LayoutGrid(100, 2));
+    shown.canvas->synchronizeDisplay();
+    QTRY_VERIFY(paints > 0);
+    QVERIFY(rowsInked(100) == 35 && rowsInked(64) == 0);
+    // Dotted subdivisions: one point on, two off, flat ends.
+    QCOMPARE(pattern(50), QString("..#..#..#..#..#..#..#..#..#..#..#.."));
+    // Subdivisions at 28/45 of the majors' ink.
+    int faint = 0;
+    for (int y = 1; y <= 35; ++y)
+        faint = std::max(faint, std::abs(ink(50, y, 1)));
+    QVERIFY2(std::abs(faint - ink(100, 20, 1) * 28 / 45) <= 3, qPrintable(QString::number(faint)));
+    // Closer than four points, subdivisions go: 64 in 32.
+    shown.session.setLayoutGrid(LayoutGrid(64, 32));
+    QVERIFY(rowsInked(2) == 0 && rowsInked(64) == 35);
+    // Exactly four points apart, they still show: 64 in 16.
+    shown.session.setLayoutGrid(LayoutGrid(64, 16));
+    QVERIFY(rowsInked(4) > 0);
+    shown.session.setLayoutGrid(LayoutGrid(100, 2));
+    // Cyan at full opacity: green rises, red falls.
+    paints = 0;
+    GridAppearance cyan;
+    cyan.preset = GridAppearance::Preset::cyan;
+    cyan.opacity = 100;
+    shown.session.setGridAppearance(cyan);
+    shown.canvas->synchronizeDisplay();
+    QTRY_VERIFY(paints > 0);
+    shown.canvas->removeEventFilter(&counter);
+    QVERIFY2(ink(100, 20, 1) >= 0 && ink(100, 20, 0) < -60, qPrintable(QString::number(ink(100, 20, 0))));
+    // At 1% the line barely shows.
+    cyan.opacity = 1;
+    shown.session.setGridAppearance(cyan);
+    QVERIFY(std::abs(ink(100, 20, 0)) < 6 && std::abs(ink(100, 20, 0)) > 0);
+    // Dashes four on, three off; dots one on, two off.
+    cyan.opacity = 100;
+    cyan.style = GridAppearance::Style::dashedLines;
+    shown.session.setGridAppearance(cyan);
+    QCOMPARE(pattern(100), QString("###...####...####...####...####...#"));
+    cyan.style = GridAppearance::Style::dots;
+    shown.session.setGridAppearance(cyan);
+    QCOMPARE(pattern(100), QString("..#..#..#..#..#..#..#..#..#..#..#.."));
 }
 
 void GuideCanvasTests::theCursorKeysAndLostReleasesEndADrag()

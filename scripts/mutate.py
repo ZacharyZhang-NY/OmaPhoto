@@ -29,7 +29,7 @@ def docker(command):
     uid, gid = os.getuid(), os.getgid()
     runtime = '/run/user/%d' % uid
     done = subprocess.run(
-        ['docker', 'run', '--rm', '--init', '--cpus=12', '-u', '%d:%d' % (uid, gid), '-e', 'HOME=/tmp', '-e', 'QT_QPA_PLATFORM=offscreen',
+        ['docker', 'run', '--rm', '--init', '--cpus=32', '-u', '%d:%d' % (uid, gid), '-e', 'HOME=/tmp', '-e', 'QT_QPA_PLATFORM=offscreen',
          '--tmpfs', '%s:uid=%d,gid=%d,mode=0700' % (runtime, uid, gid), '-e', 'XDG_RUNTIME_DIR=' + runtime,
          '-v', '%s:%s' % (repo, repo), '-w', repo, 'omaphoto-dev', 'timeout', '600', 'sh', '-c', command],
         capture_output=True, text=True)
@@ -38,7 +38,7 @@ def docker(command):
 
 def build():
     wanted = ' --target ' + ' '.join(targets) if targets else ''
-    return docker('cmake -S . -B build -G Ninja -DOMAPHOTO_WERROR=ON >/dev/null && cmake --build build -j12' + wanted)
+    return docker('cmake -S . -B build -G Ninja -DOMAPHOTO_WERROR=ON >/dev/null && cmake --build build -j32' + wanted)
 
 
 def test():

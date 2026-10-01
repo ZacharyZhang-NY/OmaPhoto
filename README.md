@@ -9,7 +9,7 @@ It is a Linux port of [Compositor](https://github.com/robbietilton/Compositor) b
 - Layers, folders, masks, clipping masks, blend modes and opacity; whole layers copy between projects
 - Selections: marquee, lasso, magic wand and its object mode, Select › Subject, load from a layer, feather, expand and contract
 - Brush, eraser, spot healing, clone stamp, smudge, blur and liquify, gradient, shapes, type with colour on selected letters
-- Move, transform and distort layers and selections; rulers, guides, a grid and snapping
+- Move, transform and distort layers and selections; rulers, guides, a grid with adjustable spacing and subdivisions, and snapping
 - Levels, Curves, Hue/Saturation, Exposure, Black & White, Color Balance, Gradient Map, Grain, Invert, blur and noise, as edits or as adjustment layers
 - Camera Raw Filter, docked beside the canvas
 - Layer effects: stroke, drop shadow, outer and inner glow, color overlay, inner shadow

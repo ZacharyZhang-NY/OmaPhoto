@@ -98,6 +98,7 @@ add_library(compositor_core STATIC
     src/UI/CropControls.cpp
     src/UI/CanvasRulers.cpp
     src/UI/CanvasSizeSheet.cpp
+    src/UI/GridSettingsSheet.cpp
     src/UI/ImageSizeSheet.cpp
     src/UI/TrimSheet.cpp
     src/UI/JPEGExportSheet.cpp
