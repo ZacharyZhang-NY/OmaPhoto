@@ -87,103 +87,45 @@ protected:
             return;
         }
         painter.setPen(Qt::NoPen);
-        painter.setBrush(Qt::white);
-        for (const CurvePoint &point : m_owner.currentPoints())
-            painter.drawEllipse(QRectF(point.x * w - 4, (1 - point.y) * h - 4, 8, 8));
+        const std::vector<CurvePoint> points = m_owner.currentPoints();
+        for (size_t index = 0; index < points.size(); ++index) {
+            painter.setBrush(m_owner.m_selectedPoint == index ? palette().color(QPalette::Highlight) : QColor(Qt::white));
+            painter.drawEllipse(QRectF(points[index].x * w - 4, (1 - points[index].y) * h - 4, 8, 8));
+        }
     }
 
-    // Swift's two drags: still, a press adds; moved, it drags.
+    // Swift's one drag: picked at the press, kept until release.
     void mousePressEvent(QMouseEvent *event) override
     {
         if (event->button() == Qt::LeftButton)
-            m_press = event->position();
+            m_owner.beginDrag(event->position(), size());
     }
 
     void mouseMoveEvent(QMouseEvent *event) override
     {
-        if (!m_press || !event->buttons().testFlag(Qt::LeftButton))
-            return;
-        if (!m_moved && QLineF(*m_press, event->position()).length() < 2)
-            return;
-        m_moved = true;
-        if (parametric())
-            moveDivider(event->position().x());
-        else
-            movePoint(event->position());
+        if (event->buttons().testFlag(Qt::LeftButton))
+            m_owner.continueDrag(event->position(), size());
     }
 
     void mouseReleaseEvent(QMouseEvent *event) override
     {
-        if (event->button() == Qt::LeftButton && m_press && !m_moved && event->position() == *m_press && !parametric())
-            addPoint(event->position());
-        m_press.reset();
-        m_moved = false;
+        if (event->button() == Qt::LeftButton)
+            m_owner.m_drag.reset();
     }
 
-    // The double click's own release must add nothing back.
+    // The second press drags too; then the point goes.
     void mouseDoubleClickEvent(QMouseEvent *event) override
     {
-        if (event->button() == Qt::LeftButton && !parametric())
-            removePoint(event->position());
+        if (event->button() != Qt::LeftButton)
+            return;
+        m_owner.beginDrag(event->position(), size());
+        if (!parametric())
+            m_owner.removePoint(event->position(), size());
+        m_owner.m_drag.reset();
     }
 
 private:
-    void moveDivider(double x)
-    {
-        const double value = std::min(98.0, std::max(2.0, x / std::max(double(width()), 1.0) * 100));
-        const CameraRawCurveSettings curve = m_owner.raw().curve;
-        const std::array<double, 3> splits{curve.shadowSplit, curve.darkSplit, curve.lightSplit};
-        size_t nearest = 0;
-        for (size_t index = 1; index < 3; ++index)
-            if (std::abs(splits[index] - value) < std::abs(splits[nearest] - value))
-                nearest = index;
-        m_owner.update([nearest, value](CameraRawSettings &settings) {
-            (nearest == 0 ? settings.curve.shadowSplit : nearest == 1 ? settings.curve.darkSplit : settings.curve.lightSplit) = value;
-        });
-    }
-
-    void addPoint(QPointF at)
-    {
-        std::vector<CurvePoint> points = m_owner.currentPoints();
-        points.push_back({std::min(0.99, std::max(0.01, at.x() / width())), std::min(1.0, std::max(0.0, 1 - at.y() / height()))});
-        m_owner.store(points);
-    }
-
-    // The nearest inner point by x; ends stay.
-    std::optional<size_t> nearestInner(const std::vector<CurvePoint> &points, double x) const
-    {
-        std::optional<size_t> nearest;
-        for (size_t index = 1; index + 1 < points.size(); ++index)
-            if (!nearest || std::abs(points[index].x - x) < std::abs(points[*nearest].x - x))
-                nearest = index;
-        return nearest;
-    }
-
-    void movePoint(QPointF at)
-    {
-        std::vector<CurvePoint> points = m_owner.currentPoints();
-        const double x = at.x() / width();
-        const std::optional<size_t> index = nearestInner(points, x);
-        if (!index)
-            return;
-        points[*index] = {std::min(0.98, std::max(0.02, x)), std::min(1.0, std::max(0.0, 1 - at.y() / height()))};
-        m_owner.store(points);
-    }
-
-    void removePoint(QPointF at)
-    {
-        std::vector<CurvePoint> points = m_owner.currentPoints();
-        const double x = at.x() / width();
-        const std::optional<size_t> index = nearestInner(points, x);
-        if (!index || !(std::abs(points[*index].x - x) < 0.04))
-            return;
-        points.erase(points.begin() + std::ptrdiff_t(*index));
-        m_owner.store(points);
-    }
-
     CameraRawCurveControls &m_owner;
-    std::optional<QPointF> m_press;
-    bool m_moved = false;
 };
 
 namespace {
@@ -250,6 +192,9 @@ CameraRawCurveControls::CameraRawCurveControls(EditorSession &session, QWidget *
     presetRow->addStretch(1);
     points->addLayout(presetRow);
     connect(m_preset, &QComboBox::activated, this, [this](int preset) {
+        // A fix beyond Swift: a preset's points drop the choice.
+        if (preset != 0)
+            m_selectedPoint.reset();
         if (preset == 1)
             store(CameraRawCurveSettings::linear());
         else if (preset == 2)
@@ -258,7 +203,7 @@ CameraRawCurveControls::CameraRawCurveControls(EditorSession &session, QWidget *
             store(CameraRawCurveSettings::strongContrast());
     });
     m_refine = new CameraRawRow({.name = QStringLiteral("refineSaturation"), .title = QStringLiteral("Refine Saturation"),
-                                 .help = QStringLiteral("How much the RGB curve also changes color strength. Zero keeps it to brightness."), .titleWidth = 88,
+                                 .help = QStringLiteral("How much the curve also changes color strength. Zero matches Photoshop; lower keeps it to brightness, higher adds more color."), .titleWidth = 88,
                                  .fixedTitle = true, .fieldWidth = 48, .scrub = 1},
                                 [this] { return raw().curve.refineSaturation; },
                                 [this](double value) { update([value](CameraRawSettings &settings) { settings.curve.refineSaturation = value; }); },
@@ -334,15 +279,23 @@ void CameraRawCurveControls::synchronize()
     m_channelBox->setVisible(point);
     const CameraRawPointChannel channel = edit ? edit->rawPanel.pointChannel : CameraRawPointChannel::rgb;
     m_channel->button(int(channel))->setChecked(true);
-    m_graph->setToolTip(point ? QStringLiteral("Drag a point. Click the curve to add one. Double-click a point to remove it.")
-                              : QStringLiteral("Drag a divider to change which tones the neighboring sliders affect."));
+    // Swift's onChange: another channel drops the choice and drag.
+    if (channel != m_shownChannel) {
+        m_shownChannel = channel;
+        m_selectedPoint.reset();
+        m_drag.reset();
+    }
+    m_graph->setToolTip(point ? QStringLiteral("Drag a point. Click to add one. Double-click a point to remove it.")
+                              : QStringLiteral("Drag up or down to lift or lower those tones. Drag a divider along the bottom to change which tones each region covers."));
     m_graph->update();
     m_amounts->setVisible(!point);
     m_points->setVisible(point);
     const std::vector<CurvePoint> points = currentPoints();
-    // Swift's selectedPoint: the last inner point, else the last.
-    const CurvePoint selected = points.size() > 2 ? points[points.size() - 2] : points.back();
-    m_selected->setText(QStringLiteral("In %1   Out %2").arg(std::lround(selected.x * 255)).arg(std::lround(selected.y * 255)));
+    // Swift's selectedPoint: the chosen index, while it exists.
+    const bool chosen = m_selectedPoint && *m_selectedPoint < points.size();
+    m_selected->setVisible(chosen);
+    if (chosen)
+        m_selected->setText(QStringLiteral("In %1   Out %2").arg(std::lround(points[*m_selectedPoint].x * 255)).arg(std::lround(points[*m_selectedPoint].y * 255)));
     const QSignalBlocker quiet(m_preset);
     m_preset->setCurrentIndex(points == CameraRawCurveSettings::linear()           ? 1
                               : points == CameraRawCurveSettings::mediumContrast() ? 2

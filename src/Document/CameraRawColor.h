@@ -33,15 +33,19 @@ struct CameraRawCurveSettings {
     static std::vector<CurvePoint> strongContrast();
     static bool isLinear(const std::vector<CurvePoint> &points);
     bool adjusts() const;
-    // Lifts or lowers the region a tone belongs to.
+    // Photoshop's parametric curve: gamma bends, smoothed as Curves.
     double parametric(double tone) const;
-    std::vector<float> lumaTable() const;
+    // Applied to red, green and blue alike.
+    std::vector<float> toneTable() const;
     std::vector<float> channelTable(const std::vector<CurvePoint> &points) const;
     CameraRawCurveSettings nudged(CameraRawPointChannel channel, double tone, double delta) const;
     // Swift's region(for:): the parametric amount a tone moves.
     double &region(double tone);
     CameraRawCurveSettings normalized() const;
     friend bool operator==(const CameraRawCurveSettings &, const CameraRawCurveSettings &) = default;
+
+private:
+    static double bend(double tone, double lower, double low, double upper, double high);
 };
 
 // One picked colour and how far its adjustment reaches.

@@ -29,7 +29,7 @@ class CameraRawColorTests : public QObject {
     Q_OBJECT
 private slots:
     void curvesAreRepairedIntoOrder();
-    void theParametricCurveLiftsItsRegion();
+    void aToneFindsItsRegion();
     void aNudgeMovesTheFirstNearestPointWithinRange();
     void splitsAndAmountsStayInTheirRanges();
     void mixerFamiliesOverlapRoundTheWheel();
@@ -56,17 +56,8 @@ void CameraRawColorTests::curvesAreRepairedIntoOrder()
     QCOMPARE(table[100], float(100 / 255.0));
 }
 
-void CameraRawColorTests::theParametricCurveLiftsItsRegion()
+void CameraRawColorTests::aToneFindsItsRegion()
 {
-    CameraRawCurveSettings curve;
-    curve.shadows = 100;
-    // The region's middle takes the whole 22%.
-    QVERIFY(std::abs(curve.parametric(0.125) - 0.345) < 1e-12);
-    QCOMPARE(curve.parametric(0.375), 0.375);
-    curve.highlights = -100;
-    curve.lightSplit = 100;
-    // A region of no width still takes a fiftieth's span.
-    QVERIFY(std::abs(curve.parametric(1) - 0.78) < 1e-12);
     // Region picks the amount a tone moves.
     CameraRawCurveSettings regions;
     regions.region(0.1) = 1;

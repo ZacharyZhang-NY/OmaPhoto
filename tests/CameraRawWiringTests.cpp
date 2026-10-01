@@ -238,7 +238,7 @@ void CameraRawWiringTests::curveMixerAndGradingReachTheKernelInOrder()
     settings.mixer.points = {{200, 0.6, 0.4, 25, -35, 15, 40, 0.5, 0.3, false}, {40, 0.8, 0.6, -10, 20, -45, 60, 0.3, 0.6, false}};
     settings.grading = {{210, 40, -20}, {100, 25, 10}, {30, 55, 15}, {300, 10, -5}, 70, -30};
     const CameraRawCurveSettings shape = curve.normalized();
-    const std::vector<float> luma = shape.lumaTable(), red = shape.channelTable(shape.red), green = shape.channelTable(shape.green),
+    const std::vector<float> tone = shape.toneTable(), red = shape.channelTable(shape.red), green = shape.channelTable(shape.green),
                              blue = shape.channelTable(shape.blue);
     std::vector<float> mixer;
     for (size_t index = 0; index < 8; ++index)
@@ -253,7 +253,7 @@ void CameraRawWiringTests::curveMixerAndGradingReachTheKernelInOrder()
                                    float(30 / 360.0),  0.55f, 0.15f, float(300 / 360.0), 0.1f,  -0.05f};
     for (const int visualize : {-1, 1}) {
         const QImage direct = kernel(picture, [&](uchar *bytes, size_t w, size_t h, size_t stride) {
-            adjust_camera_raw_curve_color(bytes, w, h, stride, luma.data(), red.data(), green.data(), blue.data(), 0.4, mixer.data(), 2, points.data(),
+            adjust_camera_raw_curve_color(bytes, w, h, stride, tone.data(), red.data(), green.data(), blue.data(), 0.4, mixer.data(), 2, points.data(),
                                           grade.data(), 0.7, -0.3, visualize);
         });
         QVERIFY(pixels(settings.apply(picture, std::nullopt, 1, 0, visualize)) == pixels(direct));
