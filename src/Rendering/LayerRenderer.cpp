@@ -20,8 +20,6 @@ QPainter::CompositionMode compositionMode(LayerBlendMode mode)
         return QPainter::CompositionMode_Screen;
     case LayerBlendMode::overlay:
         return QPainter::CompositionMode_Overlay;
-    case LayerBlendMode::softLight:
-        return QPainter::CompositionMode_SoftLight;
     case LayerBlendMode::darken:
         return QPainter::CompositionMode_Darken;
     case LayerBlendMode::lighten:

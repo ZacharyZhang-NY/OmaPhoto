@@ -70,11 +70,10 @@ Rgb reference(LayerBlendMode mode, const Rgb &backdrop, const Rgb &source)
         case LayerBlendMode::multiply: result[channel] = b * s; break;
         case LayerBlendMode::screen: result[channel] = b + s - b * s; break;
         case LayerBlendMode::overlay: result[channel] = hardLight(s, b); break;
-        case LayerBlendMode::softLight: {
-            const double d = b <= 0.25 ? ((16 * b - 12) * b + 4) * b : std::sqrt(b);
-            result[channel] = s <= 0.5 ? b - (1 - 2 * s) * b * (1 - b) : b + (2 * s - 1) * (d - b);
+        // Photoshop's, as Core Image computes it (Compositor 1.4).
+        case LayerBlendMode::softLight:
+            result[channel] = s <= 0.5 ? 2 * b * s + b * b * (1 - 2 * s) : 2 * b * (1 - s) + std::sqrt(b) * (2 * s - 1);
             break;
-        }
         case LayerBlendMode::darken: result[channel] = std::min(b, s); break;
         case LayerBlendMode::lighten: result[channel] = std::max(b, s); break;
         case LayerBlendMode::difference: result[channel] = std::abs(b - s); break;
