@@ -3,7 +3,9 @@
 #include "Rendering/EditorCanvas.h"
 #include "RenderFixtures.h"
 #include "EffectsCanvasFixtures.h"
+#include "SelectionFixtures.h"
 #include "SessionFixtures.h"
+#include <QPainterPathStroker>
 #include <QtTest>
 
 // Swift's effects on the canvas: previews, the paint's surface, distortions.
@@ -61,6 +63,8 @@ private slots:
     void paintPastTheSurfacesBudgetShowsTheLastEffects();
     void invalidEffectsShowNothing();
     void effectsDrawAheadOfAColourEditsPreview();
+    void movingPixelsKeepTheEffects();
+    void aGradientKeepsTheEffects();
 };
 
 void EffectsCanvasTests::theCanvasDrawsALayersEffectsOnceTheyLand()
@@ -352,6 +356,85 @@ void EffectsCanvasTests::effectsDrawAheadOfAColourEditsPreview()
     // Swift draws the effects first: the layer shows unadjusted.
     QCOMPARE(scene.at(QPoint(30, 20)), QColor(100, 100, 100));
     QCOMPARE(scene.at(QPoint(23, 20)), yellow);
+}
+
+// A band round a path, where overlays draw.
+QPainterPath band(const QPainterPath &path, double width)
+{
+    QPainterPathStroker stroker;
+    stroker.setWidth(width);
+    return stroker.createStroke(path);
+}
+
+// The document as shown, pixel by pixel, overlays' bands aside.
+int gapBetween(Scene &scene, const QImage &one, const QImage &other, const QPainterPath &skip)
+{
+    int worst = 0;
+    for (int y = 0; y < 40; ++y) {
+        for (int x = 0; x < 60; ++x) {
+            if (skip.contains(QPointF(x + 0.5, y + 0.5)))
+                continue;
+            const QRgb a = one.pixel(scene.shown(QPointF(x + 0.5, y + 0.5))), b = other.pixel(scene.shown(QPointF(x + 0.5, y + 0.5)));
+            worst = std::max({worst, std::abs(qRed(a) - qRed(b)), std::abs(qGreen(a) - qGreen(b)), std::abs(qBlue(a) - qBlue(b))});
+        }
+    }
+    return worst;
+}
+
+// Swift's movingWithEffects: the stroke follows the lifted pixels.
+void EffectsCanvasTests::movingPixelsKeepTheEffects()
+{
+    Scene scene;
+    EditorSession &session = scene.session;
+    session.setEffects(outline(2));
+    scene.landed();
+    session.applySelection(rectPath(QRectF(25, 15, 10, 10)), SelectionMode::replace, QStringLiteral("Select"));
+    QVERIFY(session.beginPixelMove());
+    // 5.6 rounds to 6: the square moves to 31..41.
+    session.movePixels(QSizeF(5.6, 0));
+    scene.canvas.synchronizeDisplay();
+    QCOMPARE(scene.at(QPoint(42, 20)), yellow);
+    QCOMPARE(scene.at(QPoint(24, 20)), QColor(Qt::white));
+    const QImage moving = scene.shot();
+    bool done = false;
+    session.finishPixelMove([&done] { done = true; });
+    QTRY_VERIFY(done);
+    QCOMPARE(session.selection().value().path.boundingRect(), QRectF(31, 15, 10, 10));
+    scene.canvas.synchronizeDisplay();
+    QCOMPARE(gapBetween(scene, moving, scene.shot(), band(rectPath(QRectF(31, 15, 10, 10)), 4)), 0);
+    session.deselect();
+    QTRY_COMPARE(scene.gapToExport(), 0);
+}
+
+// Swift's gradientWithEffects: the pending fill shows its effects.
+void EffectsCanvasTests::aGradientKeepsTheEffects()
+{
+    Scene scene;
+    EditorSession &session = scene.session;
+    session.setEffects(outline(2));
+    scene.landed();
+    // Black fading to clear across the square's left half.
+    session.applySelection(rectPath(QRectF(10, 5, 20, 30)), SelectionMode::replace, QStringLiteral("Select"));
+    session.selectTool(NavigationTool::gradient);
+    session.beginGradient(QPointF(15, 20));
+    session.moveGradient(std::nullopt, QPointF(30, 20));
+    session.endGradientDrag();
+    scene.canvas.synchronizeDisplay();
+    // The stroke rings the new paint at once.
+    QVERIFY(scene.at(QPoint(8, 20)).red() > 100 && scene.at(QPoint(8, 20)).blue() < 30);
+    const QImage pending = scene.shot();
+    bool done = false;
+    session.commitGradient([&done] { done = true; });
+    QTRY_VERIFY(done);
+    scene.canvas.synchronizeDisplay();
+    // The line, its ends and the ants aside.
+    QPainterPath line;
+    line.moveTo(15, 20);
+    line.lineTo(30, 20);
+    const QPainterPath overlays = band(rectPath(QRectF(10, 5, 20, 30)), 4).united(band(line, 24));
+    QTRY_VERIFY(gapBetween(scene, pending, scene.shot(), overlays) <= 1);
+    session.deselect();
+    QTRY_COMPARE(scene.gapToExport(), 0);
 }
 
 QTEST_MAIN(EffectsCanvasTests)

@@ -34,6 +34,7 @@ private slots:
     void aGradientInASelectionShowsAsItsCommit();
     void aGradientThatCannotFillCancels();
     void aLiveMaskFromFurtherDownShowsAsTheExport();
+    void aDraftOnAStacksBaseSitsInsideTheStack();
 };
 
 void CanvasEditContractTests::aNewMaskRevealsTheWholeLayer_data()
@@ -171,6 +172,30 @@ void CanvasEditContractTests::aLiveMaskFromFurtherDownShowsAsTheExport()
     scene.session.zoom(1);
     QVERIFY(ContractScene::gap(unlinked, scene.exported()) > 20);
     QVERIFY2(scene.gapToExport() <= 1, qPrintable(QString::number(scene.gapToExport())));
+}
+
+// The draft follows its active base into the stack's group.
+void CanvasEditContractTests::aDraftOnAStacksBaseSitsInsideTheStack()
+{
+    ContractScene scene(60, 40, 60, 40);
+    const QImage white = solid(30, 40, qRgba(255, 255, 255, 255));
+    scene.session.insert(ImportedImage(white, white, QStringLiteral("Base")), QPointF(15, 20));
+    const QUuid base = scene.session.activeLayerID().value();
+    const QImage red = solid(10, 40, qRgba(255, 0, 0, 255));
+    scene.session.insert(ImportedImage(red, red, QStringLiteral("Clipped")), QPointF(5, 20));
+    QVERIFY(scene.session.linkMask(base, scene.session.activeLayerID().value()));
+    scene.session.zoom(1);
+    scene.session.selectLayer(base);
+    scene.session.selectTool(NavigationTool::shape);
+    scene.session.beginShape(QPointF(5, 10));
+    scene.session.dragShape(QPointF(55, 30), false, false);
+    const QImage shown = scene.documentShot();
+    // The draft joins the base, its alpha included, as Swift's.
+    QCOMPARE(shown.pixel(20, 20), qRgb(0, 0, 0));
+    QCOMPARE(shown.pixel(45, 20), qRgb(0, 0, 0));
+    // The clipped layer stays over it.
+    QCOMPARE(shown.pixel(5, 20), qRgb(255, 0, 0));
+    scene.session.cancelShape();
 }
 
 QTEST_MAIN(CanvasEditContractTests)
