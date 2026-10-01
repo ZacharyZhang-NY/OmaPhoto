@@ -111,6 +111,7 @@ private slots:
     void theScreenIsTheDarkColourOrBlack();
     void clearPixelsStayClear();
     void everyBandOfATallImageIsDrawn();
+    void bandsDrawAsOneBandDoes();
     void theGlowIsTheBlurredLightAtItsAmount();
     void theGlowNeverPassesAlpha();
     void theSheetShowsScanlinesRows();
@@ -280,6 +281,21 @@ void ScanlinesTests::everyBandOfATallImageIsDrawn()
     // 70 lines of 8: bands of 3, the last one.
     const std::vector<int> tall = column(scanlines(8).apply(filled(3, 560, Qt::white)), 1);
     QCOMPARE(tall, repeated({0, 255, 255, 255, 255, 255, 255, 0}, 70));
+}
+
+void ScanlinesTests::bandsDrawAsOneBandDoes()
+{
+    // One band of 62 rows, 32 of 300: tops agree.
+    QImage noise = BrushRaster::context(7, 300, false);
+    for (int y = 0; y < 300; ++y)
+        for (int x = 0; x < 7; ++x)
+            noise.setPixelColor(x, y, QColor((x * 37 + y * 11) % 256, (x * 91 + y * 53) % 256, (y * 29) % 256, 128 + (x + y) % 128));
+    DitherSettings settings = scanlines(2);
+    settings.colors = DitherColors::original;
+    settings.dots = 50;
+    settings.wobble = 5;
+    const QImage whole = settings.apply(noise), one = settings.apply(noise.copy(0, 0, 7, 62));
+    QCOMPARE(whole.copy(0, 0, 7, 62), one);
 }
 
 void ScanlinesTests::theGlowIsTheBlurredLightAtItsAmount()

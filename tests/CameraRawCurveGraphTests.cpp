@@ -179,19 +179,22 @@ void CameraRawCurveGraphTests::aPointIsPickedByDistanceAndKept()
     QVERIFY(std::abs(graph.curve().rgb[2].y - 0.6) < 0.01 && graph.curve().rgb[1] == (CurvePoint{0.3, 0.3}));
     // Kept as it passes x 0.99, held before the end.
     graph.move(graph.at(1.2, 0.2));
-    QVERIFY(std::abs(graph.curve().rgb[2].x - 0.99) < 1e-9 && graph.curve().rgb[1] == (CurvePoint{0.3, 0.3}));
-    // Onto its neighbour: a hundredth past, then repaired away.
+    QVERIFY(std::abs(graph.curve().rgb[2].x - 0.99) < 1e-6 && graph.curve().rgb[1] == (CurvePoint{0.3, 0.3}));
+    // Fix beyond Swift: onto its neighbour it stays, still dragged.
     graph.move(graph.at(0.1, 0.2));
-    QCOMPARE(graph.curve().rgb.size(), size_t(3));
-    QVERIFY(graph.curve().rgb[1] == (CurvePoint{0.3, 0.3}));
-    graph.release(graph.at(0.1, 0.2));
-    // Onto the next point: a hundredth short; that one goes.
+    QCOMPARE(graph.curve().rgb.size(), size_t(4));
+    QVERIFY(std::abs(graph.curve().rgb[2].x - 0.31) < 1e-6 && graph.curve().rgb[1] == (CurvePoint{0.3, 0.3}));
+    graph.move(graph.at(0.6, 0.7));
+    QCOMPARE(graph.curve().rgb.size(), size_t(4));
+    QVERIFY(std::abs(graph.curve().rgb[2].x - 0.6) < 0.003 && graph.curve().rgb[3] == (CurvePoint{1, 1}));
+    graph.release(graph.at(0.6, 0.7));
+    // Onto the next point: a hundredth short; both stay.
     graph.set([](CameraRawCurveSettings &curve) { curve.rgb = {{0, 0}, {0.3, 0.3}, {0.5, 0.5}, {1, 1}}; });
     graph.press(graph.at(0.3, 0.3));
     graph.move(graph.at(0.8, 0.3));
     graph.release(graph.at(0.8, 0.3));
-    QCOMPARE(graph.curve().rgb.size(), size_t(3));
-    QVERIFY(std::abs(graph.curve().rgb[1].x - 0.49) < 1e-9);
+    QCOMPARE(graph.curve().rgb.size(), size_t(4));
+    QVERIFY(std::abs(graph.curve().rgb[1].x - 0.49) < 1e-6 && graph.curve().rgb[2] == (CurvePoint{0.5, 0.5}));
     // 0.05 away takes the point; 0.06 away adds one.
     graph.set([](CameraRawCurveSettings &curve) { curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
     graph.press(graph.at(0.53, 0.54));

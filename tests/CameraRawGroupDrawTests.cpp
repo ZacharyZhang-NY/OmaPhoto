@@ -133,13 +133,14 @@ void CameraRawGroupDrawTests::endPointsStayAndARealDoubleClickRemoves()
     QTest::mouseRelease(&graph, Qt::LeftButton, {}, QPoint(40, 40));
     QCOMPARE(group.raw().curve.rgb.size(), size_t(2));
     QVERIFY(group.raw().curve.rgb[0].x == 0 && std::abs(group.raw().curve.rgb[0].y - (1 - 40.0 / h)) < 1e-9 && group.raw().curve.rgb[1] == (CurvePoint{1, 1}));
-    // Past the start: a hundredth in, then repaired away.
+    // Past the start it stays a hundredth in.
     group.set([](CameraRawSettings &settings) { settings.curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
     QTest::mousePress(&graph, Qt::LeftButton, {}, QPoint(w / 2, h / 2));
     QMouseEvent far(QEvent::MouseMove, QPointF(-50, h / 2), graph.mapToGlobal(QPointF(-50, h / 2)), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
     QApplication::sendEvent(&graph, &far);
     QTest::mouseRelease(&graph, Qt::LeftButton, {}, QPoint(-50, h / 2));
-    QVERIFY(group.raw().curve.rgb == CameraRawCurveSettings::linear());
+    QCOMPARE(group.raw().curve.rgb.size(), size_t(3));
+    QVERIFY(std::abs(group.raw().curve.rgb[1].x - 0.01) < 1e-6);
     // A real double click: press, release, double click, release.
     group.set([](CameraRawSettings &settings) { settings.curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
     doubleClick(graph, QPoint(w / 2, h / 2));

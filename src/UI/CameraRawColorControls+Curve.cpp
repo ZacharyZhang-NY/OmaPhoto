@@ -70,8 +70,11 @@ void CameraRawCurveControls::continueDrag(QPointF at, QSizeF size)
             return;
         points[drag.index].y = y;
         // Ends stay ends; the rest keep their order.
-        if (drag.index > 0 && drag.index < points.size() - 1)
-            points[drag.index].x = std::min(points[drag.index + 1].x - 0.01, std::max(points[drag.index - 1].x + 0.01, x));
+        if (drag.index > 0 && drag.index < points.size() - 1) {
+            // Fix beyond Swift: just inside, so the repair keeps it.
+            const double inside = 1e-9;
+            points[drag.index].x = std::min(points[drag.index + 1].x - 0.01 - inside, std::max(points[drag.index - 1].x + 0.01 + inside, x));
+        }
         store(points);
         return;
     }
