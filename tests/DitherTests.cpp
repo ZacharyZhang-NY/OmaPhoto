@@ -1,6 +1,8 @@
 #include "Document/BrushStroke.h"
 #include "Document/Dither.h"
 #include "Document/EditorSession.h"
+#include <QPainter>
+#include <QPainterPath>
 #include <QtTest>
 #include <set>
 
@@ -87,6 +89,7 @@ void DitherTests::normalizingClampsRoundsAndTrimsTheCharacters()
     DitherSettings wild;
     wild.pixelSize = 40.6;
     wild.cellSize = 2;
+    wild.textSize = 64.6;
     wild.angle = std::nan("");
     wild.levels = 4.5;
     wild.diffusion = -5;
@@ -98,11 +101,18 @@ void DitherTests::normalizingClampsRoundsAndTrimsTheCharacters()
     const DitherSettings normal = wild.normalized();
     QCOMPARE(normal.pixelSize, 32.0);
     QCOMPARE(normal.cellSize, 4.0);
+    QCOMPARE(normal.textSize, 64.0);
     QCOMPARE(normal.angle, 45.0);
     QCOMPARE(normal.levels, 5.0);
     QCOMPARE(normal.diffusion, 0.0);
     QCOMPARE(normal.density, 100.0);
     QCOMPARE(normal.contrast, 0.0);
+    wild.textSize = 5.4;
+    QCOMPARE(wild.normalized().textSize, 6.0);
+    wild.textSize = std::nan("");
+    QCOMPARE(wild.normalized().textSize, 14.0);
+    wild.textSize = 9.5;
+    QCOMPARE(wild.normalized().textSize, 10.0);
     QVERIFY(normal.dark == AdjustmentColor(0, 0.5, 1) && normal.light == AdjustmentColor(1, 0, 0.25));
     // Every line break goes, tabs and spaces stay; 64 kept.
     QCOMPARE(normal.characters, QStringLiteral("abcdefghi\t j") + QString(52, u'x'));
@@ -263,36 +273,88 @@ void DitherTests::marksDrawLightOnDarkOrDarkOnLight()
 
 void DitherTests::glyphsAreSortedByTheirInk()
 {
-    const DitherSettings::Glyphs glyphs = DitherSettings::glyphs(QStringLiteral("@. .#"), 8);
-    // Four distinct: space, dot, hash, at; 8 × 8 maps.
+    const DitherSettings::Glyphs glyphs = DitherSettings::glyphs(QStringLiteral("@. .#"), 14);
+    // 14 tall; a bold monospace M at 12 pixels wide.
+    QFont font(QStringLiteral("monospace"));
+    font.setWeight(QFont::Bold);
+    font.setPixelSize(12);
+    QCOMPARE(glyphs.height, 14);
+    QCOMPARE(glyphs.width, int(std::lround(QFontMetricsF(font).horizontalAdvance(QStringLiteral("M")))));
+    QVERIFY(glyphs.width < glyphs.height);
+    // Four distinct: space, dot, hash, at.
     QCOMPARE(glyphs.coverage.size(), size_t(4));
-    QCOMPARE(glyphs.maps.size(), size_t(4 * 64));
+    QCOMPARE(glyphs.maps.size(), size_t(4 * glyphs.width * glyphs.height));
     QCOMPARE(glyphs.coverage[0], 0.0f);
     QVERIFY(glyphs.coverage[1] > 0 && glyphs.coverage[1] < glyphs.coverage[2] && glyphs.coverage[2] <= glyphs.coverage[3]);
-    QVERIFY(*std::max_element(glyphs.maps.begin() + 192, glyphs.maps.end()) > 200);
+    QVERIFY(*std::max_element(glyphs.maps.begin() + 3 * glyphs.width * glyphs.height, glyphs.maps.end()) > 200);
     QCOMPARE(DitherSettings::glyphs(DitherSettings::defaultCharacters(), 12).coverage.size(), size_t(10));
-    // A 20-pixel cell: M at 23 pixels, 15–19 tall.
-    const std::vector<uint8_t> m = DitherSettings::glyphs(QStringLiteral("M"), 20).maps;
-    int top = 20, bottom = -1;
-    bool smooth = false;
-    for (int index = 0; index < 400; ++index) {
-        if (m[size_t(index)] > 128) {
-            top = std::min(top, index / 20);
-            bottom = std::max(bottom, index / 20);
+    // A 20-pixel line: letters at 17 pixels, on one baseline.
+    font.setPixelSize(17);
+    const QFontMetricsF metrics(font);
+    const int baseline = 20 - int(std::round((20 - (metrics.ascent() + metrics.descent())) / 2 + metrics.descent()));
+    const auto ink = [](const DitherSettings::Glyphs &glyph) {
+        int top = glyph.height, bottom = -1;
+        double sum = 0, sumX = 0;
+        for (int y = 0; y < glyph.height; ++y)
+            for (int x = 0; x < glyph.width; ++x) {
+                const int value = glyph.maps[size_t(y * glyph.width + x)];
+                sum += value;
+                sumX += value * (x + 0.5);
+                if (value > 128) {
+                    top = std::min(top, y);
+                    bottom = std::max(bottom, y);
+                }
+            }
+        return std::tuple(top, bottom, sumX / sum);
+    };
+    const auto [mTop, mBottom, mMiddle] = ink(DitherSettings::glyphs(QStringLiteral("M"), 20));
+    const auto [dotTop, dotBottom, dotMiddle] = ink(DitherSettings::glyphs(QStringLiteral("."), 20));
+    // M's caps stand on the baseline, as the dot does.
+    QVERIFY2(mBottom - mTop + 1 >= 11 && mBottom - mTop + 1 <= 14, qPrintable(QString::number(mBottom - mTop + 1)));
+    QCOMPARE(mBottom, baseline - 1);
+    QCOMPARE(dotBottom, baseline - 1);
+    QVERIFY(dotTop > mTop);
+    // Exactly the letter drawn on that baseline, filled.
+    const DitherSettings::Glyphs drawnM = DitherSettings::glyphs(QStringLiteral("M"), 20);
+    QImage reference(drawnM.width, drawnM.height, QImage::Format_Grayscale8);
+    reference.fill(0);
+    {
+        QPainterPath path;
+        path.addText(0, baseline, font, QStringLiteral("M"));
+        QPainter painter(&reference);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.fillPath(path, Qt::white);
+    }
+    for (int y = 0; y < drawnM.height; ++y)
+        for (int x = 0; x < drawnM.width; ++x)
+            QCOMPARE(int(drawnM.maps[size_t(y * drawnM.width + x)]), int(reference.constScanLine(y)[x]));
+    // At 64: a 53-pixel face, a 32-wide cell, drawn exactly.
+    font.setPixelSize(53);
+    const QFontMetricsF large(font);
+    const DitherSettings::Glyphs bigM = DitherSettings::glyphs(QStringLiteral("M"), 64);
+    QCOMPARE(bigM.width, int(std::lround(large.horizontalAdvance(QStringLiteral("M")))));
+    QCOMPARE(bigM.width, 32);
+    const int bigBaseline = 64 - int(std::round((64 - (large.ascent() + large.descent())) / 2 + large.descent()));
+    QImage bigReference(bigM.width, bigM.height, QImage::Format_Grayscale8);
+    bigReference.fill(0);
+    {
+        QPainterPath path;
+        path.addText(0, bigBaseline, font, QStringLiteral("M"));
+        QPainter painter(&bigReference);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.fillPath(path, Qt::white);
+    }
+    long inkSum = 0;
+    for (int y = 0; y < bigM.height; ++y)
+        for (int x = 0; x < bigM.width; ++x) {
+            QCOMPARE(int(bigM.maps[size_t(y * bigM.width + x)]), int(bigReference.constScanLine(y)[x]));
+            inkSum += bigM.maps[size_t(y * bigM.width + x)];
         }
-        smooth = smooth || (m[size_t(index)] > 0 && m[size_t(index)] < 255);
-    }
-    QVERIFY2(bottom - top + 1 >= 15 && bottom - top + 1 <= 19, qPrintable(QString::number(bottom - top + 1)));
-    QVERIFY(smooth);
-    // Centred on its ink both ways: a dot mid cell.
-    const std::vector<uint8_t> dot = DitherSettings::glyphs(QStringLiteral("."), 20).maps;
-    double sum = 0, sumX = 0, sumY = 0;
-    for (int index = 0; index < 400; ++index) {
-        sum += dot[size_t(index)];
-        sumX += dot[size_t(index)] * (index % 20 + 0.5);
-        sumY += dot[size_t(index)] * (index / 20 + 0.5);
-    }
-    QVERIFY2(std::abs(sumX / sum - 10) < 0.6 && std::abs(sumY / sum - 10) < 0.6, qPrintable(QStringLiteral("%1 %2").arg(sumX / sum).arg(sumY / sum)));
+    // Coverage is the map's mean, ink over the whole cell.
+    QCOMPARE(bigM.coverage.front(), float(inkSum) / float(255 * bigM.width * bigM.height));
+    // Each centred across its cell by its advance.
+    const int width = DitherSettings::glyphs(QStringLiteral("M"), 20).width;
+    QVERIFY2(std::abs(mMiddle - width / 2.0) < 0.6 && std::abs(dotMiddle - width / 2.0) < 1, qPrintable(QStringLiteral("%1 %2").arg(mMiddle).arg(dotMiddle)));
     // Canonically equal graphemes are one, as Swift's Characters.
     QCOMPARE(DitherSettings::glyphs(QStringLiteral("\u00E9e\u0301"), 20).coverage.size(), size_t(1));
 }
@@ -344,8 +406,14 @@ void DitherTests::theScreenTurnsWithItsAngle()
 void DitherTests::asciiDrawsWithItsOwnCharacters()
 {
     DitherSettings ascii = style(DitherStyle::ascii);
-    ascii.cellSize = 12;
+    ascii.textSize = 12;
     const QImage source = ramp(48, 24);
+    // Full resolution: Pixel Size and Shape leave ASCII alone.
+    DitherSettings chunky = ascii;
+    chunky.pixelSize = 8;
+    chunky.pixelShape = DitherPixelShape::dot;
+    ascii.pixelSize = 1;
+    QCOMPARE(chunky.apply(source), ascii.apply(source));
     // A blank alphabet marks nothing: all the dark paper.
     ascii.characters = QStringLiteral(" ");
     QCOMPARE(colours(ascii.apply(source)), (std::set<QRgb>{qRgb(0, 0, 0)}));

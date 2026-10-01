@@ -1,6 +1,7 @@
 #include "Document/Dither.h"
 #include "Document/BrushStroke.h"
 #include "IO/ImageExporter.h"
+#include <QFontMetricsF>
 #include <QPainter>
 #include <QPainterPath>
 #include <QTextBoundaryFinder>
@@ -103,6 +104,7 @@ DitherSettings DitherSettings::normalized() const
     DitherSettings result = *this;
     result.pixelSize = std::round(clamp(pixelSize, pixelSizeLow, pixelSizeHigh, 2));
     result.cellSize = std::round(clamp(cellSize, cellSizeLow, cellSizeHigh, 8));
+    result.textSize = std::round(clamp(textSize, textSizeLow, textSizeHigh, 14));
     result.angle = clamp(angle, -90, 90, 45);
     result.levels = std::round(clamp(levels, levelsLow, levelsHigh, 2));
     result.diffusion = clamp(diffusion, 0, 100, 100);
@@ -123,7 +125,8 @@ DitherSettings DitherSettings::normalized() const
 QImage DitherSettings::apply(const QImage &image) const
 {
     const DitherSettings settings = normalized();
-    const int block = int(settings.pixelSize);
+    // ASCII draws at full resolution: chunks would blur its letters.
+    const int block = settings.style == DitherStyle::ascii ? 1 : int(settings.pixelSize);
     const QImage source = image.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
     if (source.isNull())
         throw ExportError(ExportError::Kind::render);
@@ -171,7 +174,7 @@ QImage DitherSettings::apply(const QImage &image) const
 QImage DitherSettings::dither(const QImage &image) const
 {
     const int cell = int(cellSize);
-    const Glyphs glyphs = style == DitherStyle::ascii ? DitherSettings::glyphs(characters.isEmpty() ? defaultCharacters() : characters, cell) : Glyphs();
+    const Glyphs glyphs = style == DitherStyle::ascii ? DitherSettings::glyphs(characters.isEmpty() ? defaultCharacters() : characters, int(textSize)) : Glyphs();
     const bool two = colors == DitherColors::twoColors;
     const std::array<uint8_t, 3> darkColor = two ? bytes(dark) : std::array<uint8_t, 3>{0, 0, 0};
     const std::array<uint8_t, 3> lightColor = two ? bytes(light) : std::array<uint8_t, 3>{255, 255, 255};
@@ -180,7 +183,7 @@ QImage DitherSettings::dither(const QImage &image) const
         DitherParams params{.style = int(style), .levels = int(levels), .diffusion = float(diffusion / 100), .density = float(density / 100),
                             .contrast = float(contrast / 100), .cell = cell, .angle = float(angle * M_PI / 180), .lightOnDark = lightOnDark ? 1 : 0,
                             .originalColors = colors == DitherColors::original ? 1 : 0, .dark = {darkColor[0], darkColor[1], darkColor[2]},
-                            .light = {lightColor[0], lightColor[1], lightColor[2]}, .glyphs = glyphs.maps.data(),
+                            .light = {lightColor[0], lightColor[1], lightColor[2]}, .glyphWidth = glyphs.width, .glyphHeight = glyphs.height, .glyphs = glyphs.maps.data(),
                             .glyphCoverage = glyphs.coverage.data(), .glyphCount = int(glyphs.coverage.size())};
         failed = dither_apply(pixels, size_t(width), size_t(height), size_t(stride), &params) == 0;
     });
@@ -189,19 +192,23 @@ QImage DitherSettings::dither(const QImage &image) const
     return result;
 }
 
-DitherSettings::Glyphs DitherSettings::glyphs(const QString &characters, int cell)
+DitherSettings::Glyphs DitherSettings::glyphs(const QString &characters, int lineHeight)
 {
     // Swift's bold system monospace, at a whole pixel size.
     QFont font(QStringLiteral("monospace"));
     font.setWeight(QFont::Bold);
-    font.setPixelSize(std::max(1, int(std::lround(cell * 1.15))));
+    font.setPixelSize(std::max(1, int(std::lround(lineHeight / 1.2))));
+    const QFontMetricsF metrics(font);
+    const int height = lineHeight, width = std::max(1, int(std::lround(metrics.horizontalAdvance(QStringLiteral("M")))));
+    // One baseline, mid-line, as a terminal sets it.
+    const double baseline = height - std::round((height - (metrics.ascent() + metrics.descent())) / 2 + metrics.descent());
     std::vector<std::pair<std::vector<uint8_t>, float>> drawn;
     // Swift's Set<Character>: canonically equivalent graphemes are one.
     std::set<QString> seen;
     for (const QString &character : graphemes(characters)) {
         if (!seen.insert(character.normalized(QString::NormalizationForm_C)).second)
             continue;
-        QImage map(cell, cell, QImage::Format_Grayscale8);
+        QImage map(width, height, QImage::Format_Grayscale8);
         if (map.isNull())
             throw ExportError(ExportError::Kind::render);
         map.fill(0);
@@ -209,25 +216,24 @@ DitherSettings::Glyphs DitherSettings::glyphs(const QString &characters, int cel
         path.addText(0, 0, font, character);
         // Overlapping outlines stay inked, as text rendering fills them.
         path.setFillRule(Qt::WindingFill);
-        const QRectF bounds = path.boundingRect();
         {
-            // Centred on its ink, as CTLineGetImageBounds centres it.
+            // Centred on its advance, on the shared baseline.
             QPainter painter(&map);
             painter.setRenderHint(QPainter::Antialiasing);
-            painter.translate((cell - bounds.width()) / 2 - bounds.left(), (cell - bounds.height()) / 2 - bounds.top());
+            painter.translate(std::round((width - metrics.horizontalAdvance(character)) / 2), baseline);
             painter.fillPath(path, Qt::white);
         }
-        std::vector<uint8_t> bytes(size_t(cell * cell));
+        std::vector<uint8_t> bytes(size_t(width * height));
         long sum = 0;
-        for (int y = 0; y < cell; ++y) {
-            std::copy_n(map.constScanLine(y), cell, bytes.begin() + y * cell);
-            for (int x = 0; x < cell; ++x)
+        for (int y = 0; y < height; ++y) {
+            std::copy_n(map.constScanLine(y), width, bytes.begin() + y * width);
+            for (int x = 0; x < width; ++x)
                 sum += map.constScanLine(y)[x];
         }
-        drawn.emplace_back(std::move(bytes), float(sum) / float(255 * cell * cell));
+        drawn.emplace_back(std::move(bytes), float(sum) / float(255 * width * height));
     }
     std::stable_sort(drawn.begin(), drawn.end(), [](const auto &a, const auto &b) { return a.second < b.second; });
-    Glyphs result;
+    Glyphs result{.maps = {}, .coverage = {}, .width = width, .height = height};
     for (const auto &[map, coverage] : drawn) {
         result.maps.insert(result.maps.end(), map.begin(), map.end());
         result.coverage.push_back(coverage);

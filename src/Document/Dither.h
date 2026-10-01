@@ -33,14 +33,17 @@ QString rawValue(DitherColors colors);
 struct DitherSettings {
     static constexpr double pixelSizeLow = 1, pixelSizeHigh = 32;
     static constexpr double cellSizeLow = 4, cellSizeHigh = 64;
+    static constexpr double textSizeLow = 6, textSizeHigh = 64;
     static constexpr double levelsLow = 2, levelsHigh = 8;
     static QString defaultCharacters() { return QStringLiteral(" .:-=+*#%@"); }
     DitherStyle style = DitherStyle::atkinson;
     // Each dithered pixel covers this many layer pixels a side.
     double pixelSize = 2;
     DitherPixelShape pixelShape = DitherPixelShape::square;
-    // Halftone and character cells, in dithered pixels.
+    // Halftone cells, in dithered pixels.
     double cellSize = 8;
+    // ASCII's line height in layer pixels; letters about 0.6 wide.
+    double textSize = 14;
     // The halftone screen's angle, in degrees.
     double angle = 45;
     // Tones per channel; 2 is 1-bit.
@@ -65,8 +68,11 @@ struct DitherSettings {
     struct Glyphs {
         std::vector<uint8_t> maps;
         std::vector<float> coverage;
+        int width = 1;
+        int height = 1;
     };
-    static Glyphs glyphs(const QString &characters, int cell);
+    // A monospaced cell: a line tall, a letter wide.
+    static Glyphs glyphs(const QString &characters, int lineHeight);
 
 private:
     QImage dither(const QImage &image) const;

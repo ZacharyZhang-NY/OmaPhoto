@@ -237,44 +237,88 @@ void DitherKernelTests::theCellSizeReachesTheScreen()
     };
     QVERIFY(!lit(12, 4, 3) && lit(12, 4, 7));
     QVERIFY(lit(8, 4, 3) && !lit(8, 4, 7));
-    // ASCII: one character tiled at its own cell size.
+    // ASCII: one character tiled a letter wide, a line tall.
     DitherSettings ascii = style(DitherStyle::ascii);
-    ascii.cellSize = 12;
+    ascii.textSize = 12;
     ascii.characters = QStringLiteral("#");
-    const QImage out = ascii.apply(filled(24, 24, Qt::white));
-    for (int y = 0; y < 12; ++y)
-        for (int x = 0; x < 12; ++x)
-            QCOMPARE(out.pixel(x + 12, y + 12), out.pixel(x, y));
-    const std::vector<uint8_t> map = DitherSettings::glyphs(QStringLiteral("#"), 12).maps;
-    for (int index = 0; index < 144; ++index)
-        QCOMPARE(qRed(out.pixel(index % 12, index / 12)), int(std::lround(map[size_t(index)] / 255.0f * 255.0f)));
+    const DitherSettings::Glyphs glyph = DitherSettings::glyphs(QStringLiteral("#"), 12);
+    const int w = glyph.width, h = glyph.height;
+    QCOMPARE(h, 12);
+    const QImage out = ascii.apply(filled(4 * w, 2 * h, Qt::white));
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            QCOMPARE(out.pixel(x + w, y + h), out.pixel(x, y));
+            QCOMPARE(qRed(out.pixel(x, y)), int(std::lround(glyph.maps[size_t(y * w + x)] / 255.0f * 255.0f)));
+        }
+    // Two characters over dark and light columns, cell by cell.
+    DitherSettings two = style(DitherStyle::ascii);
+    two.textSize = 12;
+    two.characters = QStringLiteral(" #");
+    QImage halves(4 * w, 3 * h, QImage::Format_RGBA8888_Premultiplied);
+    halves.fill(Qt::black);
+    QPainter(&halves).fillRect(QRect(2 * w, 0, 2 * w, 3 * h), Qt::white);
+    const QImage picked = two.apply(halves);
+    for (int y = 0; y < 3 * h; ++y)
+        for (int x = 0; x < 4 * w; ++x) {
+            // Light columns draw the hash, dark ones the paper.
+            const int expected = x < 2 * w ? 0 : int(std::lround(glyph.maps[size_t((y % h) * w + x % w)] / 255.0f * 255.0f));
+            QCOMPARE(qRed(picked.pixel(x, y)), expected);
+        }
+    // Each cell's pick from its whole cell's ink, edges included.
+    DitherSettings many = style(DitherStyle::ascii);
+    many.textSize = 12;
+    const DitherSettings::Glyphs set = DitherSettings::glyphs(DitherSettings::defaultCharacters(), 12);
+    const int pictureWidth = 5 * w + 3, pictureHeight = 3 * h + 5;
+    QImage pattern(pictureWidth, pictureHeight, QImage::Format_RGBA8888_Premultiplied);
+    for (int y = 0; y < pictureHeight; ++y)
+        for (int x = 0; x < pictureWidth; ++x)
+            pattern.setPixelColor(x, y, (x * 7 + y * 13) % 17 < 9 ? Qt::white : Qt::black);
+    const QImage drawn = many.apply(pattern);
+    for (int cellY = 0; cellY * h < pictureHeight; ++cellY)
+        for (int cellX = 0; cellX * w < pictureWidth; ++cellX) {
+            int white = 0, count = 0;
+            for (int y = cellY * h; y < std::min(pictureHeight, (cellY + 1) * h); ++y)
+                for (int x = cellX * w; x < std::min(pictureWidth, (cellX + 1) * w); ++x) {
+                    white += qRed(pattern.pixel(x, y)) == 255;
+                    ++count;
+                }
+            const float wanted = float(white) / float(count) * set.coverage.back();
+            size_t best = 0;
+            for (size_t index = 1; index < set.coverage.size(); ++index)
+                best = std::abs(set.coverage[index] - wanted) < std::abs(set.coverage[best] - wanted) ? index : best;
+            for (int y = cellY * h; y < std::min(pictureHeight, (cellY + 1) * h); ++y)
+                for (int x = cellX * w; x < std::min(pictureWidth, (cellX + 1) * w); ++x)
+                    QCOMPARE(qRed(drawn.pixel(x, y)), int(std::lround(set.maps[best * size_t(w * h) + size_t((y % h) * w + x % w)] / 255.0f * 255.0f)));
+        }
 }
 
 void DitherKernelTests::overlappingOutlinesStayInked()
 {
     // An accent over a letter: text rendering inks their overlap.
     const QString character = QStringLiteral("A\u0340");
-    const int cell = 64;
-    const std::vector<uint8_t> map = DitherSettings::glyphs(character, cell).maps;
+    const DitherSettings::Glyphs glyph = DitherSettings::glyphs(character, 64);
     QFont font(QStringLiteral("monospace"));
     font.setWeight(QFont::Bold);
-    font.setPixelSize(74);
-    QPainterPath path;
-    path.addText(0, 0, font, character);
-    const QRectF bounds = path.boundingRect();
-    QImage text(cell, cell, QImage::Format_Grayscale8);
+    font.setPixelSize(53);
+    const QFontMetricsF metrics(font);
+    // Text drawn on the glyph's own baseline and place.
+    const double baseline = 64 - std::round((64 - (metrics.ascent() + metrics.descent())) / 2 + metrics.descent());
+    QImage text(glyph.width, glyph.height, QImage::Format_Grayscale8);
     text.fill(0);
     {
         QPainter painter(&text);
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setFont(font);
         painter.setPen(Qt::white);
-        painter.drawText(QPointF((cell - bounds.width()) / 2 - bounds.left(), (cell - bounds.height()) / 2 - bounds.top()), character);
+        painter.drawText(QPointF(std::round((glyph.width - metrics.horizontalAdvance(character)) / 2), baseline), character);
     }
-    int holes = 0;
-    for (int y = 0; y < cell; ++y)
-        for (int x = 0; x < cell; ++x)
-            holes += text.constScanLine(y)[x] > 200 && map[size_t(y * cell + x)] < 50;
+    int holes = 0, inked = 0;
+    for (int y = 0; y < glyph.height; ++y)
+        for (int x = 0; x < glyph.width; ++x) {
+            holes += text.constScanLine(y)[x] > 200 && glyph.maps[size_t(y * glyph.width + x)] < 50;
+            inked += text.constScanLine(y)[x] > 200;
+        }
+    QVERIFY(inked > 100);
     QVERIFY2(holes <= 2, qPrintable(QString::number(holes)));
 }
 

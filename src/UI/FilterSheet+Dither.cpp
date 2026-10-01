@@ -48,8 +48,12 @@ void FilterSheet::dither()
     });
     control(QStringLiteral("Pixel Size"), key(&DitherSettings::pixelSize), DitherSettings::pixelSizeLow, DitherSettings::pixelSizeHigh, QStringLiteral("px"), 0, false);
     box()->setToolTip(QStringLiteral("Make each dithered pixel this many pixels across, for a chunky old-screen look"));
+    m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return settings.dither.style != DitherStyle::ascii; });
+    control(QStringLiteral("Text Size"), key(&DitherSettings::textSize), DitherSettings::textSizeLow, DitherSettings::textSizeHigh, QStringLiteral("px"), 0, false);
+    box()->setToolTip(QStringLiteral("The height of each line of characters"));
+    m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return settings.dither.style == DitherStyle::ascii; });
     control(QStringLiteral("Cell Size"), key(&DitherSettings::cellSize), DitherSettings::cellSizeLow, DitherSettings::cellSizeHigh, QStringLiteral("px"), 0, false);
-    m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return isHalftone(settings.dither.style) || settings.dither.style == DitherStyle::ascii; });
+    m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return isHalftone(settings.dither.style); });
     control(QStringLiteral("Angle"), key(&DitherSettings::angle), -90, 90, QStringLiteral("°"), 0, false);
     m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return isHalftone(settings.dither.style); });
     // ASCII's characters, typed as they will draw.
@@ -129,7 +133,7 @@ void FilterSheet::dither()
         const QSignalBlocker quiet(shape);
         shape->setCurrentIndex(int(settings.dither.pixelShape));
     });
-    m_shownWhen.emplace_back(shape->parentWidget(), [](const FilterSettings &settings) { return settings.dither.pixelSize > 1; });
+    m_shownWhen.emplace_back(shape->parentWidget(), [](const FilterSettings &settings) { return settings.dither.pixelSize > 1 && settings.dither.style != DitherStyle::ascii; });
     flag(QStringLiteral("Light on Dark"), QStringLiteral("Draw the marks for the light tones on the dark color, like a glowing screen"),
          [](FilterSettings &settings) -> bool & { return settings.dither.lightOnDark; });
     m_shownWhen.emplace_back(m_flags.back().first, [](const FilterSettings &settings) { return drawsMarks(settings.dither.style); });

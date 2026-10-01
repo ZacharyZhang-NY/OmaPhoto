@@ -195,7 +195,8 @@ int dither_apply(uint8_t *rgba, size_t width, size_t height, size_t stride, cons
         float cosA = cosf(p->angle), sinA = sinf(p->angle);
         float *ink = p->lightOnDark ? light : dark, *paper = p->lightOnDark ? dark : light;
         // Glyphs: each cell shares one, picked from the cell's average tone, worked out once per cell.
-        size_t columns = (width + (size_t)cell - 1) / (size_t)cell, cellRows = (height + (size_t)cell - 1) / (size_t)cell;
+        size_t gw = (size_t)(p->glyphWidth < 1 ? 1 : p->glyphWidth), gh = (size_t)(p->glyphHeight < 1 ? 1 : p->glyphHeight);
+        size_t columns = (width + gw - 1) / gw, cellRows = (height + gh - 1) / gh;
         int *picked = NULL;
         if (style == DITHER_GLYPHS && p->glyphCount > 0) {
             picked = malloc(columns * cellRows * sizeof(int));
@@ -203,8 +204,8 @@ int dither_apply(uint8_t *rgba, size_t width, size_t height, size_t stride, cons
             for (size_t row = 0; row < cellRows; ++row)
                 for (size_t column = 0; column < columns; ++column) {
                     float sum = 0; int n = 0;
-                    for (size_t yy = row * (size_t)cell; yy < (row + 1) * (size_t)cell && yy < height; ++yy)
-                        for (size_t xx = column * (size_t)cell; xx < (column + 1) * (size_t)cell && xx < width; ++xx) {
+                    for (size_t yy = row * gh; yy < (row + 1) * gh && yy < height; ++yy)
+                        for (size_t xx = column * gw; xx < (column + 1) * gw && xx < width; ++xx) {
                             size_t i = yy * width + xx;
                             if (alpha[i]) { sum += marks[i]; ++n; }
                         }
@@ -228,8 +229,8 @@ int dither_apply(uint8_t *rgba, size_t width, size_t height, size_t stride, cons
                 if (!alpha[at]) continue;
                 float amount;
                 if (picked) {
-                    int glyph = picked[(y / (size_t)cell) * columns + x / (size_t)cell];
-                    amount = p->glyphs[(size_t)glyph * (size_t)(cell * cell) + (y % (size_t)cell) * (size_t)cell + x % (size_t)cell] / 255.0f;
+                    int glyph = picked[(y / gh) * columns + x / gw];
+                    amount = p->glyphs[(size_t)glyph * gw * gh + (y % gh) * gw + x % gw] / 255.0f;
                 } else if (style == DITHER_PATTERNS) {
                     float t = marks[at];
                     float coverage = p->lightOnDark ? t : 1 - t;

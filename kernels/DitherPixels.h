@@ -29,8 +29,11 @@ typedef struct {
     int originalColors;
     uint8_t dark[3];
     uint8_t light[3];
-    // Glyphs: `glyphCount` coverage maps of `cell` × `cell` bytes (255 is fully inked), from least inked to most,
-    // with each map's mean coverage (0–1) in `glyphCoverage`.
+    // Glyphs: `glyphCount` coverage maps of `glyphWidth` × `glyphHeight` bytes (255 is fully inked), from least
+    // inked to most, with each map's mean coverage (0–1) in `glyphCoverage`. The image is laid out in cells that size,
+    // like lines of monospaced text.
+    int glyphWidth;
+    int glyphHeight;
     const uint8_t *glyphs;
     const float *glyphCoverage;
     int glyphCount;

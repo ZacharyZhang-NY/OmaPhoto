@@ -168,8 +168,9 @@ void DitherSheetTests::theControlsFollowTheStyle()
     QCOMPARE(shown.shown(), sorted(common + QStringList{"Tones"}));
     shown.set([](DitherSettings &dither) { dither.style = DitherStyle::lines; });
     QCOMPARE(shown.shown(), sorted(common + QStringList{"Cell Size", "Angle", "Light on Dark"}));
+    // ASCII: Text Size, never chunky pixels or cells.
     shown.set([](DitherSettings &dither) { dither.style = DitherStyle::ascii; });
-    QCOMPARE(shown.shown(), sorted(common + QStringList{"Cell Size", "Characters", "Light on Dark"}));
+    QCOMPARE(shown.shown(), sorted(QStringList{"Style", "Text Size", "Characters", "Density", "Contrast", "Colors", "Light on Dark"}));
     shown.set([](DitherSettings &dither) { dither.style = DitherStyle::patterns; });
     QCOMPARE(shown.shown(), sorted(common + QStringList{"Light on Dark"}));
     // Pixel Shape needs chunky pixels; the swatches, Two Colors.
@@ -286,6 +287,19 @@ void DitherSheetTests::eachNumberWritesItsOwnSetting()
     QVERIFY(glow && glow->isChecked());
     glow->click();
     QVERIFY(!shown.dither().lightOnDark);
+    // Text Size, under ASCII: whole pixels, its unit beside.
+    shown.set([](DitherSettings &dither) { dither.style = DitherStyle::ascii; });
+    QLineEdit &text = shown.child<QLineEdit>("textSizeField");
+    text.setFocus();
+    text.selectAll();
+    QTest::keyClicks(&text, QStringLiteral("20.4"));
+    QTest::keyClick(&text, Qt::Key_Return);
+    QCOMPARE(shown.dither().textSize, 20.0);
+    QCOMPARE(text.text(), QStringLiteral("20"));
+    QStringList units;
+    for (QLabel *label : text.parentWidget()->findChildren<QLabel *>())
+        units << label->text();
+    QVERIFY2(units.contains(QStringLiteral("px")), qPrintable(units.join(u',')));
 }
 
 void DitherSheetTests::leftTheCharactersShowWhatWasKept()
@@ -326,6 +340,17 @@ void DitherSheetTests::theSlidersReachTheirEnds()
     }
     QCOMPARE(shown.child<QSlider>("pixelSizeSlider").parentWidget()->toolTip(),
              QString("Make each dithered pixel this many pixels across, for a chunky old-screen look"));
+    shown.set([](DitherSettings &dither) { dither.style = DitherStyle::ascii; });
+    QSlider &text = shown.child<QSlider>("textSizeSlider");
+    text.setValue(text.maximum());
+    QCOMPARE(shown.dither().textSize, 64.0);
+    text.setValue(text.minimum());
+    QCOMPARE(shown.dither().textSize, 6.0);
+    // Quarter travel: 20.5, so 21; step 25: 7.45, so 7.
+    text.setValue(text.maximum() / 4);
+    QCOMPARE(shown.dither().textSize, 21.0);
+    text.setValue(25);
+    QCOMPARE(shown.dither().textSize, 7.0);
     shown.set([](DitherSettings &dither) { dither.style = DitherStyle::atkinson; });
     for (const auto &[name, setting, low, high] : {std::tuple("tonesSlider", &DitherSettings::levels, 2.0, 8.0),
                                                    std::tuple("diffusionSlider", &DitherSettings::diffusion, 0.0, 100.0)}) {
@@ -413,7 +438,11 @@ void DitherSheetTests::rowsKeepSwiftsOrderHelpAndScale()
                                   "Density|More ink (darker) or less before dithering", "Contrast|", "Colors|",
                                   "Pixel Shape|Draw each chunky pixel as a solid square, or as a round dot like a dot-matrix screen"}));
     shown.set([](DitherSettings &dither) { dither.style = DitherStyle::ascii; });
-    QCOMPARE(rows().mid(2, 2), (QStringList{"Cell Size|", "Characters|The characters to draw with, in any order: each spot gets the one whose ink best matches its tone"}));
+    QCOMPARE(rows().mid(1, 2), (QStringList{"Text Size|The height of each line of characters", "Characters|The characters to draw with, in any order: each spot gets the one whose ink best matches its tone"}));
+    // Text Size, 6 to 64: half its travel is 35.
+    QSlider &text = shown.child<QSlider>("textSizeSlider");
+    text.setValue(text.maximum() / 2);
+    QCOMPARE(shown.dither().textSize, 35.0);
     QCOMPARE(rows().last(), QString("Light on Dark|Draw the marks for the light tones on the dark color, like a glowing screen"));
     // Linear: half the Pixel Size travel is 16.5, so 17.
     QSlider &pixels = shown.child<QSlider>("pixelSizeSlider");
