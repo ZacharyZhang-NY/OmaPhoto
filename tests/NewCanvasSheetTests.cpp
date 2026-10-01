@@ -325,6 +325,12 @@ void NewCanvasSheetTests::theMoreButtonDrawsThreeDotsAndOpensTheMenu()
         QVERIFY2(std::abs(qGray(image.pixel(26, y)) - qGray(ink.rgb())) < std::abs(qGray(image.pixel(26, y)) - qGray(ground.rgb())), qPrintable(QString::number(y)));
     for (const QPoint clear : {QPoint(26, 11), QPoint(26, 16), QPoint(26, 5), QPoint(26, 23), QPoint(22, 14), QPoint(14, 14)})
         QCOMPARE(image.pixelColor(clear), ground);
+    // Filled, never outlined: a red ink stays red.
+    QPalette red = fixture.presets.palette();
+    red.setColor(QPalette::WindowText, Qt::red);
+    fixture.presets.setPalette(red);
+    const QColor centre = fixture.presets.grab().toImage().pixelColor(26, 14);
+    QVERIFY2(centre.red() > 200 && centre.red() - centre.green() > 60, qPrintable(centre.name()));
     bool shown = false;
     QTimer::singleShot(0, fixture.presets.menu(), [&] {
         shown = fixture.presets.menu()->isVisible();
