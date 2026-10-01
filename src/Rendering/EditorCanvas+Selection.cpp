@@ -67,7 +67,7 @@ void CanvasView::lassoMouseDown(QPointF point, Qt::KeyboardModifiers modifiers)
             m_session.magicWand(pixel, mode);
             return;
         }
-        m_session.beginLasso(pixel, mode);
+        m_session.beginLasso(m_session.tool() == NavigationTool::marquee ? snappedCorner(pixel, modifiers) : pixel, mode);
         synchronizeDisplay();
         return;
     }
@@ -218,13 +218,32 @@ void CanvasView::dragSelection(QPointF point, Qt::KeyboardModifiers modifiers)
         return;
     const QPointF pixel = m_session.viewport.documentPoint(point, m_session.document()->size());
     QSizeF offset(pixel.x() - m_selectionDragStart->x(), pixel.y() - m_selectionDragStart->y());
+    bool horizontal = true, vertical = true;
     if (modifiers.testFlag(Qt::ShiftModifier)) {
-        if (std::abs(offset.width()) >= std::abs(offset.height()))
+        if (std::abs(offset.width()) >= std::abs(offset.height())) {
             offset.setHeight(0);
-        else
+            vertical = false;
+        } else {
             offset.setWidth(0);
+            horizontal = false;
+        }
     }
+    // Snaps as a drawn Marquee does, unless Ctrl is held.
+    if (modifiers.testFlag(Qt::ControlModifier))
+        m_session.snapGuides = {};
+    else
+        offset = m_session.snappedSelectionOffset(offset, TransformSnap::distance / std::max(m_session.viewport.pointsPerPixel(), 0.0001), horizontal,
+                                                  vertical);
     m_session.moveSelection(offset);
+}
+
+QPointF CanvasView::snappedCorner(QPointF pixel, Qt::KeyboardModifiers modifiers)
+{
+    if (modifiers.testFlag(Qt::ControlModifier)) {
+        m_session.snapGuides = {};
+        return pixel;
+    }
+    return m_session.snappedPoint(pixel, TransformSnap::distance / std::max(m_session.viewport.pointsPerPixel(), 0.0001));
 }
 
 // Alt subtracts, never from the centre; Shift squares once armed.
@@ -233,7 +252,7 @@ void CanvasView::dragMarqueeDraft(QPointF pixel, Qt::KeyboardModifiers modifiers
     if (!modifiers.testFlag(Qt::ShiftModifier))
         m_marqueeConstrainArmed = true;
     m_marqueeDragPixel = pixel;
-    m_session.dragMarquee(pixel, m_marqueeConstrainArmed && modifiers.testFlag(Qt::ShiftModifier), false);
+    m_session.dragMarquee(snappedCorner(pixel, modifiers), m_marqueeConstrainArmed && modifiers.testFlag(Qt::ShiftModifier), false);
 }
 
 // A frame's pan toward a pointer at the edge.

@@ -212,13 +212,14 @@ void SelectionCanvasTests::focusLossEndsAMarqueeDraftAndAnOutlineMove()
     QVERIFY(session.lassoDraft().has_value());
     session.cancelLasso();
     session.selectAll();
+    // Twenty across: out of the canvas edges' snapping reach.
     shown.press(QPointF(200, 150));
-    shown.move(QPointF(210, 150));
+    shown.move(QPointF(220, 150));
     shown.canvas->clearFocus();
     QCOMPARE(session.history.undoName(), QString("Move Selection"));
     QVERIFY(session.canUndo());
-    shown.release(QPointF(210, 150));
-    QCOMPARE(bounds(session), QRectF(10, 0, 400, 300));
+    shown.release(QPointF(220, 150));
+    QCOMPARE(bounds(session), QRectF(20, 0, 400, 300));
 }
 
 void SelectionCanvasTests::shiftDeleteBeginsAContentAwareFill()

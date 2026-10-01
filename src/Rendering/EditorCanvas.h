@@ -210,6 +210,8 @@ private:
     void endSelectionGestures();
     void dragSelection(QPointF point, Qt::KeyboardModifiers modifiers);
     void dragMarqueeDraft(QPointF pixel, Qt::KeyboardModifiers modifiers);
+    // A Marquee or shape corner, snapped unless Ctrl is held.
+    QPointF snappedCorner(QPointF pixel, Qt::KeyboardModifiers modifiers);
     QSizeF marqueeAutoscrollDelta(QPointF point) const;
     void updateMarqueeAutoscroll(QPointF point);
     void stepMarqueeAutoscroll();

@@ -53,6 +53,7 @@ private slots:
     void layoutGridLinesIncludeMajorsAndSubdivisions();
     void aDragCreatesMovesAndDeletesGuides();
     void aDragSnapsAndHitsTheNearestGuide();
+    void drawnPointsSnapToTheSnapToTargets();
 };
 
 void GuideTests::newGuidesUndoAndClear()
@@ -425,6 +426,40 @@ void GuideTests::aDragSnapsAndHitsTheNearestGuide()
     QCOMPARE(session->hitGuide(session->viewport.viewPoint(QPointF(201, 0), QSizeF(400, 300))).value().id, placed.id);
     session->setShowsGuides(false);
     QVERIFY(!session->hitGuide(near));
+}
+
+// Swift's drawnPointsSnapToTheSnapToTargets, as written.
+void GuideTests::drawnPointsSnapToTheSnapToTargets()
+{
+    const auto session = paintedSession();
+    session->setSnapToLayers(false);
+    session->setSnapToDocumentBounds(true);
+    session->setShowsGrid(true);
+    session->setSnapToGrid(true);
+    // Each axis alone: grid every 8, the edge at 400.
+    QCOMPARE(session->snappedPoint(QPointF(62, 20), 3), QPointF(64, 20));
+    QCOMPARE(session->snappedPoint(QPointF(397.5, 9), 3), QPointF(400, 8));
+    QVERIFY(session->snapGuides.xs == std::vector<double>{400} && session->snapGuides.ys == std::vector<double>{8});
+    // A tie keeps the first line met; reach counts inclusively.
+    QCOMPARE(session->snappedPoint(QPointF(4, 17), 4), QPointF(0, 16));
+    // Two lines in reach: the nearer wins.
+    QCOMPARE(session->snappedPoint(QPointF(3, 19), 5), QPointF(0, 16));
+    QCOMPARE(session->snappedPoint(QPointF(5, 21), 5), QPointF(8, 24));
+    QCOMPARE(session->snappedPoint(QPointF(63, 11), 1), QPointF(64, 11));
+    // The canvas's middle is no target for a drawn point.
+    QCOMPARE(session->snappedPoint(QPointF(62, 149), 2), QPointF(64, 149));
+    QVERIFY(session->snapGuides.ys.empty());
+    session->setSnappingEnabled(false);
+    session->snapGuides = {{1}, {2}};
+    QCOMPARE(session->snappedPoint(QPointF(62, 20), 3), QPointF(62, 20));
+    QVERIFY(session->snapGuides.xs.empty() && session->snapGuides.ys.empty());
+    session->setSnappingEnabled(true);
+    session->setSnapEnabled(false);
+    QCOMPARE(session->snappedPoint(QPointF(62, 20), 3), QPointF(62, 20));
+    QVERIFY(session->snapGuides.xs.empty() && session->snapGuides.ys.empty());
+    session->setSnapEnabled(true);
+    session->setShowsGrid(false);
+    session->setSnapToGrid(false);
 }
 
 QTEST_GUILESS_MAIN(GuideTests)

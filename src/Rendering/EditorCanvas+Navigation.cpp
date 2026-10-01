@@ -183,7 +183,7 @@ void CanvasView::press(QMouseEvent *event, int clicks)
     } else if (m_session.tool() == NavigationTool::gradient) {
         beginGradientDrag(point);
     } else if (m_session.tool() == NavigationTool::shape) {
-        m_session.beginShape(m_session.viewport.documentPoint(point, m_session.document()->size()));
+        m_session.beginShape(snappedCorner(m_session.viewport.documentPoint(point, m_session.document()->size()), event->modifiers()));
     } else if (m_session.tool() == NavigationTool::crop) {
         beginCropDrag(point);
     } else if (m_session.tool() == NavigationTool::type) {
@@ -271,7 +271,7 @@ void CanvasView::mouseMoveEvent(QMouseEvent *event)
         return;
     if (m_session.shapeDraft() && m_session.document()) {
         // Alt has no other job here: it grows from centre.
-        m_session.dragShape(m_session.viewport.documentPoint(point, m_session.document()->size()),
+        m_session.dragShape(snappedCorner(m_session.viewport.documentPoint(point, m_session.document()->size()), event->modifiers()),
                             event->modifiers().testFlag(Qt::ShiftModifier), event->modifiers().testFlag(Qt::AltModifier));
         synchronizeDisplay();
         return;

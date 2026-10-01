@@ -174,6 +174,41 @@ SnapGuides EditorSession::cropSnapTargets() const
     return alignmentSnapTargets({}, false);
 }
 
+QPointF EditorSession::snappedPoint(QPointF point, double tolerance)
+{
+    if (!m_snappingEnabled) {
+        snapGuides = {};
+        return point;
+    }
+    const SnapGuides targets = cropSnapTargets();
+    // The first of the nearest, as Swift's `min`.
+    const auto nearest = [tolerance](double value, const std::vector<double> &lines) {
+        std::optional<double> best;
+        for (const double line : lines)
+            if (std::abs(line - value) <= tolerance && (!best || std::abs(line - value) < std::abs(*best - value)))
+                best = line;
+        return best;
+    };
+    const std::optional<double> x = nearest(point.x(), targets.xs), y = nearest(point.y(), targets.ys);
+    snapGuides = {x ? std::vector<double>{*x} : std::vector<double>{}, y ? std::vector<double>{*y} : std::vector<double>{}};
+    return QPointF(x.value_or(point.x()), y.value_or(point.y()));
+}
+
+QSizeF EditorSession::snappedSelectionOffset(QSizeF offset, double tolerance, bool horizontal, bool vertical)
+{
+    if (!m_snappingEnabled || !m_selectionMoveOrigin) {
+        snapGuides = {};
+        return offset;
+    }
+    const QSizeF whole(std::round(offset.width()), std::round(offset.height()));
+    const QRectF box = m_selectionMoveOrigin->path.boundingRect().translated(whole.width(), whole.height());
+    const SnapGuides targets = cropSnapTargets();
+    const TransformSnap::Offset snap =
+        TransformSnap::offset(box, horizontal ? targets.xs : std::vector<double>{}, vertical ? targets.ys : std::vector<double>{}, tolerance);
+    snapGuides = {snap.x ? std::vector<double>{*snap.x} : std::vector<double>{}, snap.y ? std::vector<double>{*snap.y} : std::vector<double>{}};
+    return whole + snap.offset;
+}
+
 std::optional<QRectF> EditorSession::visibleCropRect() const
 {
     if (m_tool != NavigationTool::crop || !m_document)
