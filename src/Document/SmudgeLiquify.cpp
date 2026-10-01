@@ -39,6 +39,18 @@ WarpStroke::WarpStroke(const ImageLayer &layer, const QImage &image, const Layer
 {
     QPainter painter(&m_context);
     LayerRenderer::draw(image, transform, transform.center(), painter, {});
+    painter.end();
+    if (mode != BlurToolMode::liquify)
+        return;
+    // Resampled at every dab, pixels soften; offsets keep them sharp.
+    m_original = m_context.copy();
+    if (m_original.isNull())
+        throw ExportError(ExportError::Kind::render);
+    try {
+        m_offsets.assign(size_t(width) * size_t(height) * 2, 0);
+    } catch (const std::bad_alloc &) {
+        throw ExportError(ExportError::Kind::render);
+    }
 }
 
 int WarpStroke::radius() const
@@ -68,7 +80,8 @@ void WarpStroke::append(QPointF point)
     }
     const QPointF from = *m_last;
     const double distance = std::hypot(point.x() - from.x(), point.y() - from.y());
-    const double spacing = std::max(1.0, diameter * (mode == BlurToolMode::smudge ? 0.08 : 0.025));
+    // Smudge dabs a pixel apart smear without echoes.
+    const double spacing = std::max(1.0, diameter * (mode == BlurToolMode::smudge ? 0.005 : 0.025));
     if (distance < spacing)
         return;
     const int steps = int(std::ceil(distance / spacing));
@@ -131,10 +144,11 @@ void WarpStroke::smudge(QPointF center)
             float *c = m_carried.data() + (size_t(dy + r) * size_t(side) + size_t(dx + r)) * 4;
             for (int k = 0; k < 4; ++k) {
                 const float under = float(p[k]);
-                const float painted = under + (c[k] - under) * w;
+                // What was under the brush last dab, at the strength.
+                const float painted = under + (c[k] - under) * w * keep;
                 p[k] = uchar(std::max(0.0f, std::min(255.0f, std::round(painted))));
-                // The brush picks up what it left; weaker, more so.
-                c[k] = painted + (c[k] - painted) * keep;
+                // It carries what it just left, nothing older: no ghosts.
+                c[k] = painted;
             }
         }
     }
@@ -152,14 +166,16 @@ void WarpStroke::push(QPointF a, QPointF b)
     if (x0 > x1 || y0 > y1)
         return;
     const int cw = x1 - x0 + 1, ch = y1 - y0 + 1;
-    if (m_scratch.size() < size_t(cw) * size_t(ch) * 4)
-        m_scratch.assign(size_t(cw) * size_t(ch) * 4, 0);
+    if (m_scratch.size() < size_t(cw) * size_t(ch) * 2)
+        m_scratch.assign(size_t(cw) * size_t(ch) * 2, 0);
+    for (int y = 0; y < ch; ++y) {
+        const auto row = m_offsets.begin() + std::ptrdiff_t((size_t(y + y0) * size_t(width) + size_t(x0)) * 2);
+        std::copy(row, row + std::ptrdiff_t(size_t(cw) * 2), m_scratch.begin() + std::ptrdiff_t(size_t(y) * size_t(cw) * 2));
+    }
     uchar *pixels = m_context.bits();
     const qsizetype stride = m_context.bytesPerLine();
-    for (int y = 0; y < ch; ++y) {
-        const uchar *row = pixels + (y + y0) * stride + x0 * 4;
-        std::copy(row, row + size_t(cw) * 4, m_scratch.begin() + std::ptrdiff_t(size_t(y) * size_t(cw) * 4));
-    }
+    const uchar *original = m_original.constBits();
+    const qsizetype originalStride = m_original.bytesPerLine();
     const float invR = 1 / float(diameter / 2);
     const float *s = m_scratch.data();
     for (int dy = -r; dy <= r; ++dy) {
@@ -173,19 +189,36 @@ void WarpStroke::push(QPointF a, QPointF b)
             const float w = weight(std::sqrt(float(dx * dx + dy * dy)) * invR);
             if (!(w > 0))
                 continue;
-            // Bilinear from the old pixels, behind the brush's travel.
+            // Bilinear from the old offsets, behind the brush's travel.
             const float sx = std::min(float(cw - 1), std::max(0.0f, float(x - x0) - moveX * w));
             const float sy = std::min(float(ch - 1), std::max(0.0f, float(y - y0) - moveY * w));
             const int ix = std::min(cw - 2, int(sx)), iy = std::min(ch - 2, int(sy));
             if (ix < 0 || iy < 0)
                 continue;
             const float fx = sx - float(ix), fy = sy - float(iy);
-            uchar *p = pixels + y * stride + x * 4;
-            const size_t s00 = (size_t(iy) * size_t(cw) + size_t(ix)) * 4, s10 = s00 + 4, s01 = s00 + size_t(cw) * 4, s11 = s01 + 4;
-            for (int k = 0; k < 4; ++k) {
+            const size_t s00 = (size_t(iy) * size_t(cw) + size_t(ix)) * 2, s10 = s00 + 2, s01 = s00 + size_t(cw) * 2, s11 = s01 + 2;
+            float moved[2];
+            for (int k = 0; k < 2; ++k) {
                 const float top = s[s00 + k] + (s[s10 + k] - s[s00 + k]) * fx;
                 const float bottom = s[s01 + k] + (s[s11 + k] - s[s01 + k]) * fx;
-                p[k] = uchar(std::max(0.0f, std::min(255.0f, std::round(top + (bottom - top) * fy))));
+                moved[k] = top + (bottom - top) * fy - (k == 0 ? moveX : moveY) * w;
+            }
+            float *offset = m_offsets.data() + (size_t(y) * size_t(width) + size_t(x)) * 2;
+            offset[0] = moved[0];
+            offset[1] = moved[1];
+            // The untouched layer there, held to its edges, sampled once.
+            const float sourceX = std::clamp(float(x) + moved[0], 0.0f, float(width - 1));
+            const float sourceY = std::clamp(float(y) + moved[1], 0.0f, float(height - 1));
+            const int jx = std::max(0, std::min(int(sourceX), width - 2)), jy = std::max(0, std::min(int(sourceY), height - 2));
+            const float gx = sourceX - float(jx), gy = sourceY - float(jy);
+            const int kx = std::min(jx + 1, width - 1), ky = std::min(jy + 1, height - 1);
+            const uchar *top0 = original + jy * originalStride, *bottom0 = original + ky * originalStride;
+            const uchar *c00 = top0 + jx * 4, *c10 = top0 + kx * 4, *c01 = bottom0 + jx * 4, *c11 = bottom0 + kx * 4;
+            uchar *p = pixels + y * stride + x * 4;
+            for (int k = 0; k < 4; ++k) {
+                const float a = float(c00[k]) / 255, b = float(c10[k]) / 255, c = float(c01[k]) / 255, d = float(c11[k]) / 255;
+                const float top = a + (b - a) * gx, bottom = c + (d - c) * gx;
+                p[k] = uchar(std::max(0.0f, std::min(255.0f, std::round((top + (bottom - top) * gy) * 255))));
             }
         }
     }
@@ -238,8 +271,17 @@ void EditorSession::finishWarp()
                 stroke->clone = BrushStroke::Clone{warp->image(), QSizeF(0, 0)};
                 stroke->replacesWithClone = true;
                 stroke->editName = rawValue(warp->mode);
-                for (const QPointF step : warp->points())
+                // A point every twentieth of the tip covers every dab.
+                const double spacing = std::max(1.0, warp->diameter * 0.05);
+                const std::vector<QPointF> &points = warp->points();
+                std::optional<QPointF> kept;
+                for (size_t index = 0; index < points.size(); ++index) {
+                    const QPointF step = points[index];
+                    if (kept && index + 1 < points.size() && std::hypot(step.x() - kept->x(), step.y() - kept->y()) < spacing)
+                        continue;
                     stroke->append(step);
+                    kept = step;
+                }
                 stroke->flush();
                 if (!stroke->patches().empty())
                     commitPaintSnapshot(*stroke);

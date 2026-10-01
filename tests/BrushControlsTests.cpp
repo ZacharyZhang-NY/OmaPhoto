@@ -39,6 +39,7 @@ private slots:
     void cloneStampShowsAlignedSampleAndTheSourceNote();
     void theSmearShowsItsThreeModes();
     void smoothingShowsWithTheBrushAlone();
+    void blurHasItsOwnRadius();
 };
 
 void BrushControlsTests::theTitleAndModesFollowTheSession()
@@ -304,6 +305,87 @@ void BrushControlsTests::smoothingShowsWithTheBrushAlone()
     session.selectTool(NavigationTool::brush);
     session.setBrushMode(BrushToolMode::erase);
     QVERIFY(field.isVisible());
+}
+
+// Swift's Radius: Blur alone, apart from Strength.
+void BrushControlsTests::blurHasItsOwnRadius()
+{
+    EditorSession session;
+    session.createDocument(8, 8, true);
+    session.selectTool(NavigationTool::blur);
+    BrushControls bar(session);
+    bar.show();
+    auto &field = find<QLineEdit>(bar, "blurRadius");
+    auto &slider = find<QSlider>(bar, "blurRadiusSlider");
+    QVERIFY(!field.isVisible() && !slider.isVisible());
+    session.setBlurMode(BlurToolMode::blur);
+    QVERIFY(field.isVisible() && slider.isVisible());
+    QCOMPARE(session.brushSettings().blurRadius, 5.0);
+    QCOMPARE(field.text(), QString("5"));
+    QCOMPARE(field.toolTip(), QString("How far the blur softens, in pixels"));
+    QCOMPARE(field.accessibleName(), QString("Radius"));
+    QVERIFY(slider.minimum() == 50 && slider.maximum() == 2000 && slider.value() == 500 && slider.width() == 100 && field.width() == 42);
+    slider.setValue(1250);
+    QCOMPARE(session.brushSettings().blurRadius, 12.5);
+    QCOMPARE(field.text(), QString("12.5"));
+    // Typed, it applies on Return, clamped, past the slider's end.
+    type(field, "33.33");
+    QCOMPARE(session.brushSettings().blurRadius, 12.5);
+    QTest::keyClick(&field, Qt::Key_Return);
+    QCOMPARE(session.brushSettings().blurRadius, 33.33);
+    QCOMPARE(field.text(), QString("33.3"));
+    QCOMPARE(slider.value(), 2000);
+    // Return on what it shows rounds nothing.
+    QTest::keyClick(&field, Qt::Key_Return);
+    QCOMPARE(session.brushSettings().blurRadius, 33.33);
+    type(field, "90");
+    QTest::keyClick(&field, Qt::Key_Return);
+    QCOMPARE(session.brushSettings().blurRadius, 50.0);
+    type(field, "0");
+    QTest::keyClick(&field, Qt::Key_Return);
+    QCOMPARE(session.brushSettings().blurRadius, 0.5);
+    QCOMPARE(field.text(), QString("0.5"));
+    type(field, "abc");
+    QTest::keyClick(&field, Qt::Key_Return);
+    QCOMPARE(session.brushSettings().blurRadius, 0.5);
+    QCOMPARE(field.text(), QString("0.5"));
+    // Arrows step a pixel, Shift ten, within bounds.
+    QTest::keyClick(&field, Qt::Key_Up);
+    QCOMPARE(session.brushSettings().blurRadius, 1.5);
+    QCOMPARE(field.text(), QString("1.5"));
+    QTest::keyClick(&field, Qt::Key_Up, Qt::ShiftModifier);
+    QCOMPARE(session.brushSettings().blurRadius, 11.5);
+    QTest::keyClick(&field, Qt::Key_Down, Qt::ShiftModifier);
+    QTest::keyClick(&field, Qt::Key_Down, Qt::ShiftModifier);
+    QCOMPARE(session.brushSettings().blurRadius, 0.5);
+    // While typed in, other changes leave the typing.
+    type(field, "7");
+    BrushSettings settings = session.brushSettings();
+    settings.blurRadius = 3;
+    session.setBrushSettings(settings);
+    QCOMPARE(field.text(), QString("7"));
+    QTest::keyClick(&field, Qt::Key_Return);
+    QCOMPARE(session.brushSettings().blurRadius, 7.0);
+    // The label scrubs a tenth a point.
+    QLabel *radius = nullptr;
+    for (QLabel *label : bar.findChildren<QLabel *>())
+        if (label->text() == QLatin1String("Radius"))
+            radius = label;
+    QVERIFY(radius && radius->isVisible());
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(2, 2), radius->mapToGlobal(QPointF(2, 2)), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(radius, &press);
+    QMouseEvent move(QEvent::MouseMove, QPointF(22, 2), radius->mapToGlobal(QPointF(22, 2)), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(radius, &move);
+    QCOMPARE(session.brushSettings().blurRadius, 9.0);
+    QCOMPARE(field.text(), QString("9"));
+    QMouseEvent release(QEvent::MouseButtonRelease, QPointF(22, 2), radius->mapToGlobal(QPointF(22, 2)), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(radius, &release);
+    // Smudge, Liquify and the other tools have none.
+    session.setBlurMode(BlurToolMode::smudge);
+    QVERIFY(!field.isVisible());
+    session.setBlurMode(BlurToolMode::blur);
+    session.selectTool(NavigationTool::brush);
+    QVERIFY(!field.isVisible() && !slider.isVisible());
 }
 
 QTEST_MAIN(BrushControlsTests)

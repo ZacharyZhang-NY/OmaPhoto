@@ -92,7 +92,7 @@ BrushStroke::Grid BrushStroke::grid(const ImageLayer &layer, bool mask, const Br
     grid.paintTransform.size = {grid.width * base.size.width() / originalWidth, grid.height * base.size.height() / originalHeight};
     const QPointF center = originalMapping.map(extent.center());
     grid.paintTransform.origin = {center.x() - grid.paintTransform.size.width() / 2, center.y() - grid.paintTransform.size.height() / 2};
-    if (!std::isfinite(settings.diameter) || settings.diameter < 1 || settings.diameter > 2000
+    if (!std::isfinite(settings.diameter) || settings.diameter < 1 || settings.diameter > maxDiameter
         || !std::isfinite(settings.hardness) || settings.hardness < 0 || settings.hardness > 1
         || !std::isfinite(settings.opacity) || settings.opacity < 0.01 || settings.opacity > 1)
         throw ProjectError(ProjectError::Kind::tooLarge);

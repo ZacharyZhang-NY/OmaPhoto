@@ -1,5 +1,6 @@
 #include "UI/BrushControls.h"
 #include "Document/EditorSession.h"
+#include "UI/ColorPickerSheet.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/LassoControls.h"
 #include "UI/NumericScrub.h"
@@ -24,6 +25,22 @@ void changeBrush(EditorSession &session, const std::function<void(BrushSettings 
 const QString modeTip = QStringLiteral("Paint with the foreground color (B), or erase pixels away (E)");
 const QString blurTip = QStringLiteral("Liquify pushes pixels · Blur softens · Smudge drags color along");
 const QString sampleTip = QStringLiteral("Copy from the active layer only, or from every visible layer as shown");
+
+// Swift's fractionLength(0...1): one place at most, none trailing.
+QString oneDecimal(double value, QLocale locale)
+{
+    locale.setNumberOptions(QLocale::OmitGroupSeparator);
+    QString text = locale.toString(value, 'f', 1);
+    const QString zero = locale.decimalPoint() + locale.zeroDigit();
+    if (text.endsWith(zero))
+        text.chop(zero.size());
+    return text;
+}
+
+double radius(double value)
+{
+    return std::min(50.0, std::max(0.5, value));
+}
 
 QLabel *label(const QString &text, QWidget *parent)
 {
@@ -53,6 +70,22 @@ BrushControls::BrushControls(EditorSession &session, QWidget *parent)
                              [this](int value) { changeBrush(m_session, [value](BrushSettings &brush) { brush.opacity = value / 1000.0; }); })),
       m_opacity(new SelectionAmountField(session, 1, 100, [this] { return m_session.brushSettings().opacity * 100; },
                                          [this](double percent) { changeBrush(m_session, [percent](BrushSettings &brush) { brush.opacity = percent / 100; }); }, this)),
+      m_radiusLabel(label(QStringLiteral("Radius"), this)),
+      m_radiusSlider(slider(QStringLiteral("blurRadiusSlider"), 50, 2000,
+                            [this](int value) { changeBrush(m_session, [value](BrushSettings &brush) { brush.blurRadius = value / 100.0; }); })),
+      m_radius(new PickerField([this] {
+          bool number = false;
+          const double typed = m_radius->locale().toDouble(m_radius->text(), &number);
+          if (m_radius->isModified() && number)
+              changeBrush(m_session, [typed](BrushSettings &brush) { brush.blurRadius = std::isfinite(typed) ? radius(typed) : 5; });
+          m_radius->setModified(false);
+          m_radius->setText(oneDecimal(m_session.brushSettings().blurRadius, m_radius->locale()));
+      }, [this](int step) {
+          changeBrush(m_session, [step](BrushSettings &brush) { brush.blurRadius = radius(brush.blurRadius + step); });
+          m_radius->setModified(false);
+          m_radius->setText(oneDecimal(m_session.brushSettings().blurRadius, m_radius->locale()));
+      }, this)),
+      m_radiusUnit(label(QStringLiteral("px"), this)),
       m_smoothingLabel(label(QStringLiteral("Smoothing"), this)),
       m_smoothingSlider(slider(QStringLiteral("brushSmoothingSlider"), 0, 1000,
                                [this](int value) { changeBrush(m_session, [value](BrushSettings &brush) { brush.smoothing = value / 10.0; }); })),
@@ -79,6 +112,19 @@ BrushControls::BrushControls(EditorSession &session, QWidget *parent)
     m_opacity->setObjectName(QStringLiteral("brushOpacity"));
     m_opacity->setFixedWidth(42);
     m_opacity->setToolTip(QStringLiteral("Press 1–9 for 10–90%, 0 for 100%"));
+    m_radius->setObjectName(QStringLiteral("blurRadius"));
+    m_radius->setFixedWidth(42);
+    m_radius->setFont(ToolHeaderStyle::controlFont());
+    m_radius->setAccessibleName(QStringLiteral("Radius"));
+    m_radius->setPlaceholderText(QStringLiteral("Radius"));
+    m_radius->setToolTip(QStringLiteral("How far the blur softens, in pixels"));
+    // The slider covers everyday radii; typing or scrubbing reaches 50.
+    new NumericScrub(m_radiusLabel, {.sensitivity = 0.1, .low = 0.5, .high = 50, .step = std::nullopt,
+                                     .value = [this] { return m_session.brushSettings().blurRadius; }, .set = [this](double value) {
+                                         changeBrush(m_session, [value](BrushSettings &brush) { brush.blurRadius = value; });
+                                         m_radius->setModified(false);
+                                         m_radius->setText(oneDecimal(value, m_radius->locale()));
+                                     }});
     m_smoothing->setObjectName(QStringLiteral("brushSmoothing"));
     m_smoothing->setFixedWidth(42);
     m_smoothing->setToolTip(QStringLiteral("The brush trails the pointer on a string this long, so a shaky hand still draws a smooth line"));
@@ -118,7 +164,7 @@ BrushControls::BrushControls(EditorSession &session, QWidget *parent)
     widgets.insert(widgets.end(), {m_aligned, m_thisLayer, m_allLayers});
     widgets.insert(widgets.end(), {size, m_size, label(QStringLiteral("px"), this), hardness,
                                    m_hardnessSlider, m_hardness, label(QStringLiteral("%"), this), m_opacityLabel, m_opacitySlider, m_opacity,
-                                   label(QStringLiteral("%"), this), m_smoothingLabel, m_smoothingSlider, m_smoothing, m_paintLabel, m_maskPaint, m_colourLabel, m_colour});
+                                   label(QStringLiteral("%"), this), m_radiusLabel, m_radiusSlider, m_radius, m_radiusUnit, m_smoothingLabel, m_smoothingSlider, m_smoothing, m_paintLabel, m_maskPaint, m_colourLabel, m_colour});
     for (QWidget *widget : widgets)
         row->insertWidget(row->count() - 1, widget);
     row->addWidget(m_cloneNote);
@@ -179,11 +225,19 @@ void BrushControls::synchronize()
     m_size->sync(int(std::lround(brush.diameter)));
     m_hardness->sync(int(std::lround(brush.hardness * 100)));
     m_opacity->sync(int(std::lround(brush.opacity * 100)));
+    const bool blurring = tool == NavigationTool::blur && m_session.blurMode() == BlurToolMode::blur;
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_radiusLabel, m_radiusSlider, m_radius, m_radiusUnit})
+        widget->setVisible(blurring);
+    // A field being typed in keeps its typing.
+    if (!m_radius->isModified())
+        m_radius->setText(oneDecimal(brush.blurRadius, m_radius->locale()));
     for (QWidget *widget : std::initializer_list<QWidget *>{m_smoothingLabel, m_smoothingSlider, m_smoothing})
         widget->setVisible(tool == NavigationTool::brush);
     m_smoothing->sync(int(std::lround(brush.smoothing)));
     // The sliders show the session's numbers without writing back.
-    const QSignalBlocker hardness(m_hardnessSlider), opacity(m_opacitySlider), smoothing(m_smoothingSlider);
+    const QSignalBlocker hardness(m_hardnessSlider), opacity(m_opacitySlider), smoothing(m_smoothingSlider), reach(m_radiusSlider);
+    // Past 20 the slider rests at its end.
+    m_radiusSlider->setValue(int(std::lround(brush.blurRadius * 100)));
     m_hardnessSlider->setValue(int(std::lround(brush.hardness * 1000)));
     m_opacitySlider->setValue(int(std::lround(brush.opacity * 1000)));
     m_smoothingSlider->setValue(int(std::lround(brush.smoothing * 10)));

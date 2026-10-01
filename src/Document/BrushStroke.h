@@ -34,6 +34,8 @@ struct BrushSettings {
     double opacity = 1;
     // 0–100: the brush trails the pointer on this string.
     double smoothing = 0;
+    // Blur: how far it softens, in canvas pixels.
+    double blurRadius = 5;
     // Erase clears the layer's pixels instead of painting on them.
     bool erasing = false;
     // Spot healing takes nearby pixels instead of the colour.
@@ -120,6 +122,8 @@ public:
     // The undo name when the stroke's kind says none.
     std::optional<QString> editName;
     static constexpr int tileSize = 256;
+    // Size stops at 2000; the app's own commits run wider.
+    static constexpr double maxDiameter = 2100;
     // Soft-tip deposition rate, shared with the continuous integral.
     static double spacingFraction(double hardness);
 

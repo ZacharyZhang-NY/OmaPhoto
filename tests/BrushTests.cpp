@@ -305,7 +305,9 @@ void BrushTests::masksPaintInGrayAndCommitWhole()
 
 void BrushTests::wildSettingsAndPointsAreRefused()
 {
-    for (const BrushSettings &settings : {red(0), red(2001), red(NAN), red(20, 1.1), red(20, -0.1), brush(20, 1, 1, 0, 0, 0.001), brush(20, 1, 1, 0, 0, INFINITY)})
+    // Past the bar's 2000, the app's own commits reach 2100.
+    QCOMPARE(BrushStroke(blankLayer(600, 80), false, red(2100), QSizeF(600, 80)).settings.diameter, 2100.0);
+    for (const BrushSettings &settings : {red(0), red(2100.5), red(NAN), red(20, 1.1), red(20, -0.1), brush(20, 1, 1, 0, 0, 0.001), brush(20, 1, 1, 0, 0, INFINITY)})
         QVERIFY_THROWS_EXCEPTION(ProjectError, BrushStroke(blankLayer(600, 80), false, settings, QSizeF(600, 80)));
     // A billion-pixel grid is refused while still a double.
     QImage strip = BrushRaster::context(30000, 1, false);

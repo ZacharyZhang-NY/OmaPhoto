@@ -9,6 +9,7 @@ class QComboBox;
 class QLabel;
 class QSlider;
 class QToolButton;
+class PickerField;
 class SelectionAmountField;
 class SwatchButton;
 
@@ -44,6 +45,11 @@ private:
     QLabel *const m_opacityLabel;
     QSlider *const m_opacitySlider;
     SelectionAmountField *const m_opacity;
+    // Blur's own Radius, apart from Strength.
+    QLabel *const m_radiusLabel;
+    QSlider *const m_radiusSlider;
+    PickerField *const m_radius;
+    QLabel *const m_radiusUnit;
     // Paint and Erase only; other tools have their own feel.
     QLabel *const m_smoothingLabel;
     QSlider *const m_smoothingSlider;

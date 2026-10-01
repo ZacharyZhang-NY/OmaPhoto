@@ -54,7 +54,7 @@ private slots:
     void aPointSpreadsAlongTheBellCurve();
     void clearEdgesFadeAndClampedEdgesHold();
     void grayBlursAndBadInputIsRefused();
-    void theSampleFollowsTheBrushSize();
+    void theSampleFollowsTheRadius();
     void aMaskSampleKeepsItsEdgeToneAndPlacement();
     void aBlurStrokeSoftensUnderTheBrushAsOneStep();
     void aBlurStrokeSoftensAMask();
@@ -127,16 +127,17 @@ void BlurToolTests::grayBlursAndBadInputIsRefused()
     QVERIFY_THROWS_EXCEPTION(std::logic_error, PixelAdjust::gaussianBlur(step.convertToFormat(QImage::Format_RGB32), 2, true));
 }
 
-void BlurToolTests::theSampleFollowsTheBrushSize()
+void BlurToolTests::theSampleFollowsTheRadius()
 {
     EditorSession session;
     blurring(session, BrushSettings{.diameter = 60});
     const CanvasDocument document = session.document().value();
     const QImage sharp = edge(60, 40);
-    // A tenth of the size, within 1.5 and 30.
-    for (const auto &[diameter, sigma] : {std::pair(60.0, 6.0), std::pair(5.0, 1.5), std::pair(900.0, 30.0)}) {
+    // The bar's Radius, within 0.5 and 50, whatever the size.
+    for (const auto &[radius, sigma] : {std::pair(6.0, 6.0), std::pair(0.1, 0.5), std::pair(90.0, 50.0)}) {
         BrushSettings settings = session.brushSettings();
-        settings.diameter = diameter;
+        settings.blurRadius = radius;
+        settings.diameter = 3 * radius;
         session.setBrushSettings(settings);
         QCOMPARE(session.blurSample(document).value(), PixelAdjust::gaussianBlur(sharp, sigma, false));
     }
@@ -149,7 +150,7 @@ void BlurToolTests::theSampleFollowsTheBrushSize()
 void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
 {
     EditorSession session;
-    blurring(session, BrushSettings{.diameter = 20});
+    blurring(session, BrushSettings{.diameter = 20, .blurRadius = 2});
     const QUuid id = session.activeLayerID().value();
     // A white mask with a black bar, placed mid-layer.
     QImage mask(20, 20, QImage::Format_Grayscale8);
@@ -185,7 +186,7 @@ void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
         record(snapshot, wideID).maskPlacement = LayerTransform{.origin = {30, 10}, .size = {40, 40}, .rotation = 30};
         record(snapshot, wideID).maskLinked = false;
     });
-    turned.setBrushSettings(BrushSettings{.diameter = 5});
+    turned.setBrushSettings(BrushSettings{.diameter = 5, .blurRadius = 1.5});
     const QImage soft = turned.blurSample(turned.document().value(), true).value();
     // Past the true box, inside one turned the other way.
     QVERIFY2(soft.constScanLine(36)[73] > 240, qPrintable(QString::number(soft.constScanLine(36)[73])));
@@ -195,7 +196,7 @@ void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
 void BlurToolTests::aBlurStrokeSoftensUnderTheBrushAsOneStep()
 {
     EditorSession session;
-    blurring(session, BrushSettings{.diameter = 20, .hardness = 1});
+    blurring(session, BrushSettings{.diameter = 20, .hardness = 1, .blurRadius = 2});
     const int steps = session.history.undoCount();
     session.beginBrush(QPointF(30, 12));
     QVERIFY(session.brushStroke() && session.brushStroke()->isBlur && !session.warpStroke());
@@ -225,7 +226,7 @@ void BlurToolTests::aBlurStrokeSoftensUnderTheBrushAsOneStep()
 void BlurToolTests::aBlurStrokeSoftensAMask()
 {
     EditorSession session;
-    blurring(session, BrushSettings{.diameter = 20, .hardness = 1});
+    blurring(session, BrushSettings{.diameter = 20, .hardness = 1, .blurRadius = 2});
     const QUuid id = session.activeLayerID().value();
     QImage mask(60, 40, QImage::Format_Grayscale8);
     for (int y = 0; y < 40; ++y)

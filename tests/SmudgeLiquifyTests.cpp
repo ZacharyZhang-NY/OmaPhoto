@@ -5,7 +5,7 @@
 #include "SessionFixtures.h"
 #include <cmath>
 
-// The Smear's warps against Swift's own arithmetic, replayed here.
+// The Smear against Swift's arithmetic and shader, replayed here.
 namespace {
 // Swift's WarpStroke, written again from SmudgeLiquify.swift.
 struct Oracle {
@@ -15,6 +15,9 @@ struct Oracle {
     bool smudging;
     std::vector<float> carried, scratch;
     std::optional<QPointF> last;
+    // Liquify, as MetalWarp's shader: the untouched pixels and offsets.
+    std::vector<uchar> original;
+    std::vector<float> offsets;
 
     int radius() const { return int(std::ceil(diameter / 2)); }
     float weight(float u) const
@@ -57,9 +60,9 @@ struct Oracle {
                 for (int k = 0; k < 4; ++k) {
                     uchar &p = pixels[size_t((y * width + x) * 4 + k)];
                     float &carry = carried[size_t(((dy + r) * side + dx + r) * 4 + k)];
-                    const float under = float(p), painted = under + (carry - under) * w;
+                    const float under = float(p), painted = under + (carry - under) * w * keep;
                     p = uchar(std::max(0.0f, std::min(255.0f, std::round(painted))));
-                    carry = painted + (carry - painted) * keep;
+                    carry = painted;
                 }
             }
     }
@@ -74,12 +77,17 @@ struct Oracle {
         if (x0 > x1 || y0 > y1)
             return;
         const int cw = x1 - x0 + 1, ch = y1 - y0 + 1;
-        scratch.assign(size_t(cw * ch * 4), 0);
+        if (original.empty()) {
+            original = pixels;
+            offsets.assign(size_t(width * height * 2), 0);
+        }
+        scratch.assign(size_t(cw * ch * 2), 0);
         for (int y = 0; y < ch; ++y)
             for (int x = 0; x < cw; ++x)
-                for (int k = 0; k < 4; ++k)
-                    scratch[size_t((y * cw + x) * 4 + k)] = float(pixels[size_t(((y + y0) * width + x + x0) * 4 + k)]);
+                for (int k = 0; k < 2; ++k)
+                    scratch[size_t((y * cw + x) * 2 + k)] = offsets[size_t(((y + y0) * width + x + x0) * 2 + k)];
         const float invR = 1 / float(diameter / 2);
+        const auto mix = [](float a, float b, float t) { return a + (b - a) * t; };
         for (int dy = -r; dy <= r; ++dy)
             for (int dx = -r; dx <= r; ++dx) {
                 const int y = cy + dy, x = cx + dx;
@@ -94,11 +102,19 @@ struct Oracle {
                 if (ix < 0 || iy < 0)
                     continue;
                 const float fx = sx - float(ix), fy = sy - float(iy);
-                const auto at = [&](int ox, int oy, int k) { return scratch[size_t(((iy + oy) * cw + ix + ox) * 4 + k)]; };
+                const auto at = [&](int ox, int oy, int k) { return scratch[size_t(((iy + oy) * cw + ix + ox) * 2 + k)]; };
+                float moved[2];
+                for (int k = 0; k < 2; ++k)
+                    moved[k] = mix(mix(at(0, 0, k), at(1, 0, k), fx), mix(at(0, 1, k), at(1, 1, k), fx), fy) - (k == 0 ? mx : my) * w;
+                offsets[size_t((y * width + x) * 2)] = moved[0];
+                offsets[size_t((y * width + x) * 2 + 1)] = moved[1];
+                const float px = std::clamp(float(x) + moved[0], 0.0f, float(width - 1)), py = std::clamp(float(y) + moved[1], 0.0f, float(height - 1));
+                const int jx = std::min(int(px), width - 2), jy = std::min(int(py), height - 2);
+                const float gx = px - float(jx), gy = py - float(jy);
+                const auto c = [&](int ox, int oy, int k) { return float(original[size_t(((jy + oy) * width + jx + ox) * 4 + k)]) / 255; };
                 for (int k = 0; k < 4; ++k) {
-                    const float top = at(0, 0, k) + (at(1, 0, k) - at(0, 0, k)) * fx;
-                    const float bottom = at(0, 1, k) + (at(1, 1, k) - at(0, 1, k)) * fx;
-                    pixels[size_t((y * width + x) * 4 + k)] = uchar(std::max(0.0f, std::min(255.0f, std::round(top + (bottom - top) * fy))));
+                    const float colour = mix(mix(c(0, 0, k), c(1, 0, k), gx), mix(c(0, 1, k), c(1, 1, k), gx), gy);
+                    pixels[size_t((y * width + x) * 4 + k)] = uchar(std::clamp(std::round(colour * 255), 0.0f, 255.0f));
                 }
             }
     }
@@ -112,7 +128,7 @@ struct Oracle {
         }
         const QPointF from = *last;
         const double distance = std::hypot(point.x() - from.x(), point.y() - from.y());
-        const double spacing = std::max(1.0, diameter * (smudging ? 0.08 : 0.025));
+        const double spacing = std::max(1.0, diameter * (smudging ? 0.005 : 0.025));
         if (distance < spacing)
             return;
         const int steps = int(std::ceil(distance / spacing));
@@ -147,7 +163,7 @@ Oracle oracle(const QImage &image, const BrushSettings &settings, bool smudging)
     for (int y = 0; y < image.height(); ++y)
         std::memcpy(bytes.data() + size_t(y * image.width() * 4), image.constScanLine(y), size_t(image.width() * 4));
     return Oracle{bytes, image.width(), image.height(), std::max(2.0, settings.diameter), std::min(0.98, std::max(0.0, settings.hardness)),
-                  std::min(1.0, std::max(0.01, settings.opacity)), smudging, {}, {}, std::nullopt};
+                  std::min(1.0, std::max(0.01, settings.opacity)), smudging, {}, {}, std::nullopt, {}, {}};
 }
 
 // Every byte the stroke made, against the oracle's.
@@ -181,6 +197,7 @@ class SmudgeLiquifyTests : public QObject {
 private slots:
     void liquifyAndSmudgeFollowSwiftsArithmetic_data();
     void liquifyAndSmudgeFollowSwiftsArithmetic();
+    void liquifyHoldsItsSourcesToTheEdges();
     void theSettingsAreClampedAsSwiftClampsThem();
     void liquifyCommitsAlongThePathAsOneStep();
     void theCommitLandsAllTheWarpMoved();
@@ -217,15 +234,35 @@ void SmudgeLiquifyTests::liquifyAndSmudgeFollowSwiftsArithmetic()
                       ImageLayer(ImportedImage(image, image, QStringLiteral("Scene")), QPointF(0, 0)).transform, QSizeF(80, 40),
                       smudging ? BlurToolMode::smudge : BlurToolMode::liquify, settings);
     Oracle expected = oracle(image, settings, smudging);
-    // Along, back across, off the canvas and in again.
+    // Along, back, off the canvas, then in from edges.
     for (const QPointF point : {QPointF(30.6, 20.2), QPointF(47.7, 23.1), QPointF(47.9, 23.3), QPointF(48.4, 23.3), QPointF(20, 31.5), QPointF(-6, 37),
-                                QPointF(12, 9.5)}) {
+                                QPointF(12, 9.5), QPointF(79.4, 38.6), QPointF(64, 30.2), QPointF(70, 0.3), QPointF(66.5, 12)}) {
         stroke.append(point);
         expected.append(point);
         QCOMPARE(differences(stroke, expected), 0);
     }
     QVERIFY(stroke.image() != image);
     QVERIFY(stroke.points().size() > 10);
+}
+
+// Pushed in from each edge, sources clamp at the ramps.
+void SmudgeLiquifyTests::liquifyHoldsItsSourcesToTheEdges()
+{
+    QImage ramps = BrushRaster::context(80, 40, false);
+    for (int y = 0; y < 40; ++y)
+        for (int x = 0; x < 80; ++x)
+            ramps.setPixel(x, y, qRgba(x * 3, y * 6, 90, 255));
+    const ImageLayer layer(ImportedImage(ramps, ramps, QStringLiteral("Ramps")), QPointF(0, 0));
+    const BrushSettings settings = brush(30, 0.8, 0, 0, 0, 1);
+    WarpStroke stroke(layer, ramps, layer.transform, QSizeF(80, 40), BlurToolMode::liquify, settings);
+    Oracle expected = oracle(ramps, settings, false);
+    for (const QPointF point : {QPointF(79.5, 20), QPointF(62, 20), QPointF(40, 39.5), QPointF(40, 24), QPointF(0.5, 20), QPointF(16, 20),
+                                QPointF(40, 0.5), QPointF(40, 15)}) {
+        stroke.append(point);
+        expected.append(point);
+        QCOMPARE(differences(stroke, expected), 0);
+    }
+    QVERIFY(stroke.image() != ramps);
 }
 
 void SmudgeLiquifyTests::theSettingsAreClampedAsSwiftClampsThem()
@@ -282,7 +319,7 @@ void SmudgeLiquifyTests::theCommitLandsAllTheWarpMoved()
         for (int y = 0; y < 40; ++y)
             apart += std::memcmp(landed.constScanLine(y), live.constScanLine(y), 80 * 4) != 0;
         QCOMPARE(apart, 0);
-        QVERIFY(pixel(live, 41, 19) != pixel(scene(80, 40), 41, 19));
+        QVERIFY(pixel(live, 41, 15) != pixel(scene(80, 40), 41, 15));
         // Shift's line starts where the warp ended, on the pixels.
         QCOMPARE(session.shiftLineStart().value(), to);
     }
@@ -296,10 +333,13 @@ void SmudgeLiquifyTests::smudgeCarriesColourAndNamesItsStep()
     session.continueBrush(QPointF(50, 12));
     session.finishBrush();
     QCOMPARE(session.history.undoName(), QString("Smudge"));
-    // The core carries red all the way; its flanks fade.
-    QCOMPARE(exported(session, 49, 12), (std::vector<int>{255, 0, 0, 255}));
-    const std::vector<int> near = exported(session, 42, 15), far = exported(session, 49, 15);
-    QVERIFY2(near[0] > far[0] + 20 && far[0] > 0 && far[2] > 0, qPrintable(QString("%1 %2 %3").arg(near[0]).arg(far[0]).arg(far[2])));
+    // Red drags into the blue, fading along the way.
+    QCOMPARE(exported(session, 41, 12), (std::vector<int>{233, 0, 22, 255}));
+    QCOMPARE(exported(session, 45, 12), (std::vector<int>{94, 0, 161, 255}));
+    QCOMPARE(exported(session, 49, 12), (std::vector<int>{9, 0, 246, 255}));
+    // Its flanks less so; the rim not at all.
+    QCOMPARE(exported(session, 42, 15), (std::vector<int>{61, 0, 194, 255}));
+    QCOMPARE(exported(session, 49, 15), (std::vector<int>{0, 0, 255, 255}));
     QCOMPARE(exported(session, 75, 35), (std::vector<int>{0, 0, 255, 255}));
 }
 

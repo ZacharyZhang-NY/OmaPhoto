@@ -41,7 +41,7 @@ private:
     float weight(float u) const;
     void pickUp(QPointF center);
     void smudge(QPointF center);
-    // Forward warp: pixels follow the brush, fading to the rim.
+    // Forward warp on offsets; pixels drawn afresh from the original.
     void push(QPointF from, QPointF to);
 
     QImage m_context;
@@ -49,5 +49,9 @@ private:
     std::optional<QPointF> m_last;
     // Smudge: the colour the brush carries, a (2r+1)² RGBA square.
     std::vector<float> m_carried;
+    // Liquify: the layer as found, and each pixel's source offset.
+    QImage m_original;
+    std::vector<float> m_offsets;
+    // Liquify: the dab's offsets as they were before it.
     std::vector<float> m_scratch;
 };

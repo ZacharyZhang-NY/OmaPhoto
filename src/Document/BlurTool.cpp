@@ -11,8 +11,8 @@ std::optional<QImage> EditorSession::blurSample(const CanvasDocument &document, 
     const std::optional<ImageLayer> layer = activeLayer();
     if (!layer)
         return std::nullopt;
-    // The softening follows the brush's size.
-    const double sigma = std::min(30.0, std::max(1.5, m_brushSettings.diameter / 10));
+    // The bar's Radius, whatever the brush's size.
+    const double sigma = std::min(50.0, std::max(0.5, m_brushSettings.blurRadius));
     try {
         if (mask) {
             if (!layer->mask)
