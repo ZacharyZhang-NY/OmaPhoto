@@ -2,20 +2,10 @@
 #include "IO/RecentProjects.h"
 #include "Logging.h"
 #include "UI/KeyboardShortcuts.h"
-#include "UI/NativeLayerList.h"
 #include <QApplication>
 #include <QMenu>
 
 namespace {
-// The layer list holding the keys, as Swift's table.
-NativeLayerList *focusedList()
-{
-    for (QWidget *widget = QApplication::focusWidget(); widget; widget = widget->parentWidget())
-        if (auto *list = qobject_cast<NativeLayerList *>(widget))
-            return list;
-    return nullptr;
-}
-
 // An entry's name: Hue/Saturation is newHueSaturationAdjustment.
 QString adjustmentName(AdjustmentKind kind)
 {
@@ -186,8 +176,6 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
             m_field->selectAll();
         else if (InlineTextEditor *text = typedText())
             text->selectAll();
-        else if (NativeLayerList *list = focusedList())
-            list->selectAllRows();
         else
             session().selectAll();
     });

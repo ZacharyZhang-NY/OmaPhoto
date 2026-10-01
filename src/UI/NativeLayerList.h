@@ -215,8 +215,6 @@ public:
     QString dragToken() const { return m_dragToken; }
 
     EditorSession &session() const { return m_session; }
-    // The table's Select All: every row, the top one primary.
-    void selectAllRows();
     void update();
     std::vector<LayerCell *> cells() const { return m_cells; }
     // The row under a point of this list, or -1.
