@@ -113,8 +113,12 @@ public:
     struct Clone {
         QImage image;
         QSizeF offset;
+        // Makes a part of `image`: Blur softens piece by piece.
+        std::function<QImage(const QRect &)> render;
     };
-    std::optional<Clone> clone;
+    const std::optional<Clone> &clone() const { return m_clone; }
+    // Swift's didSet: the pieces cut so far go.
+    void setClone(std::optional<Clone> clone);
     // Blur: the clone is the layer softened, in place.
     bool isBlur = false;
     // The clone replaces what is under the tip, clearing too.
@@ -179,7 +183,8 @@ private:
     void renderContinuous(const std::vector<BrushSegment> &settled, const std::vector<BrushSegment> &tail);
     void publish(const std::set<qint64> &changed);
     QImage selectionCoverage(const Tile &tile) const;
-    QImage clonePixels(const Tile &tile) const;
+    // Null where the clone does not reach the tile.
+    QImage clonePixels(qint64 key, const Tile &tile);
     void allocateTile(qint64 key, qint64 x, qint64 y);
     // `draw` in document coordinates over every tile the canvas covers.
     void paintCanvas(bool withinSource, const std::function<void(QPainter &)> &draw);
@@ -198,5 +203,12 @@ private:
     std::map<qint64, QImage> m_coverage;
     // Selected pixels cut from the source, in layer pixels.
     std::optional<Lifted> m_lifted;
+    std::optional<Clone> m_clone;
+    // Each tile's part of the clone, cut once, and where.
+    struct ClonePiece {
+        QImage image;
+        QPoint origin;
+    };
+    std::map<qint64, ClonePiece> m_clonePieces;
     std::set<qint64> m_moveTiles;
 };

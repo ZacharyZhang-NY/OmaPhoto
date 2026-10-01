@@ -268,7 +268,7 @@ void EditorSession::finishWarp()
                 settings.hardness = 1;
                 settings.opacity = 1;
                 const std::unique_ptr<BrushStroke> stroke = makeRasterEdit(current, settings);
-                stroke->clone = BrushStroke::Clone{warp->image(), QSizeF(0, 0)};
+                stroke->setClone(BrushStroke::Clone{warp->image(), QSizeF(0, 0), {}});
                 stroke->replacesWithClone = true;
                 stroke->editName = rawValue(warp->mode);
                 // A point every twentieth of the tip covers every dab.

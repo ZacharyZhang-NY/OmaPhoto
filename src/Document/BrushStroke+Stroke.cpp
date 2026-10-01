@@ -239,7 +239,7 @@ void BrushStroke::publish(const std::set<qint64> &changed)
         tile.context.detach();
         if (tile.context.isNull())
             throw ExportError(ExportError::Kind::render);
-        work.push_back({&tile, &m_coverage.at(key), selectionCoverage(tile), clonePixels(tile)});
+        work.push_back({&tile, &m_coverage.at(key), selectionCoverage(tile), clonePixels(key, tile)});
         const QRectF rect = pixelToDocument.mapRect(tile.rect).intersected(canvas);
         m_dirtyDocumentRect = m_dirtyDocumentRect ? std::optional(m_dirtyDocumentRect->united(rect)) : std::optional(rect);
     }
@@ -250,9 +250,11 @@ void BrushStroke::publish(const std::set<qint64> &changed)
     const double alpha = healing ? 0.45 : settings.opacity;
     PoolMap::blocking(work, [&](const Fill &item) {
         Tile &tile = *item.tile;
-        if (clone && (!isMask || isBlur))
-            fillClone(item.sample, *item.coverage, settings.opacity, tile.context, item.clip, replacesWithClone);
-        else
+        if (m_clone && (!isMask || isBlur)) {
+            // Where the sample does not reach, nothing is painted.
+            if (!item.sample.isNull())
+                fillClone(item.sample, *item.coverage, settings.opacity, tile.context, item.clip, replacesWithClone);
+        } else
             BrushRaster::fill(colour, *item.coverage, QRectF(QPointF(0, 0), tile.rect.size()), alpha, tile.context, mode, item.clip);
         tile.image = tile.context;
     });
@@ -267,17 +269,36 @@ QImage BrushStroke::selectionCoverage(const Tile &tile) const
                                  QTransform::fromTranslate(tile.rect.left(), tile.rect.top()) * pixelToDocument);
 }
 
-// The clone as this tile sees it, before the fill.
-QImage BrushStroke::clonePixels(const Tile &tile) const
+void BrushStroke::setClone(std::optional<Clone> clone)
 {
-    if (!clone)
+    m_clone = std::move(clone);
+    m_clonePieces.clear();
+}
+
+// The clone as this tile sees it, before the fill.
+QImage BrushStroke::clonePixels(qint64 key, const Tile &tile)
+{
+    if (!m_clone)
         return QImage();
     const int width = int(tile.rect.width()), height = int(tile.rect.height());
     // Tile pixels to clone pixels: grid, document, then offset.
-    const QTransform toClone = QTransform::fromTranslate(tile.rect.left(), tile.rect.top()) * pixelToDocument
-        * QTransform::fromTranslate(clone->offset.width(), clone->offset.height());
+    const QTransform toWhole = QTransform::fromTranslate(tile.rect.left(), tile.rect.top()) * pixelToDocument
+        * QTransform::fromTranslate(m_clone->offset.width(), m_clone->offset.height());
+    // Swift's clonePiece: the part under the tile, cut once.
+    if (!m_clonePieces.contains(key)) {
+        const QRect part =
+            toWhole.mapRect(QRectF(0, 0, width, height)).adjusted(-2, -2, 2, 2).toAlignedRect().intersected(m_clone->image.rect());
+        if (part.isEmpty())
+            return QImage();
+        const QImage piece = m_clone->render ? m_clone->render(part) : m_clone->image.copy(part);
+        if (piece.isNull())
+            throw ExportError(ExportError::Kind::render);
+        m_clonePieces.emplace(key, ClonePiece{piece, part.topLeft()});
+    }
+    const ClonePiece &piece = m_clonePieces.at(key);
+    const QTransform toClone = toWhole * QTransform::fromTranslate(-piece.origin.x(), -piece.origin.y());
     // Colour even for gray clones: edges carry their coverage.
-    const QImage &image = clone->image;
+    const QImage &image = piece.image;
     if (toClone.type() > QTransform::TxTranslate) {
         // Swift's medium quality: bilinear under a scale or turn.
         QImage sample = BrushRaster::context(width, height, false);

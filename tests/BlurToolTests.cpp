@@ -139,7 +139,9 @@ void BlurToolTests::theSampleFollowsTheRadius()
         settings.blurRadius = radius;
         settings.diameter = 3 * radius;
         session.setBrushSettings(settings);
-        QCOMPARE(session.blurSample(document).value(), PixelAdjust::gaussianBlur(sharp, sigma, false));
+        const BrushStroke::Clone sample = session.blurSample(document).value();
+        QCOMPARE(sample.image, sharp);
+        QCOMPARE(sample.render(sharp.rect()), PixelAdjust::gaussianBlur(sharp, sigma, false));
     }
     // No layer, nothing to soften.
     session.selectLayer(std::nullopt);
@@ -163,7 +165,8 @@ void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
         record(snapshot, id).maskPlacement = LayerTransform{.origin = {20, 10}, .size = {20, 20}};
         record(snapshot, id).maskLinked = false;
     });
-    const QImage sample = session.blurSample(session.document().value(), true).value();
+    const BrushStroke::Clone clone = session.blurSample(session.document().value(), true).value();
+    const QImage sample = clone.render(clone.image.rect());
     QCOMPARE(sample.format(), QImage::Format_Grayscale8);
     QImage expected(60, 40, QImage::Format_Grayscale8);
     // Past its pixels the mask keeps its edge's tone: white.
@@ -187,7 +190,8 @@ void BlurToolTests::aMaskSampleKeepsItsEdgeToneAndPlacement()
         record(snapshot, wideID).maskLinked = false;
     });
     turned.setBrushSettings(BrushSettings{.diameter = 5, .blurRadius = 1.5});
-    const QImage soft = turned.blurSample(turned.document().value(), true).value();
+    const BrushStroke::Clone sharp = turned.blurSample(turned.document().value(), true).value();
+    const QImage soft = sharp.render(sharp.image.rect());
     // Past the true box, inside one turned the other way.
     QVERIFY2(soft.constScanLine(36)[73] > 240, qPrintable(QString::number(soft.constScanLine(36)[73])));
     QVERIFY2(soft.constScanLine(24)[27] > 240, qPrintable(QString::number(soft.constScanLine(24)[27])));
@@ -261,7 +265,7 @@ void BlurToolTests::aMaskBetweenPixelsTakesTheFraction()
     for (int y = 0; y < 20; ++y)
         for (int x = 0; x < 80; ++x)
             steps.scanLine(y)[x] = x < 21 ? 0 : 200;
-    paint.clone = BrushStroke::Clone{steps, QSizeF(0, 0)};
+    paint.setClone(BrushStroke::Clone{steps, QSizeF(0, 0), {}});
     paint.isBlur = true;
     paint.append(QPointF(21, 10));
     const QImage tile = paint.patches().at(0).image;
@@ -281,7 +285,7 @@ void BlurToolTests::aMaskPastTheCanvasEdgeKeepsItsTone()
     white.fill(255);
     layer.mask = LayerMask(LayerMask::assetFrom(white));
     BrushStroke paint(layer, true, brush(6, 1, 1, 1, 1), QSizeF(20, 20));
-    paint.clone = BrushStroke::Clone{white, QSizeF(0, 0)};
+    paint.setClone(BrushStroke::Clone{white, QSizeF(0, 0), {}});
     paint.isBlur = true;
     paint.append(QPointF(0, 10));
     const QImage tile = paint.patches().at(0).image;
@@ -292,7 +296,7 @@ void BlurToolTests::aMaskPastTheCanvasEdgeKeepsItsTone()
     black.fill(0);
     layer.mask = LayerMask(LayerMask::assetFrom(black));
     BrushStroke over(layer, true, brush(6, 1, 1, 1, 1), QSizeF(20, 20));
-    over.clone = BrushStroke::Clone{white, QSizeF(0, 0)};
+    over.setClone(BrushStroke::Clone{white, QSizeF(0, 0), {}});
     over.isBlur = true;
     over.append(QPointF(0, 10));
     QCOMPARE(int(over.patches().at(0).image.constScanLine(10)[0]), 128);

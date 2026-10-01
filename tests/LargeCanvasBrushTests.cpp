@@ -40,6 +40,9 @@ private slots:
     void largestBrushCommits_data();
     void largestBrushCommits();
     void aThinnedCommitLandsAllTheWarpMoved();
+    void blurPiecesMatchTheWhole_data();
+    void blurPiecesMatchTheWhole();
+    void piecesAreCutOnceWhereTheBrushReaches();
 };
 
 void LargeCanvasBrushTests::largestBrushCommits_data()
@@ -47,6 +50,7 @@ void LargeCanvasBrushTests::largestBrushCommits_data()
     QTest::addColumn<BlurToolMode>("mode");
     QTest::newRow("liquify") << BlurToolMode::liquify;
     QTest::newRow("smudge") << BlurToolMode::smudge;
+    QTest::newRow("blur") << BlurToolMode::blur;
 }
 
 // The commit's tip runs past Size's 2000, once refused.
@@ -56,6 +60,9 @@ void LargeCanvasBrushTests::largestBrushCommits()
     EditorSession session;
     bands(session, 5000);
     session.setBlurMode(mode);
+    BrushSettings settings = session.brushSettings();
+    settings.blurRadius = 20;
+    session.setBrushSettings(settings);
     const ImageIdentity before = session.activeLayer().value().asset.value().identity();
     stroke(session, 5000);
     QCOMPARE(session.brushError(), std::optional<QString>());
@@ -95,6 +102,89 @@ void LargeCanvasBrushTests::aThinnedCommitLandsAllTheWarpMoved()
     for (int y = 0; y < 400; ++y)
         apart += std::memcmp(turned.constScanLine(y), circled.constScanLine(y), 400 * 4) != 0;
     QCOMPARE(apart, 0);
+}
+
+void LargeCanvasBrushTests::blurPiecesMatchTheWhole_data()
+{
+    QTest::addColumn<bool>("mask");
+    QTest::newRow("pixels") << false;
+    QTest::newRow("mask") << true;
+}
+
+// Swift's test: each piece is its part of the whole.
+void LargeCanvasBrushTests::blurPiecesMatchTheWhole()
+{
+    QFETCH(bool, mask);
+    EditorSession session;
+    bands(session, 600);
+    const QUuid id = session.activeLayerID().value();
+    QImage stripes(600, 600, QImage::Format_Grayscale8);
+    for (int y = 0; y < 600; ++y)
+        for (int x = 0; x < 600; ++x)
+            stripes.scanLine(y)[x] = (x / 37 + y / 23) % 2 ? 255 : 0;
+    rewrite(session, [&](ProjectSnapshot &snapshot) { setMask(snapshot, id, LayerMask::assetFrom(stripes)); });
+    BrushSettings settings = session.brushSettings();
+    settings.blurRadius = 12;
+    session.setBrushSettings(settings);
+    const BrushStroke::Clone blur = session.blurSample(session.document().value(), mask).value();
+    const QImage whole = blur.render(blur.image.rect());
+    QCOMPARE(whole.size(), QSize(600, 600));
+    for (const QRect part : {QRect(0, 0, 256, 256), QRect(250, 300, 260, 180), QRect(500, 530, 100, 70)}) {
+        const QImage piece = blur.render(part);
+        QCOMPARE(piece.size(), part.size());
+        QCOMPARE(piece, whole.copy(part));
+    }
+}
+
+// Only tiles the brush reaches are blurred, each once.
+void LargeCanvasBrushTests::piecesAreCutOnceWhereTheBrushReaches()
+{
+    QImage image = BrushRaster::context(1000, 1000, false);
+    image.fill(Qt::red);
+    const ImageLayer layer(ImportedImage(image, image, QStringLiteral("Red")), QPointF(0, 0));
+    BrushStroke stroke(layer, false, brush(20, 1, 0, 0, 0), QSizeF(1000, 1000));
+    std::vector<QRect> parts;
+    stroke.setClone(BrushStroke::Clone{image, QSizeF(0, 0), [&](const QRect &part) {
+                                           parts.push_back(part);
+                                           return image.copy(part);
+                                       }});
+    stroke.isBlur = true;
+    stroke.append(QPointF(100, 100));
+    stroke.append(QPointF(120, 100));
+    stroke.flush();
+    QCOMPARE(int(parts.size()), 1);
+    QCOMPARE(parts[0], QRect(0, 0, 258, 258));
+    // Over the same tile again: nothing new is cut.
+    stroke.append(QPointF(100, 110));
+    stroke.flush();
+    QCOMPARE(int(parts.size()), 1);
+    // Into the next tile: its piece, two pixels round.
+    stroke.append(QPointF(300, 110));
+    stroke.flush();
+    QCOMPARE(int(parts.size()), 2);
+    QCOMPARE(parts[1], QRect(254, 0, 260, 258));
+    // A new clone drops what was cut.
+    stroke.setClone(stroke.clone());
+    stroke.append(QPointF(310, 110));
+    stroke.flush();
+    QCOMPARE(int(parts.size()), 3);
+    QCOMPARE(parts[2], parts[1]);
+    // Past the clone, a tile is neither cut nor painted.
+    BrushStroke past(layer, false, brush(20, 1, 0, 0, 0), QSizeF(1000, 1000));
+    QImage blue = BrushRaster::context(200, 200, false);
+    blue.fill(Qt::blue);
+    parts.clear();
+    past.setClone(BrushStroke::Clone{blue, QSizeF(0, 0), [&](const QRect &part) {
+                                         parts.push_back(part);
+                                         return blue.copy(part);
+                                     }});
+    past.isBlur = true;
+    past.append(QPointF(400, 400));
+    past.append(QPointF(420, 400));
+    past.flush();
+    QVERIFY(parts.empty());
+    QVERIFY(!past.patches().empty());
+    QCOMPARE(pixel(preview(past, QSizeF(1000, 1000)), 410, 400), (std::vector<int>{255, 0, 0, 255}));
 }
 
 QTEST_GUILESS_MAIN(LargeCanvasBrushTests)

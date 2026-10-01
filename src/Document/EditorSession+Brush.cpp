@@ -88,14 +88,13 @@ void EditorSession::beginBrush(QPointF point)
         if (!image)
             return;
         m_cloneOffset = offset;
-        clone = BrushStroke::Clone{*image, *offset};
+        clone = BrushStroke::Clone{*image, *offset, {}};
     }
     // Blur paints a softened copy of the layer, in place.
     if (m_tool == NavigationTool::blur) {
-        const std::optional<QImage> image = blurSample(m_document.value(), m_isMaskSelected);
-        if (!image)
+        clone = blurSample(m_document.value(), m_isMaskSelected);
+        if (!clone)
             return;
-        clone = BrushStroke::Clone{*image, QSizeF(0, 0)};
     }
     finishOpacityEdit();
     try {
@@ -109,7 +108,7 @@ void EditorSession::beginBrush(QPointF point)
             settings.blue = settings.red;
         }
         m_brushStroke = makeRasterEdit(layer, settings, m_tool == NavigationTool::brush);
-        m_brushStroke->clone = clone;
+        m_brushStroke->setClone(clone);
         m_brushStroke->isBlur = m_tool == NavigationTool::blur;
         m_brushStroke->append(point);
         m_brushAnchor = point;
@@ -254,7 +253,7 @@ void EditorSession::commitPaintSnapshot(const BrushStroke &stroke)
     beginEdit(stroke.editName.value_or(stroke.isMask               ? QStringLiteral("Paint Mask")
                                        : stroke.settings.erasing ? QStringLiteral("Erase")
                                        : stroke.isBlur           ? QStringLiteral("Blur")
-                                       : stroke.clone            ? QStringLiteral("Clone Stamp")
+                                       : stroke.clone()          ? QStringLiteral("Clone Stamp")
                                        : stroke.settings.healing ? QStringLiteral("Spot Healing")
                                                                  : QStringLiteral("Brush Stroke")));
     ImageLayer &layer = m_document->layers[index];
