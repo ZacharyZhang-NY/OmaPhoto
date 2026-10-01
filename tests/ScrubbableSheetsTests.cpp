@@ -203,7 +203,8 @@ void ScrubbableSheetsTests::canvasSizeTitlesScrubInTheirUnit()
 {
     CanvasDocument document{1200, 800};
     document.resolution = 72;
-    CanvasSizeSheet sheet(document, PaletteColor::black(), PaletteColor::white(), [](std::optional<CanvasSizeOptions>) {});
+    EditorSession session;
+    CanvasSizeSheet sheet(document, session, [](std::optional<CanvasSizeOptions>) {});
     showActive(sheet);
     QLineEdit &width = find<QLineEdit>(sheet, "canvasWidth");
     QLineEdit &height = find<QLineEdit>(sheet, "canvasHeight");
@@ -250,7 +251,8 @@ void ScrubbableSheetsTests::canvasSizeCentimetresScrubTheirLimits()
 {
     CanvasDocument document{1200, 800};
     document.resolution = 72;
-    CanvasSizeSheet sheet(document, PaletteColor::black(), PaletteColor::white(), [](std::optional<CanvasSizeOptions>) {});
+    EditorSession session;
+    CanvasSizeSheet sheet(document, session, [](std::optional<CanvasSizeOptions>) {});
     showActive(sheet);
     QLineEdit &width = find<QLineEdit>(sheet, "canvasWidth");
     QLineEdit &height = find<QLineEdit>(sheet, "canvasHeight");
