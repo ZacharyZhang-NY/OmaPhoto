@@ -48,10 +48,25 @@ void FilterSheet::dither()
     });
     control(QStringLiteral("Pixel Size"), key(&DitherSettings::pixelSize), DitherSettings::pixelSizeLow, DitherSettings::pixelSizeHigh, QStringLiteral("px"), 0, false);
     box()->setToolTip(QStringLiteral("Make each dithered pixel this many pixels across, for a chunky old-screen look"));
-    m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return settings.dither.style != DitherStyle::ascii; });
+    m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return usesPixelSize(settings.dither.style); });
     control(QStringLiteral("Text Size"), key(&DitherSettings::textSize), DitherSettings::textSizeLow, DitherSettings::textSizeHigh, QStringLiteral("px"), 0, false);
     box()->setToolTip(QStringLiteral("The height of each line of characters"));
     m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return settings.dither.style == DitherStyle::ascii; });
+    // Scanlines' four rows.
+    const auto scanlines = [](const FilterSettings &settings) { return settings.dither.style == DitherStyle::scanlines; };
+    control(QStringLiteral("Line Spacing"), key(&DitherSettings::lineSpacing), DitherSettings::lineSpacingLow, DitherSettings::lineSpacingHigh, QStringLiteral("px"), 0,
+            false);
+    box()->setToolTip(QStringLiteral("How far apart the screen's lines are"));
+    m_shownWhen.emplace_back(box(), scanlines);
+    control(QStringLiteral("Glow"), key(&DitherSettings::glow), 0, 100, QStringLiteral("%"), 0, false);
+    box()->setToolTip(QStringLiteral("Light blooming around the lines, like a CRT's phosphors"));
+    m_shownWhen.emplace_back(box(), scanlines);
+    control(QStringLiteral("Dots"), key(&DitherSettings::dots), 0, 100, QStringLiteral("%"), 0, false);
+    box()->setToolTip(QStringLiteral("Break the lines into glowing beads"));
+    m_shownWhen.emplace_back(box(), scanlines);
+    control(QStringLiteral("Wobble"), key(&DitherSettings::wobble), DitherSettings::wobbleLow, DitherSettings::wobbleHigh, QStringLiteral("px"), 0, false);
+    box()->setToolTip(QStringLiteral("Make the lines waver sideways down the screen, like a CRT losing sync"));
+    m_shownWhen.emplace_back(box(), scanlines);
     control(QStringLiteral("Cell Size"), key(&DitherSettings::cellSize), DitherSettings::cellSizeLow, DitherSettings::cellSizeHigh, QStringLiteral("px"), 0, false);
     m_shownWhen.emplace_back(box(), [](const FilterSettings &settings) { return isHalftone(settings.dither.style); });
     control(QStringLiteral("Angle"), key(&DitherSettings::angle), -90, 90, QStringLiteral("°"), 0, false);
@@ -133,7 +148,7 @@ void FilterSheet::dither()
         const QSignalBlocker quiet(shape);
         shape->setCurrentIndex(int(settings.dither.pixelShape));
     });
-    m_shownWhen.emplace_back(shape->parentWidget(), [](const FilterSettings &settings) { return settings.dither.pixelSize > 1 && settings.dither.style != DitherStyle::ascii; });
+    m_shownWhen.emplace_back(shape->parentWidget(), [](const FilterSettings &settings) { return settings.dither.pixelSize > 1 && usesPixelSize(settings.dither.style); });
     flag(QStringLiteral("Light on Dark"), QStringLiteral("Draw the marks for the light tones on the dark color, like a glowing screen"),
          [](FilterSettings &settings) -> bool & { return settings.dither.lightOnDark; });
     m_shownWhen.emplace_back(m_flags.back().first, [](const FilterSettings &settings) { return drawsMarks(settings.dither.style); });

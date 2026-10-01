@@ -6,11 +6,12 @@
 #include <QEvent>
 #include <QFontMetricsF>
 #include <QHBoxLayout>
+#include <QMenu>
+#include <QMouseEvent>
 #include <QPainter>
-#include <QScrollBar>
+#include <QPainterPath>
 #include <QStyleOptionToolButton>
 #include <QStylePainter>
-#include <QTimer>
 
 namespace {
 QFont tabFont(bool active)
@@ -47,8 +48,10 @@ int labelWidth(const QString &title, bool active, bool modified)
 }
 }
 
-ProjectTabButton::ProjectTabButton(ProjectWorkspace &workspace, std::shared_ptr<ProjectTab> tab, QWidget *parent)
-    : QWidget(parent), tab(std::move(tab)), m_workspace(workspace), m_select(new TabTitle(this)), m_close(new QToolButton(this))
+ProjectTabButton::ProjectTabButton(ProjectWorkspace &workspace, std::shared_ptr<ProjectTab> tab, std::function<void(TabDragPhase, double)> onReorder,
+                                   QWidget *parent)
+    : QWidget(parent), tab(std::move(tab)), m_workspace(workspace), m_onReorder(std::move(onReorder)), m_select(new TabTitle(this)),
+      m_close(new QToolButton(this))
 {
     // 28 high: the strip's 34 less its margins.
     m_select->setObjectName(QStringLiteral("selectTab"));
@@ -65,6 +68,7 @@ ProjectTabButton::ProjectTabButton(ProjectWorkspace &workspace, std::shared_ptr<
     row->addWidget(m_select);
     row->addWidget(m_close);
     setAcceptDrops(true);
+    m_select->installEventFilter(this);
     connect(m_select, &QToolButton::clicked, this, [this] { m_workspace.select(this->tab->id); });
     connect(m_close, &QToolButton::clicked, this, [this] { m_workspace.close(this->tab->id); });
     // The strip syncs every button on the workspace's news.
@@ -91,6 +95,26 @@ void ProjectTabButton::synchronize()
     m_close->setEnabled(m_workspace.canSwitch());
     // The capsule repaints with the buttons it holds.
     setProperty("active", active);
+}
+
+// A press moved three points reorders; measured in the window.
+bool ProjectTabButton::eventFilter(QObject *watched, QEvent *event)
+{
+    const auto *mouse = static_cast<QMouseEvent *>(event);
+    if (event->type() == QEvent::MouseButtonPress && mouse->button() == Qt::LeftButton) {
+        m_press = mouse->globalPosition();
+        m_dragging = false;
+    } else if (event->type() == QEvent::MouseMove && m_press && mouse->buttons().testFlag(Qt::LeftButton)) {
+        m_dragging = m_dragging || QLineF(*m_press, mouse->globalPosition()).length() >= 3;
+        if (m_dragging)
+            m_onReorder(TabDragPhase::changed, mouse->globalPosition().x() - m_press->x());
+    } else if (event->type() == QEvent::MouseButtonRelease && mouse->button() == Qt::LeftButton && m_press) {
+        const double translation = mouse->globalPosition().x() - m_press->x();
+        m_press.reset();
+        if (std::exchange(m_dragging, false))
+            m_onReorder(TabDragPhase::ended, translation);
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 // Another tab's layer, unless Alt duplicates it, or files.
@@ -237,82 +261,74 @@ void NewCanvasButton::dropEvent(QDropEvent *event)
     m_workspace.receiveProviders(*event->mimeData(), std::nullopt);
 }
 
-ProjectTabStrip::ProjectTabStrip(ProjectWorkspace &workspace, QWidget *parent)
-    : QScrollArea(parent), m_workspace(workspace), m_row(new QWidget(this))
+OverflowTabsPill::OverflowTabsPill(ProjectWorkspace &workspace, QWidget *parent) : QToolButton(parent), m_workspace(workspace)
 {
-    setObjectName(QStringLiteral("projectTabs"));
-    setAccessibleName(QStringLiteral("Project tabs"));
-    setFixedHeight(34);
-    setFrameShape(QFrame::NoFrame);
-    // The toolbar shows through; a stylesheet would freeze the palette.
-    setAutoFillBackground(false);
-    viewport()->setAutoFillBackground(false);
-    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    auto *row = new QHBoxLayout(m_row);
-    row->setContentsMargins(0, 3, 0, 3);
-    row->setSpacing(6);
-    row->addStretch(1);
-    setWidget(m_row);
-    // setWidget turns the row's fill on; the toolbar shows through.
-    m_row->setAutoFillBackground(false);
-    m_row->installEventFilter(this);
-    connect(&m_workspace, &ProjectWorkspace::changed, this, &ProjectTabStrip::synchronize);
-    synchronize();
+    setObjectName(QStringLiteral("projectTabsOverflow"));
+    setFocusPolicy(Qt::NoFocus);
+    QFont font;
+    font.setPixelSize(12);
+    font.setWeight(QFont::Medium);
+    setFont(font);
+    connect(this, &QToolButton::pressed, this, &OverflowTabsPill::showMenu);
 }
 
-QList<ProjectTabButton *> ProjectTabStrip::buttons() const
+double OverflowTabsPill::pillWidth(int hiddenCount)
 {
-    QList<ProjectTabButton *> result;
-    for (int index = 0; index < m_row->layout()->count(); ++index) {
-        if (auto *button = qobject_cast<ProjectTabButton *>(m_row->layout()->itemAt(index)->widget()))
-            result << button;
-    }
-    return result;
+    QFont font;
+    font.setPixelSize(12);
+    font.setWeight(QFont::Medium);
+    // Leading, gap before the chevron, chevron, trailing.
+    return std::ceil(QFontMetricsF(font).horizontalAdvance(projectTabOverflowLabel(hiddenCount))) + 11 + 4 + 10 + 11;
 }
 
-void ProjectTabStrip::synchronize()
+void OverflowTabsPill::setHiddenIDs(std::vector<QUuid> hiddenIDs)
 {
-    // Buttons follow the tabs: kept where the tab stays.
-    auto *row = static_cast<QHBoxLayout *>(m_row->layout());
-    QList<ProjectTabButton *> shown = buttons();
-    int position = 0;
-    for (const std::shared_ptr<ProjectTab> &tab : m_workspace.tabs()) {
-        const auto kept = std::find_if(shown.begin(), shown.end(), [&](ProjectTabButton *button) { return button->tab == tab; });
-        ProjectTabButton *button = kept == shown.end() ? new ProjectTabButton(m_workspace, tab, m_row) : *kept;
-        if (kept != shown.end())
-            shown.erase(kept);
-        row->removeWidget(button);
-        row->insertWidget(position, button);
-        button->show();
-        button->synchronize();
-        position += 1;
-    }
-    for (ProjectTabButton *gone : shown)
-        delete gone;
-    // The row is as wide as its tabs, never squeezed.
-    m_row->resize(m_row->sizeHint());
-    showFront();
+    m_hiddenIDs = std::move(hiddenIDs);
+    const QString label = projectTabOverflowLabel(int(m_hiddenIDs.size()));
+    setText(label);
+    setToolTip(label);
+    setAccessibleName(label);
+    update();
 }
 
-bool ProjectTabStrip::eventFilter(QObject *watched, QEvent *event)
+// Below the pill: hidden tabs in order, unsaved marked.
+void OverflowTabsPill::showMenu()
 {
-    // A title changed size: the row takes its new width.
-    if (event->type() == QEvent::LayoutRequest)
-        m_row->resize(m_row->sizeHint());
-    return QScrollArea::eventFilter(watched, event);
-}
-
-// Only a new front tab scrolls into view.
-void ProjectTabStrip::showFront()
-{
-    if (std::exchange(m_shownFront, m_workspace.selectedID()) == m_workspace.selectedID())
+    setDown(false);
+    if (!m_workspace.canSwitch())
         return;
-    // Posted, as Swift's: the row's layout request runs first.
-    QTimer::singleShot(0, this, [this] {
-        for (ProjectTabButton *button : buttons()) {
-            if (button->tab->id == m_workspace.selectedID())
-                ensureWidgetVisible(button, 0, 0);
-        }
-    });
+    auto *menu = new QMenu(this);
+    menu->setObjectName(QStringLiteral("projectTabsOverflowMenu"));
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    for (const QUuid &id : m_hiddenIDs) {
+        const std::shared_ptr<ProjectTab> tab = m_workspace.tab(id);
+        const QString title = (tab->session.isModified() ? QStringLiteral("• ") : QString()) + tab->title();
+        connect(menu->addAction(title), &QAction::triggered, this, [this, id] { m_workspace.select(id); });
+    }
+    menu->popup(mapToGlobal(QPoint(0, height() + 4)));
+}
+
+void OverflowTabsPill::paintEvent(QPaintEvent *)
+{
+    // An inactive tab's capsule; the label dims while busy.
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    QColor fill = palette().color(QPalette::WindowText), edge = fill;
+    fill.setAlphaF(0.035);
+    edge.setAlphaF(0.08);
+    painter.setPen(QPen(edge, 1));
+    painter.setBrush(fill);
+    painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 14, 14);
+    painter.setOpacity(m_workspace.canSwitch() ? 1 : 0.5);
+    painter.setPen(palette().color(QPalette::ButtonText));
+    painter.drawText(QRectF(11, 0, width() - 36, height()), Qt::AlignLeft | Qt::AlignVCenter, text());
+    // Swift's chevron.down, nine points, medium.
+    QPainterPath chevron;
+    const double left = width() - 21, middle = height() / 2.0;
+    chevron.moveTo(left + 1, middle - 2);
+    chevron.lineTo(left + 5, middle + 2);
+    chevron.lineTo(left + 9, middle - 2);
+    painter.setPen(QPen(palette().color(QPalette::ButtonText), 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPath(chevron);
 }

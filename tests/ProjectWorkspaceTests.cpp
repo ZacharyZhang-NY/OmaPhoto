@@ -42,6 +42,7 @@ private slots:
     void everyChangeIsAnnouncedAndRefusalsAreSilent();
     void aDropThatIsNoLayerIdIsIgnored();
     void anOpenFilterHoldsTheSwitch();
+    void moveTabReordersWithoutTouchingSelectionOrDocuments();
 };
 
 void ProjectWorkspaceTests::newCanvasOpensAnEmptyTabWithoutAModal()
@@ -356,6 +357,37 @@ void ProjectWorkspaceTests::anOpenFilterHoldsTheSwitch()
     QVERIFY(!workspace.canSwitch());
     session.closeColorPicker(false);
     QVERIFY(workspace.canSwitch());
+}
+
+void ProjectWorkspaceTests::moveTabReordersWithoutTouchingSelectionOrDocuments()
+{
+    ProjectWorkspace workspace;
+    const QUuid a = workspace.current().id, b = workspace.addTab(false).id, c = workspace.addTab(false).id;
+    const auto order = [&] {
+        std::vector<QUuid> ids;
+        for (const std::shared_ptr<ProjectTab> &tab : workspace.tabs())
+            ids.push_back(tab->id);
+        return ids;
+    };
+    QSignalSpy changed(&workspace, &ProjectWorkspace::changed);
+    workspace.moveTab(c, 0);
+    QVERIFY((order() == std::vector<QUuid>{c, a, b}));
+    workspace.moveTab(a, 2);
+    QVERIFY((order() == std::vector<QUuid>{c, b, a}));
+    QCOMPARE(changed.size(), 2);
+    // Out of range clamps to the ends.
+    workspace.moveTab(c, 99);
+    QVERIFY((order() == std::vector<QUuid>{b, a, c}));
+    workspace.moveTab(c, -4);
+    QVERIFY((order() == std::vector<QUuid>{c, b, a}));
+    QCOMPARE(changed.size(), 4);
+    // Where it is, or no tab: nothing, silently.
+    workspace.moveTab(a, 2);
+    workspace.moveTab(QUuid::createUuid(), 0);
+    QVERIFY((order() == std::vector<QUuid>{c, b, a}));
+    QCOMPARE(changed.size(), 4);
+    // Chrome: the selection stays.
+    QCOMPARE(workspace.selectedID(), c);
 }
 
 QTEST_MAIN(ProjectWorkspaceTests)

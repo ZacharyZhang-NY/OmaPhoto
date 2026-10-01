@@ -27,7 +27,7 @@ std::optional<ProjectSnapshot> EditorSession::projectSnapshot() const
 void EditorSession::installProject(const ProjectSnapshot &snapshot, const QString &path)
 {
     m_collapsedGroupIDs.clear();
-    m_isMaskSelected = false;
+    setIsMaskSelected(false);
     m_cropRect.reset();
     m_guideDrag = std::nullopt;
     m_transformEdit = std::nullopt;
@@ -78,7 +78,7 @@ void EditorSession::setProjectPath(std::optional<QString> path)
 void EditorSession::clearProject()
 {
     m_collapsedGroupIDs.clear();
-    m_isMaskSelected = false;
+    setIsMaskSelected(false);
     m_cropRect.reset();
     m_transformEdit = std::nullopt;
     m_guideDrag = std::nullopt;

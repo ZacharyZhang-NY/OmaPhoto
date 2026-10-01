@@ -50,6 +50,8 @@ struct RawLayer {
     std::map<QString, QByteArray> extra;
     qint64 maskTop = 0, maskLeft = 0, maskBottom = 0, maskRight = 0;
     qint64 sourceMaskTop = 0, sourceMaskLeft = 0, sourceMaskBottom = 0, sourceMaskRight = 0;
+    // The mask's value outside its stored bounds.
+    uchar maskDefault = 255;
     bool maskDisabled = false;
     bool maskLinked = true;
     bool maskFromRender = false;

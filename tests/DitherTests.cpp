@@ -67,11 +67,11 @@ void DitherTests::stylesKeepSwiftsNamesOrderAndGroups()
     for (const DitherStyle each : allDitherStyles)
         names << rawValue(each);
     QCOMPARE(names, (QStringList{"Atkinson (Classic Mac)", "Floyd–Steinberg", "Bayer 2 × 2", "Bayer 4 × 4", "Bayer 8 × 8", "Halftone Dots",
-                                 "Halftone Lines", "Halftone Diamonds", "Mac Patterns", "ASCII"}));
+                                 "Halftone Lines", "Halftone Diamonds", "Mac Patterns", "ASCII", "Scanlines (CRT)"}));
     QString groups;
     for (const DitherStyle each : allDitherStyles)
         groups += QString::number(ditherGroup(each));
-    QCOMPARE(groups, QString("0011122233"));
+    QCOMPARE(groups, QString("00111222333"));
     QVERIFY(diffuses(DitherStyle::floydSteinberg) && !diffuses(DitherStyle::bayer2));
     QVERIFY(hasTones(DitherStyle::bayer8) && !hasTones(DitherStyle::dots));
     QVERIFY(isHalftone(DitherStyle::diamonds) && !isHalftone(DitherStyle::patterns));

@@ -85,7 +85,8 @@ CanvasView::DisplayState CanvasView::displayState() const
                        .layers = {},
                        .folderMasks = {},
                        .textStyle = m_session.textDraft() ? std::optional(m_session.textDraft()->style) : std::nullopt,
-                       .textTransform = m_session.textDraft() && m_inlineTextEditor ? std::optional(m_inlineTextEditor->shownTransform()) : std::nullopt};
+                       .textTransform = m_session.textDraft() && m_inlineTextEditor ? std::optional(m_inlineTextEditor->shownTransform()) : std::nullopt,
+                       .maskAlone = m_session.maskAloneLayer() ? std::optional(m_session.maskAloneLayer()->mask->asset.identity()) : std::nullopt};
     if (!document)
         return state;
     // A hidden source still clips: live masks count every layer.
@@ -260,45 +261,12 @@ void CanvasView::draw(QPainter &context, const QRectF &dirty)
     context.restore();
 }
 
-// The folder's live mask, multiplied into the coverage.
-FolderMaskClip::Applier CanvasView::liveFolderMaskClip(const BrushStroke &edit, double scale, const Center &center) const
-{
-    return [&edit, scale, center](const QPainter &painter, QImage &coverage) {
-        QImage live(coverage.size(), QImage::Format_Grayscale8);
-        if (live.isNull())
-            throw ExportError(ExportError::Kind::render);
-        // Outside the mask's bounds stays hidden, as when committed.
-        live.fill(0);
-        LayerTransform transform = edit.paintTransform;
-        transform.sampling = LayerSampling::nearest;
-        const std::optional<ImportedImage> &base = edit.layer.mask ? std::optional(edit.layer.mask->asset) : std::nullopt;
-        {
-            QPainter drawing(&live);
-            drawing.setTransform(painter.deviceTransform());
-            // Swift's displayImage: halved near the size drawn.
-            const double device = LayerRenderer::deviceScale(drawing);
-            const auto shown = [device](const QImage &image, double width) {
-                return DownsampleCache::shared().imageDrawnAt(image, width * device / std::max(1, image.width()));
-            };
-            const std::shared_ptr<const RasterSnapshot> raster = base ? base->raster : nullptr;
-            const QImage image = base && !raster ? shown(base->image(), transform.size.width() * scale) : QImage();
-            const QImage rasterBase = raster && !raster->base.isNull()
-                ? shown(raster->base, transform.size.width() * scale * raster->baseRect.width() / std::max(1, raster->width))
-                : QImage();
-            LayerRenderer::drawBrushPreview(image, transform, center(transform.center()), drawing, {.scale = scale},
-                                            {.patches = edit.patches(), .pixelWidth = edit.width, .pixelHeight = edit.height, .paintingMask = false,
-                                             .sourceRect = edit.sourceRect, .raster = raster, .rasterBase = rasterBase});
-        }
-        QPainter multiplying(&coverage);
-        if (!multiplying.isActive())
-            throw ExportError(ExportError::Kind::render);
-        multiplying.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-        multiplying.drawImage(QRectF(coverage.rect()), BrushRaster::alphaView(live));
-    };
-}
-
 void CanvasView::drawLayers(const CanvasDocument &document, double scale, const Center &center, QPainter &context)
 {
+    if (const std::optional<ImageLayer> alone = m_session.maskAloneLayer()) {
+        drawMaskAlone(*alone, document, scale, center, context);
+        return;
+    }
     handOnDraftEffects(document);
     m_session.effectsPreviews.prepare(document.layers);
     std::map<QUuid, ImageLayer> byID;
@@ -430,6 +398,10 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
     live.adjustment = [&](QUuid id) { return byID.contains(id) ? byID.at(id).adjustment : std::nullopt; };
     live.adjustmentOpacity = [&](QUuid id) { return byID.at(id).effectiveOpacity(byID); };
     live.adjustmentScale = scale;
+    const QPointF corner = center(QPointF(0, 0));
+    live.adjustmentRegion = [corner, scale](const QRectF &rect) {
+        return QRectF((rect.left() - corner.x()) / scale, (rect.top() - corner.y()) / scale, rect.width() / scale, rect.height() / scale);
+    };
     live.adjustmentClip = [&](QUuid id, const QPainter &painter, QImage &coverage) {
         const ImageLayer &layer = byID.at(id);
         if (!layer.mask || !layer.mask->isEnabled)

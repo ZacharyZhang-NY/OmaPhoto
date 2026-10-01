@@ -102,8 +102,8 @@ void SheetTeardownTests::theDocumentSheetsGoQuietly()
 {
     const CanvasDocument canvas{120, 80};
     typeThenDestroy(std::make_unique<ImageSizeSheet>(canvas, [](std::optional<ImageSizeOptions>) {}), QStringLiteral("60"));
-    typeThenDestroy(std::make_unique<CanvasSizeSheet>(canvas, PaletteColor::black(), PaletteColor::white(), [](std::optional<CanvasSizeOptions>) {}),
-                    QStringLiteral("60"));
+    EditorSession session;
+    typeThenDestroy(std::make_unique<CanvasSizeSheet>(canvas, session, [](std::optional<CanvasSizeOptions>) {}), QStringLiteral("60"));
 }
 
 void SheetTeardownTests::aCameraRawRowGoesQuietly()

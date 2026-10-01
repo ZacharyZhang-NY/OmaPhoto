@@ -276,7 +276,7 @@ ProjectError::ProjectError(Kind kind, std::optional<qint64> version, const QStri
 {
 }
 
-void ProjectStore::save(const ProjectSnapshot &snapshot, const QString &path)
+void ProjectStore::save(const ProjectSnapshot &snapshot, const QString &path, const std::optional<QuickLookImages> &quickLook)
 {
     validate(snapshot.manifest);
     std::vector<std::pair<QString, QByteArray>> files;
@@ -323,6 +323,13 @@ void ProjectStore::save(const ProjectSnapshot &snapshot, const QString &path)
     for (const auto &[filename, data] : files)
         writeFile(staged + QLatin1String("/images/") + filename, data);
     syncDirectory(staged + QLatin1String("/images"));
+    // Quick Look's Space-bar preview; loading ignores it.
+    if (quickLook) {
+        if (!QDir().mkdir(staged + QLatin1String("/QuickLook")))
+            fail(QStringLiteral("could not create"), staged + QLatin1String("/QuickLook"), QStringLiteral("the folder cannot be made"));
+        writeFile(staged + QLatin1String("/QuickLook/Preview.jpg"), quickLook->preview);
+        syncDirectory(staged + QLatin1String("/QuickLook"));
+    }
     syncDirectory(staged);
     replace(staged, destination.absoluteFilePath(), destination.absolutePath(), staging.keep);
     qCInfo(lcIO) << "saved" << destination.absoluteFilePath() << "with" << snapshot.manifest.layers.size() << "layers and" << files.size() << "images";

@@ -93,10 +93,11 @@ public:
     void selectTool(NavigationTool value);
     // Tab: the current tool's next mode.
     void cycleToolMode();
-
     // Whether the mask thumbnail, not the layer's, is the target.
     bool isMaskSelected() const { return m_isMaskSelected; }
-
+    // Alt-click: the targeted mask alone, gray, on the canvas.
+    bool viewsMaskAlone() const { return m_viewsMaskAlone; }
+    void setViewsMaskAlone(bool value);
     // A blend mode tried on by hovering; nothing is saved.
     struct BlendPreview {
         QUuid layerID;
@@ -132,7 +133,6 @@ public:
     // An unlinked mask, selected, transforms without its layer.
     bool transformTargetsMask() const;
     void nudgeLayer(double dx, double dy);
-
     const std::optional<LassoDraft> &lassoDraft() const { return m_lassoDraft; }
     LassoKind lassoKind() const { return m_lassoKind; }
     void setLassoKind(LassoKind kind);
@@ -350,6 +350,7 @@ private:
     std::optional<BlendPreview> m_blendPreview;
     std::optional<QUuid> m_opacityEditLayerID;
     bool m_isMaskSelected = false;
+    bool m_viewsMaskAlone = false;
     std::optional<QUuid> m_activeLayerID;
     bool m_isProjectBusy = false;
     bool m_showsNewDocument = false;

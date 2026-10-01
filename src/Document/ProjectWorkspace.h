@@ -36,12 +36,16 @@ public:
     bool canSwitch() const;
     ProjectTab &addTab(bool reuseEmpty = true);
     void select(QUuid id);
+    // A dragged tab lands at `index`, clamped; chrome, never undone.
+    void moveTab(QUuid id, int index);
     void newCanvas();
     // Each `done` runs from the event loop, never inline.
     void open(std::optional<QString> path = std::nullopt, std::function<void(bool)> done = {});
     void close(QUuid id, std::function<void()> done = {});
     void removeTab(QUuid id);
     std::vector<std::shared_ptr<ProjectTab>> quitOrder() const;
+    // Applies canvas edits and cancels dialogs before a quit.
+    void settlePendingEdits(std::function<void()> done);
     void confirmQuit(std::function<void(bool)> done);
     void closeWindow(QWidget *closing);
     void receive(const QList<QUrl> &urls, std::optional<QUuid> destination = std::nullopt,

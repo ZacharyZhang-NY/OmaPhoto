@@ -119,6 +119,10 @@ void ProjectReplaceTests::everythingIsSyncedBeforeTheSwap()
     ProjectStore::save(twoLayers(), path);
     QCOMPARE(faults.trace, (QStringList{"sync file", "sync file", "sync folder", "sync folder", "exchange", "sync folder"}));
     QCOMPARE(QDir(root.path()).entryList(everything), QStringList{"Durable.comp"});
+    // The preview and its folder, before the project's folder.
+    faults.trace.clear();
+    ProjectStore::save(twoLayers(), path, QuickLookImages{"preview"});
+    QCOMPARE(faults.trace, (QStringList{"sync file", "sync file", "sync folder", "sync file", "sync folder", "sync folder", "exchange", "sync folder"}));
 }
 
 void ProjectReplaceTests::withoutAnExchangeTheProjectIsReplacedInTwoSteps_data()

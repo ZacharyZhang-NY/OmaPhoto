@@ -79,25 +79,34 @@ bool CameraRawCurveSettings::adjusts() const
         || !isLinear(green) || !isLinear(blue);
 }
 
-double CameraRawCurveSettings::parametric(double tone) const
+// Bends tones below `lower` by `low`, above `upper` by `high`.
+double CameraRawCurveSettings::bend(double tone, double lower, double low, double upper, double high)
 {
-    const double shadow = shadowSplit / 100, dark = darkSplit / 100, light = lightSplit / 100;
-    double amount, lo, hi;
-    if (tone < shadow)
-        amount = shadows, lo = 0, hi = shadow;
-    else if (tone < dark)
-        amount = darks, lo = shadow, hi = dark;
-    else if (tone < light)
-        amount = lights, lo = dark, hi = light;
-    else
-        amount = highlights, lo = light, hi = 1;
-    const double span = std::max(0.02, hi - lo);
-    const double weight = 1 - std::abs(tone - (lo + hi) / 2) / (span / 2);
-    // A tone in its region weighs 0 to 1, unfloored.
-    return std::min(1.0, std::max(0.0, tone + (amount / 100) * weight * 0.22));
+    // Fitted to Photoshop: Darks −51 dips 0.1 there.
+    const double strength = 1.66;
+    if (tone < lower)
+        return lower * std::pow(tone / lower, std::pow(2, -low / 100 * strength));
+    if (tone > upper) {
+        const double rest = 1 - upper;
+        return 1 - rest * std::pow((1 - tone) / rest, std::pow(2, high / 100 * strength));
+    }
+    return tone;
 }
 
-std::vector<float> CameraRawCurveSettings::lumaTable() const
+double CameraRawCurveSettings::parametric(double tone) const
+{
+    if (shadows == 0 && darks == 0 && lights == 0 && highlights == 0)
+        return tone;
+    // Gamma bends, smoothed as Image › Curves smooths.
+    std::vector<CurvePoint> anchors;
+    for (int index = 0; index <= 32; ++index) {
+        const double x = index / 32.0;
+        anchors.push_back({x, bend(bend(x, shadowSplit / 100, shadows, lightSplit / 100, highlights), darkSplit / 100, darks, darkSplit / 100, lights)});
+    }
+    return point(tone, anchors);
+}
+
+std::vector<float> CameraRawCurveSettings::toneTable() const
 {
     std::vector<float> table(256);
     for (int index = 0; index < 256; ++index)
@@ -262,10 +271,10 @@ void CameraRawSettings::applyCurveColor(uchar *pixels, int width, int height, qs
     const CameraRawCurveSettings shape = curve.normalized();
     const CameraRawMixerSettings mixing = mixer.normalized();
     const CameraRawGradingSettings grade = grading.normalized();
-    const std::vector<float> luma = shape.lumaTable(), redTable = shape.channelTable(shape.red), greenTable = shape.channelTable(shape.green),
+    const std::vector<float> tone = shape.toneTable(), redTable = shape.channelTable(shape.red), greenTable = shape.channelTable(shape.green),
                              blueTable = shape.channelTable(shape.blue), mixerFloats = mixing.mixerFloats(), pointFloats = mixing.pointFloats(),
                              gradeFloats = grade.gradeFloats();
-    adjust_camera_raw_curve_color(pixels, size_t(width), size_t(height), size_t(stride), luma.data(), redTable.data(), greenTable.data(),
+    adjust_camera_raw_curve_color(pixels, size_t(width), size_t(height), size_t(stride), tone.data(), redTable.data(), greenTable.data(),
                                   blueTable.data(), shape.refineSaturation / 100, mixerFloats.data(), int(mixing.points.size()), pointFloats.data(),
                                   gradeFloats.data(), grade.blending / 100, grade.balance / 100, visualize);
 }

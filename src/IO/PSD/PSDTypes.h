@@ -38,6 +38,9 @@ struct PSDRecord {
     QRectF bounds;
     std::optional<QImage> image;
     std::optional<QImage> mask;
+    // Where `mask` sits, and Photoshop's value everywhere else.
+    QRectF maskBounds;
+    uchar maskDefault = 255;
     bool maskEnabled = true;
     bool maskLinked = true;
     std::optional<LayerAdjustment> adjustment;

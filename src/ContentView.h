@@ -14,6 +14,7 @@
 #include <QWidget>
 
 class LayersPanel;
+class MaskAloneBadge;
 class ToolButton;
 class ProjectWorkspace;
 class QFileDialog;
@@ -74,6 +75,8 @@ private:
     QWidget *const m_dock;
     // An accent ring while a drop may land.
     QWidget *const m_dropRing;
+    // Over the canvas's foot while a mask shows alone.
+    MaskAloneBadge *const m_maskAloneBadge;
     // Swift 1.1.7's rulers: the corner, then the two strips.
     std::vector<QWidget *> m_rulers;
     ProjectWorkspace *m_workspace = nullptr;

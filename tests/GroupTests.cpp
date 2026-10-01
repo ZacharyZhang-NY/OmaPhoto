@@ -214,8 +214,8 @@ void GroupTests::documentHierarchyFollowsItsLayers()
     shown.parentID = open.id;
     ImageLayer top("Top", document.size());
     document.layers = {folder, child, open, shown, top};
-    QCOMPARE(names(document.hierarchyEntries()),
-             QStringList({"Folder:0:hidden", "Child:1:hidden", "Open:0:shown", "Shown:1:shown", "Top:0:shown"}));
+    QCOMPARE(document.hierarchy().order, (std::vector<QUuid>{folder.id, child.id, open.id, shown.id, top.id}));
+    QCOMPARE(document.hierarchy().drawn, (std::vector<QUuid>{shown.id, top.id}));
     QCOMPARE(document.effectiveVisibleIDs(), QSet<QUuid>({open.id, shown.id, top.id}));
     const std::vector<ImageLayer> rendered = document.renderLayers();
     QCOMPARE(int(rendered.size()), 2);

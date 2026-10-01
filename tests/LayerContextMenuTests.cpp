@@ -22,6 +22,7 @@ private slots:
     void entriesFollowTheSelectionAndTheGates();
     void thumbnailsAndEffectsChooseWhatTheMenuTargets();
     void testContextMenuDuplicateFolderPreservesHierarchy();
+    void aFoldersMenuOffersUngroup();
 };
 
 void LayerContextMenuTests::testContextMenuContainsCoreLayerActions()
@@ -310,6 +311,31 @@ void LayerContextMenuTests::testContextMenuDuplicateFolderPreservesHierarchy()
         copied += layer.parentID == copy.id;
     QCOMPARE(copied, children);
     QCOMPARE(session->document().value().layers.size(), 2 * children + 2);
+}
+
+void LayerContextMenuTests::aFoldersMenuOffersUngroup()
+{
+    const auto session = threeLayers();
+    const QUuid lower = session->document().value().layers[0].id;
+    session->selectLayers({lower}, lower);
+    session->groupSelectedLayers();
+    Shown shown(*session);
+    // The folder sits lowest; the top row is none.
+    session->selectLayer(std::nullopt);
+    QVERIFY(!titles(*shown.menu(0)).contains("Ungroup Layers"));
+    const int folder = int(shown.list.cells().size()) - 2;
+    QVERIFY(shown.row(folder).layerID() != lower);
+    std::unique_ptr<QMenu> menu = shown.menu(folder);
+    const QStringList entries = titles(*menu);
+    QCOMPARE(entries.indexOf("Ungroup Layers"), entries.indexOf("Group Selected Layers") + 1);
+    QVERIFY(item(*menu, "ungroupLayers").isEnabled());
+    session->setIsProjectBusy(true);
+    QVERIFY(!item(*shown.menu(folder), "ungroupLayers").isEnabled());
+    session->setIsProjectBusy(false);
+    item(*shown.menu(folder), "ungroupLayers").trigger();
+    QCOMPARE(session->history.undoName(), QString("Ungroup Layers"));
+    QCOMPARE(session->document().value().layers.size(), size_t(3));
+    QCOMPARE(session->selectedLayerIDs(), QSet<QUuid>{lower});
 }
 
 QTEST_MAIN(LayerContextMenuTests)

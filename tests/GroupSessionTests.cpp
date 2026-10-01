@@ -3,6 +3,7 @@
 #include "IO/ImageExporter.h"
 #include "IO/ImageResizer.h"
 #include <QTemporaryDir>
+#include <QSignalSpy>
 #include <QtTest>
 
 // The session cases of Swift's GroupTests.
@@ -42,6 +43,10 @@ private slots:
     void hiddenParentOverridesChildrenAndExportOrderFollowsGroups();
     void groupsRoundTripAndSurviveImageAndCanvasResize();
     void rowsOfASessionWithoutADocument();
+    void ungroupLayersRestoresChildrenAtTheFoldersSpotAndUndoes();
+    void ungroupPreservesClippingBetweenTwoOfAFoldersOwnChildren();
+    void ungroupingReleasesClippingThatNoLongerMakesSense();
+    void ungroupingANestedOrEmptyFolder();
 };
 
 void GroupSessionTests::nestedGroupsMoveOutCollapseAndDeleteUndo()
@@ -247,6 +252,136 @@ void GroupSessionTests::groupsRoundTripAndSurviveImageAndCanvasResize()
 void GroupSessionTests::rowsOfASessionWithoutADocument()
 {
     QVERIFY(EditorSession().layerRows().empty());
+}
+
+void GroupSessionTests::ungroupLayersRestoresChildrenAtTheFoldersSpotAndUndoes()
+{
+    EditorSession session;
+    session.createDocument(100, 100);
+    session.addBlankLayer();
+    const QUuid below = session.activeLayerID().value();
+    QVERIFY(!session.canUngroupLayers());
+    session.addGroup();
+    const QUuid group = session.activeLayerID().value();
+    session.addBlankLayer();
+    const QUuid childA = session.activeLayerID().value();
+    session.addBlankLayer();
+    const QUuid childB = session.activeLayerID().value();
+    session.selectLayer(std::nullopt);
+    session.addBlankLayer();
+    const QUuid above = session.activeLayerID().value();
+    QCOMPARE(parentOf(session, childA), std::optional(group));
+    session.selectLayer(group);
+    session.toggleGroupExpansion(group);
+    QVERIFY(session.collapsedGroupIDs().contains(group));
+    QVERIFY(session.canUngroupLayers());
+    const int undoCount = session.history.undoCount();
+    const qsizetype count = qsizetype(session.document().value().layers.size());
+    QSignalSpy changed(&session, &EditorSession::changed);
+    session.ungroupLayers();
+    QVERIFY(!changed.isEmpty());
+    std::vector<QUuid> order;
+    for (const ImageLayer &layer : session.document().value().layers)
+        order.push_back(layer.id);
+    QVERIFY(std::ranges::find(order, group) == order.end());
+    QCOMPARE(parentOf(session, childA), std::nullopt);
+    QCOMPARE(parentOf(session, childB), std::nullopt);
+    // Spliced in where the folder sat.
+    const auto at = [&](QUuid id) { return std::ranges::find(order, id) - order.begin(); };
+    QCOMPARE(at(childA), at(below) + 1);
+    QCOMPARE(at(childB), at(childA) + 1);
+    QCOMPARE(at(above), at(childB) + 1);
+    QCOMPARE(qsizetype(order.size()), count - 1);
+    QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{childA, childB}));
+    QCOMPARE(session.activeLayerID(), std::optional(childA));
+    QVERIFY(!session.collapsedGroupIDs().contains(group));
+    QCOMPARE(session.history.undoCount(), undoCount + 1);
+    QCOMPARE(session.history.undoName(), QString("Ungroup Layers"));
+    session.undo();
+    QCOMPARE(parentOf(session, childA), std::optional(group));
+    session.redo();
+    QCOMPARE(qsizetype(session.document().value().layers.size()), count - 1);
+    // A plain layer has nothing to unwrap; nothing changes.
+    changed.clear();
+    session.selectLayer(childA);
+    changed.clear();
+    session.ungroupLayers();
+    QVERIFY(changed.isEmpty());
+    QCOMPARE(qsizetype(session.document().value().layers.size()), count - 1);
+}
+
+void GroupSessionTests::ungroupPreservesClippingBetweenTwoOfAFoldersOwnChildren()
+{
+    EditorSession session;
+    session.createDocument(100, 100);
+    session.addBlankLayer();
+    const QUuid base = session.activeLayerID().value();
+    session.addBlankLayer();
+    const QUuid clipped = session.activeLayerID().value();
+    QVERIFY(session.linkMask(base, clipped));
+    session.selectLayers({base, clipped}, base);
+    session.groupSelectedLayers();
+    session.ungroupLayers();
+    for (const ImageLayer &layer : session.document().value().layers) {
+        if (layer.id == clipped)
+            QCOMPARE(layer.maskSourceID, std::optional(base));
+    }
+}
+
+void GroupSessionTests::ungroupingReleasesClippingThatNoLongerMakesSense()
+{
+    EditorSession session;
+    session.createDocument(100, 100);
+    session.addBlankLayer();
+    const QUuid outsideBase = session.activeLayerID().value();
+    session.addBlankLayer();
+    session.addBlankLayer();
+    const QUuid childSource = session.activeLayerID().value();
+    // linkMask allows a clip across a folder's edge.
+    QVERIFY(session.linkMask(outsideBase, childSource));
+    session.selectLayer(childSource);
+    session.groupSelectedLayers();
+    session.ungroupLayers();
+    for (const ImageLayer &layer : session.document().value().layers) {
+        if (layer.id == childSource)
+            QCOMPARE(layer.maskSourceID, std::nullopt);
+    }
+}
+
+void GroupSessionTests::ungroupingANestedOrEmptyFolder()
+{
+    EditorSession session;
+    session.createDocument(100, 100);
+    session.addGroup();
+    const QUuid outer = session.activeLayerID().value();
+    session.addGroup();
+    const QUuid inner = session.activeLayerID().value();
+    session.addBlankLayer();
+    const QUuid child = session.activeLayerID().value();
+    // Children join the folder's parent; a drag ends first.
+    session.selectLayer(inner);
+    session.beginOpacityEdit();
+    session.setLayerOpacity(0.5);
+    QVERIFY(!session.canUndo());
+    session.ungroupLayers();
+    QVERIFY(session.canUndo());
+    QCOMPARE(session.history.undoName(), QString("Ungroup Layers"));
+    QCOMPARE(parentOf(session, child), std::optional(outer));
+    QCOMPARE(session.selectedLayerIDs(), QSet<QUuid>{child});
+    // An empty folder just goes, nothing left chosen.
+    session.addGroup();
+    const QUuid empty = session.activeLayerID().value();
+    const qsizetype count = qsizetype(session.document().value().layers.size());
+    session.ungroupLayers();
+    QCOMPARE(qsizetype(session.document().value().layers.size()), count - 1);
+    QVERIFY(std::ranges::none_of(session.document().value().layers, [&](const ImageLayer &layer) { return layer.id == empty; }));
+    QVERIFY(session.selectedLayerIDs().isEmpty() && !session.activeLayerID());
+    // Busy, it rests.
+    session.selectLayer(outer);
+    session.setIsProjectBusy(true);
+    QVERIFY(!session.canUngroupLayers());
+    session.setIsProjectBusy(false);
+    QVERIFY(session.canUngroupLayers());
 }
 
 QTEST_GUILESS_MAIN(GroupSessionTests)

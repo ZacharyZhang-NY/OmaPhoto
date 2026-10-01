@@ -257,8 +257,8 @@ LayerTransform EditorSession::displayedTransform(const ImageLayer &layer) const
     if (const std::optional<LayerTransform> pending = pendingTransform(layer))
         return *pending;
     // Content-Aware Fill past the edge previews on the grown layer.
-    if (m_filterEdit && m_filterEdit->grownTransform && m_filterEdit->previewImage(layer.id))
-        return *m_filterEdit->grownTransform;
+    if (m_filterEdit && m_filterEdit->preparedTransform && m_filterEdit->previewImage(layer.id))
+        return *m_filterEdit->preparedTransform;
     return layer.transform;
 }
 

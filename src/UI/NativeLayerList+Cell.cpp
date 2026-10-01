@@ -31,7 +31,7 @@ LayerCell::LayerCell(NativeLayerList &list)
     connect(m_disclosure, &QToolButton::clicked, this, [this] { m_list.session().toggleGroupExpansion(m_layerID); });
     m_thumbnail->setObjectName(QStringLiteral("layerThumbnail"));
     m_maskThumbnail->setObjectName(QStringLiteral("maskThumbnail"));
-    m_maskThumbnail->setToolTip(QStringLiteral("Select layer mask; Shift-click to enable/disable; Ctrl-click to select its black areas (Ctrl-Shift adds, Ctrl-Alt subtracts)"));
+    m_maskThumbnail->setToolTip(QStringLiteral("Select layer mask; Alt-click to view it alone; Shift-click to enable/disable; Ctrl-click to select its black areas (Ctrl-Shift adds, Ctrl-Alt subtracts)"));
     m_link->setObjectName(QStringLiteral("maskLink"));
     m_link->setAutoRaise(true);
     m_link->setFixedSize(9, 20);
@@ -159,7 +159,7 @@ void LayerCell::updateTarget()
     const bool active = session.activeLayerID() == m_layerID && session.selectedLayerIDs().size() == 1;
     const bool mask = session.isMaskSelected();
     m_thumbnail->setTargeted(active && !mask);
-    m_maskThumbnail->setTargeted(active && mask);
+    m_maskThumbnail->setTargeted(active && mask, active && session.maskAloneLayer());
     QWidget::update();
 }
 

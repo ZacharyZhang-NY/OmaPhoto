@@ -1,13 +1,14 @@
 #include "Document/BrushStroke.h"
-#include "Rendering/PoolMap.h"
 #include "Document/HueSaturation.h"
 #include "Document/PixelAdjust.h"
 #include "IO/ImageExporter.h"
-#include <QPainter>
-#include <QtConcurrent>
 #include <algorithm>
 #include <cmath>
-#include <numeric>
+#include <deque>
+#include <mutex>
+extern "C" {
+#include "LevelsPixels.h"
+}
 
 namespace {
 struct HSL {
@@ -48,38 +49,38 @@ HueSaturationFilter::Color toRGB(double hue, double saturation, double lightness
     return {clamp(color.red), clamp(color.green), clamp(color.blue)};
 }
 
-// Core Image's colour cube: unpremultiplied, trilinear, premultiplied back.
-void applyCube(uchar *bits, qsizetype stride, int width, const std::vector<float> &cube, const std::vector<int> &rows)
+// The last tables built: building costs more than applying.
+struct CubeCache {
+    std::mutex lock;
+    std::deque<std::pair<HueSaturationSettings, std::vector<float>>> cubes;
+};
+
+CubeCache &cubeCache()
 {
-    constexpr int size = HueSaturationFilter::dimension, last = size - 1;
-    PoolMap::blocking(rows, [&](int y) {
-        uchar *pixel = bits + y * stride;
-        for (int x = 0; x < width; ++x, pixel += 4) {
-            const float alpha = pixel[3];
-            if (alpha == 0) {
-                std::fill_n(pixel, 3, uchar(0));
-                continue;
+    static CubeCache cache;
+    return cache;
+}
+
+std::vector<float> built(const HueSaturationSettings &settings)
+{
+    const std::vector<HueSaturationFilter::HueResponse> response = HueSaturationFilter::hueResponse(settings);
+    constexpr int dimension = HueSaturationFilter::dimension;
+    std::vector<float> values(size_t(dimension * dimension * dimension * 4));
+    size_t index = 0;
+    const double step = dimension - 1;
+    for (int blue = 0; blue < dimension; ++blue) {
+        for (int green = 0; green < dimension; ++green) {
+            for (int red = 0; red < dimension; ++red) {
+                const HueSaturationFilter::Color color = HueSaturationFilter::adjust(red / step, green / step, blue / step, settings, response);
+                values[index] = float(color.red);
+                values[index + 1] = float(color.green);
+                values[index + 2] = float(color.blue);
+                values[index + 3] = 1;
+                index += 4;
             }
-            float place[3], fraction[3];
-            int low[3];
-            for (int channel = 0; channel < 3; ++channel) {
-                place[channel] = std::min(1.0f, pixel[channel] / alpha) * last;
-                low[channel] = std::min(int(place[channel]), last - 1);
-                fraction[channel] = place[channel] - float(low[channel]);
-            }
-            float out[3] = {0, 0, 0};
-            for (int corner = 0; corner < 8; ++corner) {
-                const int r = low[0] + (corner & 1), g = low[1] + (corner >> 1 & 1), b = low[2] + (corner >> 2 & 1);
-                const float share = ((corner & 1) ? fraction[0] : 1 - fraction[0]) * ((corner >> 1 & 1) ? fraction[1] : 1 - fraction[1])
-                    * ((corner >> 2 & 1) ? fraction[2] : 1 - fraction[2]);
-                const float *entry = &cube[size_t(((b * size + g) * size + r) * 4)];
-                for (int channel = 0; channel < 3; ++channel)
-                    out[channel] += share * entry[channel];
-            }
-            for (int channel = 0; channel < 3; ++channel)
-                pixel[channel] = uchar(std::lround(std::min(1.0f, std::max(0.0f, out[channel])) * alpha));
         }
-    });
+    }
+    return values;
 }
 }
 
@@ -104,22 +105,20 @@ std::vector<HueSaturationFilter::HueResponse> HueSaturationFilter::hueResponse(c
 
 std::vector<float> HueSaturationFilter::cube(const HueSaturationSettings &settings)
 {
-    const std::vector<HueResponse> response = hueResponse(settings);
-    std::vector<float> values(size_t(dimension * dimension * dimension * 4));
-    size_t index = 0;
-    const double step = dimension - 1;
-    for (int blue = 0; blue < dimension; ++blue) {
-        for (int green = 0; green < dimension; ++green) {
-            for (int red = 0; red < dimension; ++red) {
-                const Color color = adjust(red / step, green / step, blue / step, settings, response);
-                values[index] = float(color.red);
-                values[index + 1] = float(color.green);
-                values[index + 2] = float(color.blue);
-                values[index + 3] = 1;
-                index += 4;
-            }
+    CubeCache &cache = cubeCache();
+    {
+        const std::lock_guard<std::mutex> held(cache.lock);
+        for (const auto &[known, values] : cache.cubes) {
+            if (known == settings)
+                return values;
         }
     }
+    std::vector<float> values = built(settings);
+    const std::lock_guard<std::mutex> held(cache.lock);
+    std::erase_if(cache.cubes, [&](const auto &entry) { return entry.first == settings; });
+    cache.cubes.emplace_front(settings, values);
+    if (cache.cubes.size() > 8)
+        cache.cubes.pop_back();
     return values;
 }
 
@@ -144,13 +143,21 @@ HueSaturationFilter::Color HueSaturationFilter::adjust(double red, double green,
         hue = std::fmod(hue + sampled.shift, 360);
         if (hue < 0)
             hue += 360;
-        // Multiplied, so neutral grays stay neutral.
-        saturation = std::min(1.0, std::max(0.0, saturation * (1 + sampled.saturation / 100)));
+        saturation = adjustedSaturation(saturation, sampled.saturation);
     }
     // Toward white above zero, black below, reaching either at 100.
     const double amount = std::min(1.0, std::max(-1.0, lightnessAmount));
     lightness = amount >= 0 ? lightness + (1 - lightness) * amount : lightness * (1 + amount);
     return toRGB(hue, saturation, std::min(1.0, std::max(0.0, lightness)));
+}
+
+double HueSaturationFilter::adjustedSaturation(double saturation, double amount)
+{
+    const double share = std::min(1.0, std::max(-1.0, amount / 100));
+    // Multiplied both ways, so neutral grays stay neutral.
+    if (!(share > 0))
+        return std::max(0.0, saturation * (1 + share));
+    return share >= 1 ? (saturation > 0 ? 1 : 0) : std::min(1.0, saturation / (1 - share));
 }
 
 double HueSaturationFilter::shiftedHue(double hue, const HueSaturationSettings &settings)
@@ -166,23 +173,19 @@ double HueSaturationFilter::shiftedHue(double hue, const HueSaturationSettings &
 
 AdjustedPixels HueSaturationFilter::run(const HueSaturationJob &job)
 {
-    const int width = job.image.width(), height = job.image.height();
-    QImage result = BrushRaster::context(width, height, false);
-    {
-        QPainter painter(&result);
-        BrushRaster::draw(job.image, QRectF(0, 0, width, height), painter);
-    }
+    // Across the cores: it runs over the view each frame.
+    QImage result = BrushRaster::copy(job.image);
     std::vector<float> table;
-    std::vector<int> rows;
     try {
         table = cube(job.settings);
-        rows.resize(size_t(height));
     } catch (const std::bad_alloc &) {
         // Out of memory fails as a context would.
         throw ExportError(ExportError::Kind::render);
     }
-    std::iota(rows.begin(), rows.end(), 0);
-    applyCube(result.bits(), result.bytesPerLine(), width, table, rows);
+    // The lookup unpremultiplies around itself.
+    uchar *const pixels = result.bits();
+    BrushRaster::inBands(qsizetype(result.width()) * result.height(),
+                         [&](qsizetype start, qsizetype length) { cube_apply(pixels + start * 4, size_t(length), table.data(), dimension); });
     // Swift blends over the image drawn again: the same pixels.
     if (job.selection)
         result = PixelAdjust::blend(result, job.image, *job.selection, job.pixelToDocument, false);

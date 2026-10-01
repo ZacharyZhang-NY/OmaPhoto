@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QTemporaryDir>
 #include <QToolButton>
+#include <QToolBar>
 #include <QtTest>
 
 // The window: tabs, the toolbar, closing and quitting.
@@ -203,29 +204,27 @@ void ProjectWorkspaceViewTests::tabsShowTheirTitlesDotsAndState()
     late.session.setProjectPath(QString("/x/Late.comp"));
     workspace.select(workspace.tabs()[0]->id);
     QCOMPARE(titles(strip), (QStringList{"● Untitled", "Untitled 2", "Late"}));
-    // More tabs than fit: the front one scrolls into view.
+    // More tabs than fit: the rest gather under the pill.
     QVERIFY(QTest::qWaitForWindowExposed(&window));
-    for (int index = 0; index < 8; ++index)
+    for (int index = 0; index < 12; ++index)
         workspace.addTab(false).session.setProjectPath(QString("/x/Wide project number %1.comp").arg(index));
     const ProjectTabButton *last = strip.buttons().last();
     const auto wholeInView = [&](const ProjectTabButton *button) {
-        return strip.viewport()->rect().contains(QRect(button->mapTo(strip.viewport(), QPoint(0, 0)), button->size()));
+        return button->isVisible() && strip.rect().contains(button->geometry());
     };
-    // In view once laid out, as Swift posts its reveal.
     QVERIFY(last->tab->id == workspace.selectedID());
-    QTRY_VERIFY(wholeInView(last));
-    QVERIFY(strip.widget()->width() > strip.viewport()->width());
-    QVERIFY(last->findChild<QToolButton *>("selectTab")->width() >= 35 && strip.horizontalScrollBar()->maximum() > 0);
-    // Since 1.2.4 a growing title keeps the offset.
-    const int offset = strip.horizontalScrollBar()->value();
+    QVERIFY(wholeInView(last));
+    QVERIFY(strip.pill()->isVisible() && !strip.buttons().first()->isVisible());
+    // The strip ends before the zoom buttons.
+    const QWidget &fitButton = *window.findChild<QToolBar *>("toolbar")->widgetForAction(&action(window, "fitCanvas"));
+    QVERIFY(strip.mapTo(&window, QPoint(strip.width(), 0)).x() <= fitButton.mapTo(&window, QPoint()).x());
+    // A growing title keeps the front tab whole.
     workspace.tabs().back()->session.setProjectPath(QString("/x/") + QString(60, QLatin1Char('W')) + ".comp");
-    QCoreApplication::processEvents();
-    QCoreApplication::processEvents();
     QVERIFY(last->width() > 180);
-    QCOMPARE(strip.horizontalScrollBar()->value(), offset);
+    QVERIFY(wholeInView(last));
     workspace.select(workspace.tabs()[0]->id);
     const ProjectTabButton *head = strip.buttons().first();
-    QTRY_VERIFY(wholeInView(head));
+    QVERIFY(wholeInView(head));
 }
 
 void ProjectWorkspaceViewTests::tabButtonsSelectAndClose()

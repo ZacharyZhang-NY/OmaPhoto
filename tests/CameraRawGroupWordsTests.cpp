@@ -88,7 +88,7 @@ void CameraRawGroupWordsTests::everyViewCarriesSwiftsWords()
     curve.show();
     holds(*curve.controls, {"Parametric", "Point", "RGB", "Red", "Green", "Blue", "Parametric lifts tonal regions. Point places anchors on the curve.",
                             "RGB changes brightness. Red, green, and blue also shift the color.",
-                            "Drag a divider to change which tones the neighboring sliders affect.", "Targeted Adjustment", "Preset"});
+                            "Drag up or down to lift or lower those tones. Drag a divider along the bottom to change which tones each region covers.", "Targeted Adjustment", "Preset"});
     Group<CameraRawMixerControls> mixer;
     mixer.set([](CameraRawSettings &settings) { settings.mixer.points = {CameraRawPointColor{.hue = 30, .saturation = 1, .luminance = 0.5}}; });
     mixer.show();
@@ -228,7 +228,7 @@ void CameraRawGroupWordsTests::theCurveShowsItsLineItsSelectedPointAndRepaints()
     Group<CameraRawCurveControls> curve;
     curve.show();
     auto &graph = curve.child<QWidget>(QStringLiteral("cameraRawCurveGraph"));
-    // Lights at 100 lift their region's middle by 0.22.
+    // The drawn curve is the model's parametric curve.
     curve.set([](CameraRawSettings &settings) { settings.curve.lights = 100; });
     QImage drawn = graph.grab().toImage();
     const int w = drawn.width(), h = drawn.height();
@@ -237,7 +237,7 @@ void CameraRawGroupWordsTests::theCurveShowsItsLineItsSelectedPointAndRepaints()
     for (int y = 0; y < h; ++y)
         if (qGray(drawn.pixel(int(0.625 * w), y)) > qGray(drawn.pixel(int(0.625 * w), brightest)))
             brightest = y;
-    QVERIFY2(std::abs(brightest - (1 - 0.845) * h) < 3, qPrintable(QString::number(brightest)));
+    QVERIFY2(std::abs(brightest - (1 - curve.raw().curve.parametric(0.625)) * h) < 3, qPrintable(QString::number(brightest)));
     // A write repaints the graph without being asked.
     struct Paints : QObject {
         int count = 0;
@@ -253,10 +253,14 @@ void CameraRawGroupWordsTests::theCurveShowsItsLineItsSelectedPointAndRepaints()
     paints.count = 0;
     curve.set([](CameraRawSettings &settings) { settings.curve.darkSplit = 60; });
     QTRY_VERIFY(paints.count > 0);
-    // The selected point is the last inner one.
+    // No point is chosen until one is pressed.
     curve.arm([](CameraRawPanel &panel) { panel.curvePage = CameraRawCurvePage::point; });
     curve.set([](CameraRawSettings &settings) { settings.curve.rgb = {{0, 0}, {0.2, 0.3}, {0.6, 0.7}, {1, 1}}; });
-    QCOMPARE(curve.child<QLabel>(QStringLiteral("curveSelectedPoint")).text(), QString("In 153   Out 179"));
+    auto &readout = curve.child<QLabel>(QStringLiteral("curveSelectedPoint"));
+    QVERIFY(!readout.isVisible());
+    QTest::mouseClick(&graph, Qt::LeftButton, {}, QPoint(int(0.6 * graph.width()), int(0.3 * graph.height())));
+    QVERIFY(readout.isVisible());
+    QCOMPARE(readout.text(), QString("In 153   Out 179"));
 }
 
 void CameraRawGroupWordsTests::widgetsFollowTheModelAndGuardsHold()

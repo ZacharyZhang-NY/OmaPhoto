@@ -1,7 +1,7 @@
 #pragma once
 #include "Document/LayerAppearance.h"
 
-// Swift's SeparableBlend: channel-by-channel modes QPainter lacks.
+// Swift's SeparableBlend: channel-by-channel modes QPainter lacks or differs on.
 namespace SeparableBlend {
 // Blended by hand against a surface, Swift's `needsSurface`.
 bool needsSurface(LayerBlendMode mode);

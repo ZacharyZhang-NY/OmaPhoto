@@ -179,13 +179,13 @@ void DitherSheetTests::theControlsFollowTheStyle()
         dither.colors = DitherColors::twoColors;
     });
     QCOMPARE(shown.shown(), sorted(QStringList{"Style", "Pixel Size", "Density", "Contrast", "Colors", "Light on Dark", "Swatches"}));
-    // Style's menu: ten looks in four groups.
+    // Style's menu: eleven looks in four groups.
     QComboBox &style = shown.child<QComboBox>("ditherStyle");
     QStringList items;
     for (int index = 0; index < style.count(); ++index)
         items << (style.itemText(index).isEmpty() ? QStringLiteral("—") : style.itemText(index));
     QCOMPARE(items, (QStringList{"Atkinson (Classic Mac)", "Floyd–Steinberg", "—", "Bayer 2 × 2", "Bayer 4 × 4", "Bayer 8 × 8", "—", "Halftone Dots",
-                                 "Halftone Lines", "Halftone Diamonds", "—", "Mac Patterns", "ASCII"}));
+                                 "Halftone Lines", "Halftone Diamonds", "—", "Mac Patterns", "ASCII", "Scanlines (CRT)"}));
     QCOMPARE(style.currentText(), QString("Mac Patterns"));
     // Its quick preview never shows the busy line.
     QVERIFY(!shown.child<QProgressBar>("filterSpinner").isVisibleTo(shown.sheet.get()));

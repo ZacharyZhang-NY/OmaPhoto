@@ -80,6 +80,8 @@ std::vector<PSDRecord> assemble(const std::vector<RawLayer> &raw, QSizeF canvas,
             }
         }
         record.mask = layer.maskFromRender ? std::nullopt : layer.maskImage;
+        record.maskBounds = QRectF(layer.maskLeft, layer.maskTop, layer.maskRight - layer.maskLeft, layer.maskBottom - layer.maskTop);
+        record.maskDefault = layer.maskDefault;
         record.maskEnabled = !layer.maskDisabled;
         record.maskLinked = layer.maskLinked;
         if (!isGroup)

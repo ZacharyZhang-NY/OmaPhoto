@@ -26,11 +26,8 @@ ProjectWorkspaceView::ProjectWorkspaceView(ProjectWorkspace &workspace, QWidget 
     auto *newButton = new NewCanvasButton(m_workspace, m_toolbar);
     newButton->setDefaultAction(m_newCanvas);
     m_toolbar->addWidget(newButton);
-    m_toolbar->addWidget(m_tabs);
     // The strip takes the toolbar's free width; zooms stay right.
-    auto *spacer = new QWidget(m_toolbar);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_toolbar->addWidget(spacer);
+    m_toolbar->addWidget(m_tabs);
     m_fit = action(m_toolbar, QStringLiteral("Fit"), QStringLiteral("Fit canvas in window (Ctrl+0)"), QStringLiteral("fitCanvas"));
     m_actualPixels = action(m_toolbar, QStringLiteral("100%"), QStringLiteral("Actual pixels (Ctrl+1)"), QStringLiteral("actualPixels"));
     m_zoomIn = action(m_toolbar, QStringLiteral("+"), QStringLiteral("Zoom in (Ctrl++)"), QStringLiteral("zoomIn"));

@@ -208,8 +208,9 @@ void LiveMaskRenderer::adjust(QUuid id, QPainter &context, const QImage &clip)
         qCWarning(lcRendering) << "an adjustment passes its pixel budget:" << device->size();
         return;
     }
-    // The document the device shows, where Grain's pattern sits.
-    const QRectF region = context.deviceTransform().inverted().mapRect(QRectF(device->rect()));
+    // What the device shows; Grain and Noise keep the document.
+    const QRectF shown = context.deviceTransform().inverted().mapRect(QRectF(device->rect()));
+    const QRectF region = adjustmentRegion ? adjustmentRegion(shown) : shown;
     try {
         // The kernels' byte order, one image pixel a device pixel.
         QImage original = device->convertToFormat(QImage::Format_RGBA8888_Premultiplied).copy();
@@ -217,7 +218,7 @@ void LiveMaskRenderer::adjust(QUuid id, QPainter &context, const QImage &clip)
             throw ExportError(ExportError::Kind::render);
         original.setDevicePixelRatio(1);
         // Device pixels a document pixel, where Swift's surface counts points.
-        QImage adjusted = adjustment(id).value().apply(original, region, adjustmentScale * device->width() / region.width());
+        QImage adjusted = adjustment(id).value().apply(original, region, adjustmentScale * device->width() / shown.width());
         const auto found = m_modes.find(id);
         const LayerBlendMode mode = found != m_modes.end() ? found->second : LayerBlendMode::normal;
         if (mode != LayerBlendMode::normal)

@@ -1,5 +1,6 @@
 #include "Rendering/SeparableBlend.h"
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace {
@@ -22,6 +23,7 @@ float dodge(float backdrop, float source)
 bool SeparableBlend::needsSurface(LayerBlendMode mode)
 {
     switch (mode) {
+    case LayerBlendMode::softLight:
     case LayerBlendMode::linearBurn:
     case LayerBlendMode::linearDodge:
     case LayerBlendMode::vividLight:
@@ -39,6 +41,10 @@ bool SeparableBlend::needsSurface(LayerBlendMode mode)
 float SeparableBlend::channel(LayerBlendMode mode, float backdrop, float source)
 {
     switch (mode) {
+    case LayerBlendMode::softLight:
+        // Photoshop's, as Core Image's: the PDF's strays 17 levels.
+        return source <= 0.5f ? 2 * backdrop * source + backdrop * backdrop * (1 - 2 * source)
+                              : 2 * backdrop * (1 - source) + std::sqrt(backdrop) * (2 * source - 1);
     case LayerBlendMode::linearBurn:
         return std::max(0.0f, backdrop + source - 1);
     case LayerBlendMode::linearDodge:

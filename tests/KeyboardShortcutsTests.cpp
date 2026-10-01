@@ -92,8 +92,8 @@ void KeyboardShortcutsTests::chordsReadKeysAsSwiftDoes()
 void KeyboardShortcutsTests::theListIsSwiftsWithoutHide()
 {
     const std::vector<ShortcutDefinition> &all = ShortcutDefinition::all();
-    // Swift's 112 since 1.1.7, less Hide Compositor.
-    QCOMPARE(int(all.size()), 111);
+    // Swift's 113 with Ungroup Layers, less Hide Compositor.
+    QCOMPARE(int(all.size()), 112);
     QSet<QString> ids;
     for (const ShortcutDefinition &definition : all)
         ids.insert(definition.id());

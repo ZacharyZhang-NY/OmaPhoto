@@ -28,9 +28,25 @@ private:
     void update(const std::function<void(CameraRawSettings &)> &change);
     void store(const std::vector<CurvePoint> &points);
     void panel(const std::function<void(CameraRawPanel &)> &change);
+    // Swift's Drag: a point, divider, or region.
+    struct Drag {
+        enum class Kind { point, divider, region } kind;
+        size_t index = 0;
+        double CameraRawCurveSettings::*key = nullptr;
+        double start = 0;
+        QPointF from;
+    };
+    std::optional<Drag> parametricDrag(QPointF at, QSizeF size) const;
+    std::optional<Drag> pointDrag(QPointF at, QSizeF size);
+    void beginDrag(QPointF at, QSizeF size);
+    void continueDrag(QPointF at, QSizeF size);
+    void removePoint(QPointF at, QSizeF size);
     friend class CameraRawCurveGraph;
 
     EditorSession &m_session;
+    std::optional<Drag> m_drag;
+    std::optional<size_t> m_selectedPoint;
+    CameraRawPointChannel m_shownChannel = CameraRawPointChannel::rgb;
     QButtonGroup *m_page;
     QWidget *m_channelBox;
     QButtonGroup *m_channel;

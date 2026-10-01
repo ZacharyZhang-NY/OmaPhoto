@@ -121,19 +121,6 @@ double ProjectLayerRecord::effectiveOpacity(const std::map<QUuid, ProjectLayerRe
     });
 }
 
-QHash<QUuid, double> CanvasDocument::effectiveOpacities() const
-{
-    std::map<QUuid, ImageLayer> byID;
-    for (const ImageLayer &layer : layers) {
-        if (!byID.emplace(layer.id, layer).second)
-            throw std::logic_error("two layers share an id");
-    }
-    QHash<QUuid, double> result;
-    for (const ImageLayer &layer : layers)
-        result.insert(layer.id, layer.effectiveOpacity(byID));
-    return result;
-}
-
 ProjectLayerRecord ImageLayer::hierarchyRecord() const
 {
     const QString file = id.toString(QUuid::WithoutBraces).toUpper();
@@ -157,40 +144,6 @@ ProjectLayerRecord ImageLayer::hierarchyRecord() const
             .shape = live ? std::optional(live->style) : std::nullopt,
             .effects = effects,
             .text = typed ? std::optional(typed->style) : std::nullopt};
-}
-
-std::vector<LayerHierarchy::Entry> CanvasDocument::hierarchyEntries() const
-{
-    std::vector<ProjectLayerRecord> records;
-    for (const ImageLayer &layer : layers)
-        records.push_back(layer.hierarchyRecord());
-    return LayerHierarchy::entries(records);
-}
-
-QSet<QUuid> CanvasDocument::effectiveVisibleIDs() const
-{
-    QSet<QUuid> result;
-    for (const LayerHierarchy::Entry &entry : hierarchyEntries()) {
-        if (entry.visible)
-            result.insert(entry.layer.id);
-    }
-    return result;
-}
-
-std::vector<ImageLayer> CanvasDocument::renderLayers() const
-{
-    QHash<QUuid, const ImageLayer *> byID;
-    for (const ImageLayer &layer : layers) {
-        if (byID.contains(layer.id))
-            throw std::logic_error("two layers share an id");
-        byID.insert(layer.id, &layer);
-    }
-    std::vector<ImageLayer> result;
-    for (const LayerHierarchy::Entry &entry : hierarchyEntries()) {
-        if (entry.visible && entry.layer.isGroup != true)
-            result.push_back(*byID.value(entry.layer.id));
-    }
-    return result;
 }
 
 void EditorSession::selectLayers(const QSet<QUuid> &ids, std::optional<QUuid> primary)
@@ -264,10 +217,10 @@ void EditorSession::groupSelectedLayers()
     }
     std::vector<QUuid> ordered;
     std::vector<Chain> chains;
-    for (const LayerHierarchy::Entry &entry : m_document->hierarchyEntries()) {
-        if (rootIDs.contains(entry.layer.id)) {
-            ordered.push_back(entry.layer.id);
-            chains.push_back(ancestors(entry.layer.id));
+    for (const QUuid id : m_document->hierarchy().order) {
+        if (rootIDs.contains(id)) {
+            ordered.push_back(id);
+            chains.push_back(ancestors(id));
         }
     }
     // The nearest folder they all share; the root when none.
@@ -314,6 +267,44 @@ void EditorSession::groupSelectedLayers()
     setActiveLayerID(group.id);
     if (parent)
         m_collapsedGroupIDs.remove(*parent);
+    endEdit();
+}
+
+bool EditorSession::canUngroupLayers() const
+{
+    const std::optional<ImageLayer> active = activeLayer();
+    return canEditLayers() && active && active->isGroup;
+}
+
+// The folder's children take its place, in order.
+void EditorSession::ungroupLayers()
+{
+    if (!canUngroupLayers())
+        return;
+    const ImageLayer group = activeLayer().value();
+    std::vector<ImageLayer> children;
+    for (const ImageLayer &layer : m_document->layers) {
+        if (layer.parentID == group.id) {
+            children.push_back(layer);
+            children.back().parentID = group.parentID;
+        }
+    }
+    std::vector<ImageLayer> layers;
+    QSet<QUuid> childIDs;
+    for (const ImageLayer &child : children)
+        childIDs.insert(child.id);
+    for (const ImageLayer &layer : m_document->layers) {
+        if (layer.id == group.id)
+            layers.insert(layers.end(), children.begin(), children.end());
+        else if (!childIDs.contains(layer.id))
+            layers.push_back(layer);
+    }
+    releaseDetachedClipping(layers);
+    finishOpacityEdit();
+    beginEdit(QStringLiteral("Ungroup Layers"));
+    m_document->layers = layers;
+    selectLayers(childIDs, children.empty() ? std::nullopt : std::optional(children.front().id));
+    m_collapsedGroupIDs.remove(group.id);
     endEdit();
 }
 

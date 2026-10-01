@@ -94,14 +94,20 @@ void CameraRawCurveMixerTests::theParametricPageMovesRegionsAndDividers()
         QTest::mouseDClick(&slider, Qt::LeftButton, {}, knob(slider));
         QCOMPARE(group.raw().curve.*member, 0.0);
     }
-    // A drag moves the nearest divider, within 2 and 98.
+    // Along the bottom: the nearest divider, kept ordered.
     auto &graph = group.child<QWidget>(QStringLiteral("cameraRawCurveGraph"));
-    press(graph, QPoint(int(graph.width() * 0.3), 75));
-    drag(graph, QPoint(int(graph.width() * 0.35), 75));
+    const int h = graph.height();
+    press(graph, QPoint(int(graph.width() * 0.3), h - 5));
+    drag(graph, QPoint(int(graph.width() * 0.35), h - 5));
     QVERIFY(std::abs(group.raw().curve.shadowSplit - 35) < 1 && group.raw().curve.darkSplit == 50);
     drag(graph, QPoint(graph.width() + 40, 75));
-    QVERIFY(group.raw().curve.lightSplit == 98 || group.raw().curve.shadowSplit == 98 || group.raw().curve.darkSplit == 98);
+    QCOMPARE(group.raw().curve.shadowSplit, 48.0);
     QTest::mouseRelease(&graph, Qt::LeftButton, {}, QPoint(graph.width() + 40, 75));
+    // Above it a drag lifts the region under the press.
+    press(graph, QPoint(int(graph.width() * 0.3), 75));
+    drag(graph, QPoint(int(graph.width() * 0.9), 75 - h / 4));
+    QCOMPARE(group.raw().curve.shadows, std::round(double(h / 4) / h * 200));
+    QTest::mouseRelease(&graph, Qt::LeftButton, {}, QPoint(int(graph.width() * 0.9), 75 - h / 4));
     // A double click here leaves the point curve's points.
     group.set([](CameraRawSettings &settings) { settings.curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
     QTest::mouseDClick(&graph, Qt::LeftButton, {}, QPoint(graph.width() / 2, graph.height() / 2));

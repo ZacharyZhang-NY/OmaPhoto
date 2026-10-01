@@ -15,6 +15,12 @@ public:
     std::optional<QImage> maskDistortPreview(const ImageLayer &layer) const;
     // The selection made a mask; without one, a solid mask.
     void addMask(bool revealing = true);
+    // The layer whose mask the canvas shows alone, if any.
+    std::optional<ImageLayer> maskAloneLayer() const;
+    // Alt-click on a mask thumbnail: alone, or the composite again.
+    void toggleMaskAlone(QUuid id);
 
 private:
+    // Swift's didSet: the pixels targeted end the mask view.
+    void setIsMaskSelected(bool value);
     void commitMaskTransform();

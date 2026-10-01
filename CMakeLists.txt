@@ -44,7 +44,9 @@ add_library(compositor_core STATIC
     src/Document/AdjustmentEditing.cpp
     src/Document/LayerAppearance.cpp
     src/Document/LayerGroups.cpp
+    src/Document/LayerGroups+Order.cpp
     src/Document/LayerMask.cpp
+    src/Document/LayerMask+Alone.cpp
     src/Document/LayerTransform.cpp
     src/Document/LiveLayerMask.cpp
     src/Document/PixelAdjust.cpp
@@ -136,6 +138,7 @@ add_library(compositor_core STATIC
     src/UI/TransformInspector.cpp
     src/UI/EffectsSheet.cpp
     src/UI/CameraRawColorControls.cpp
+    src/UI/CameraRawColorControls+Curve.cpp
     src/UI/CameraRawColorControls+Grading.cpp
     src/UI/CameraRawColorControls+Mixer.cpp
     src/UI/CameraRawControls.cpp
@@ -157,6 +160,8 @@ add_library(compositor_core STATIC
     src/UI/RawDevelopSheet.cpp
     src/UI/OmarchyTheme.cpp
     src/UI/ProjectTabs.cpp
+    src/UI/ProjectTabs+Strip.cpp
+    src/UI/ProjectTabLayout.cpp
     src/UI/ProjectWorkspaceView.cpp
     src/UI/ToolHeaderStyle.cpp
     src/UI/ToolIcons.cpp
@@ -203,6 +208,7 @@ add_library(compositor_core STATIC
     src/Rendering/EditorCanvas+Gradient.cpp
     src/Rendering/EditorCanvas+Cursors.cpp
     src/Rendering/BrushCursorOverlay.cpp
+    src/Rendering/EditorCanvas+Masks.cpp
     src/Rendering/EditorCanvas+Navigation.cpp
     src/Rendering/EditorCanvas+Picking.cpp
     src/Rendering/EditorCanvas+Selection.cpp

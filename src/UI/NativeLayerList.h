@@ -43,8 +43,8 @@ public:
     LayerThumbnailButton(NativeLayerList &list, bool maskTarget, QWidget *parent);
     QUuid layerID;
     const bool isMaskTarget;
-    // An accent ring while the target is selected.
-    void setTargeted(bool targeted);
+    // An accent ring while targeted; white while shown alone.
+    void setTargeted(bool targeted, bool alone = false);
     bool isTargeted() const { return m_targeted; }
 
     ~LayerThumbnailButton() override;
@@ -63,6 +63,7 @@ private:
 
     NativeLayerList &m_list;
     bool m_targeted = false;
+    bool m_alone = false;
     // Alt on a mask: chosen on release, or dragged.
     std::optional<QPoint> m_altMaskPress;
 };
@@ -240,6 +241,8 @@ public:
     // The cursor Alt asks for here: clip, duplicate, arrow.
     QCursor cursorFor(QPoint listPoint, Qt::KeyboardModifiers modifiers) const;
     static QCursor clippingCursor(bool releasing, double ratio);
+    // Alt over a mask: the duplicate pointer, an eye behind.
+    static QCursor showMaskCursor(double ratio);
 
 protected:
     bool event(QEvent *event) override;

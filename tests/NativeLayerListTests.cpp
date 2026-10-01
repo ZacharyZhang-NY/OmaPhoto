@@ -469,7 +469,7 @@ void NativeLayerListTests::ctrlClicksOnThumbnailsLoadSelections()
     Shown shown(session);
     LayerCell &row = shown.row(0);
     QCOMPARE(row.thumbnail().toolTip(), QString("Select image pixels"));
-    QCOMPARE(row.maskThumbnail().toolTip(), QString("Select layer mask; Shift-click to enable/disable; Ctrl-click to select its black areas (Ctrl-Shift adds, Ctrl-Alt subtracts)"));
+    QCOMPARE(row.maskThumbnail().toolTip(), QString("Select layer mask; Alt-click to view it alone; Shift-click to enable/disable; Ctrl-click to select its black areas (Ctrl-Shift adds, Ctrl-Alt subtracts)"));
     // Ctrl on the picture: its opaque pixels, the row untouched.
     QTest::mouseClick(&row.thumbnail(), Qt::LeftButton, Qt::ControlModifier);
     QCOMPARE(session.history.undoName(), QString("Load Layer Selection"));

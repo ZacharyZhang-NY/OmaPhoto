@@ -262,7 +262,7 @@ void EditorSession::selectLayerTarget(QUuid id, bool mask)
     resolveGradient();
     selectLayer(id);
     const std::optional<ImageLayer> active = activeLayer();
-    m_isMaskSelected = mask && active && active->mask;
+    setIsMaskSelected(mask && active && active->mask);
     notify();
 }
 
@@ -286,14 +286,15 @@ void EditorSession::addMask(bool revealing)
         // The selection's coverage, soft where it is feathered.
         QImage image = PixelAdjust::coverage(current->clip(m_document->size()), width, height,
                                              BrushRaster::pixelToDocument(active->transform, width, height));
-        if (revealing)
+        // Revealing, white inside; hiding, black inside.
+        if (!revealing)
             image.invertPixels();
         const LayerMask mask(LayerMask::assetFrom(image));
         finishOpacityEdit();
-        beginEdit(QStringLiteral("Add Mask from Selection"));
+        beginEdit(revealing ? QStringLiteral("Reveal Selection") : QStringLiteral("Hide Selection"));
         m_document->layers[size_t(index)].mask = mask;
         m_document->selection = std::nullopt;
-        m_isMaskSelected = true;
+        setIsMaskSelected(true);
         endEdit();
     } catch (const std::runtime_error &error) {
         qCWarning(lcApp).noquote() << "cannot make a mask from the selection:" << error.what();
@@ -312,7 +313,7 @@ void EditorSession::addLayerMask(bool revealing)
         if (layer.id == active->id)
             layer.mask = LayerMask::solid(revealing);
     }
-    m_isMaskSelected = true;
+    setIsMaskSelected(true);
     endEdit();
 }
 
@@ -341,7 +342,7 @@ void EditorSession::deleteLayerMask()
         if (layer.id == active->id)
             layer.mask = std::nullopt;
     }
-    m_isMaskSelected = false;
+    setIsMaskSelected(false);
     endEdit();
 }
 
@@ -371,7 +372,7 @@ void EditorSession::copyMask(QUuid source, QUuid target)
     beginEdit(find(target)->mask ? QStringLiteral("Replace Layer Mask") : QStringLiteral("Copy Layer Mask"));
     find(target)->mask = mask;
     selectLayer(target);
-    m_isMaskSelected = true;
+    setIsMaskSelected(true);
     endEdit();
 }
 
@@ -392,7 +393,7 @@ std::optional<LayerTransform> EditorSession::displayedMaskPlacement(const ImageL
     if (!layer.mask)
         return std::nullopt;
     // Previewed on a grown layer, the mask keeps its bounds.
-    if (m_filterEdit && m_filterEdit->grownTransform && m_filterEdit->previewImage(layer.id))
+    if (m_filterEdit && m_filterEdit->preparedTransform && m_filterEdit->previewImage(layer.id))
         return layer.mask->placement.value_or(layer.transform);
     if (m_transformEdit && m_transformEdit->group) {
         const TransformGroup &group = *m_transformEdit->group;

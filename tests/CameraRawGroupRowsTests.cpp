@@ -83,7 +83,7 @@ void CameraRawGroupRowsTests::curveRows()
         checkRow(*group.controls, group.session, row);
     group.arm([](CameraRawPanel &panel) { panel.curvePage = CameraRawCurvePage::point; });
     checkRow(*group.controls, group.session,
-             {"refineSaturation", "Refine Saturation", "How much the RGB curve also changes color strength. Zero keeps it to brightness.", -100, 100, 0, false,
+             {"refineSaturation", "Refine Saturation", "How much the curve also changes color strength. Zero matches Photoshop; lower keeps it to brightness, higher adds more color.", -100, 100, 0, false,
               48, 88, true, false, curve(&CameraRawCurveSettings::refineSaturation)});
 }
 
