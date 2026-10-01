@@ -220,14 +220,40 @@ bool ProjectWorkspace::finishTextEditing()
     return true;
 }
 
+void ProjectWorkspace::settlePendingEdits(std::function<void()> done)
+{
+    // Canvas edits are applied; dialogs cancelled, as their Cancel.
+    const std::shared_ptr<ProjectTab> settled = tab(current().id);
+    settled->session.commitGradient([self = QPointer<ProjectWorkspace>(this), settled, done] {
+        settled->session.finishPixelMove([self, settled, done] {
+            EditorSession &session = settled->session;
+            session.cancelFilter();
+            session.cancelHueSaturation();
+            session.cancelLevels();
+            session.cancelColorRange();
+            session.setSelectionAmountOperation(std::nullopt);
+            session.closeColorPicker(false);
+            if (self)
+                done();
+        });
+    });
+}
+
 void ProjectWorkspace::confirmQuit(std::function<void(bool)> done)
 {
-    if (!finishTextEditing() || !canSwitch()) {
+    if (m_isManaging || !finishTextEditing()) {
         finish(done, false);
         return;
     }
-    setManaging(true);
-    askNext(quitOrder(), 0, std::move(done));
+    settlePendingEdits([this, done] {
+        if (!canSwitch()) {
+            qCWarning(lcApp) << "Quit refused: the project is still busy";
+            finish(done, false);
+            return;
+        }
+        setManaging(true);
+        askNext(quitOrder(), 0, done);
+    });
 }
 
 void ProjectWorkspace::askNext(std::vector<std::shared_ptr<ProjectTab>> order, size_t index, std::function<void(bool)> done)

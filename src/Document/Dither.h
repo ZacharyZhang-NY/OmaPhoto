@@ -6,10 +6,10 @@
 #include <vector>
 
 // Filter › Dither's looks, in the panel's order and DitherPixels.h's.
-enum class DitherStyle { atkinson, floydSteinberg, bayer2, bayer4, bayer8, dots, lines, diamonds, patterns, ascii };
-inline constexpr std::array allDitherStyles{DitherStyle::atkinson, DitherStyle::floydSteinberg, DitherStyle::bayer2, DitherStyle::bayer4,
-                                            DitherStyle::bayer8,   DitherStyle::dots,           DitherStyle::lines,  DitherStyle::diamonds,
-                                            DitherStyle::patterns, DitherStyle::ascii};
+enum class DitherStyle { atkinson, floydSteinberg, bayer2, bayer4, bayer8, dots, lines, diamonds, patterns, ascii, scanlines };
+inline constexpr std::array allDitherStyles{DitherStyle::atkinson, DitherStyle::floydSteinberg, DitherStyle::bayer2,   DitherStyle::bayer4,
+                                            DitherStyle::bayer8,   DitherStyle::dots,           DitherStyle::lines,    DitherStyle::diamonds,
+                                            DitherStyle::patterns, DitherStyle::ascii,          DitherStyle::scanlines};
 QString rawValue(DitherStyle style);
 // Swift's groups: diffusion, ordered, halftone, marks.
 int ditherGroup(DitherStyle style);
@@ -19,6 +19,8 @@ bool diffuses(DitherStyle style);
 bool hasTones(DitherStyle style);
 bool isHalftone(DitherStyle style);
 bool drawsMarks(DitherStyle style);
+// ASCII and Scanlines draw at full resolution, not chunky.
+bool usesPixelSize(DitherStyle style);
 
 // A chunky pixel: a square, or a dot on dark.
 enum class DitherPixelShape { square, dot };
@@ -35,6 +37,8 @@ struct DitherSettings {
     static constexpr double cellSizeLow = 4, cellSizeHigh = 64;
     static constexpr double textSizeLow = 6, textSizeHigh = 64;
     static constexpr double levelsLow = 2, levelsHigh = 8;
+    static constexpr double lineSpacingLow = 2, lineSpacingHigh = 32;
+    static constexpr double wobbleLow = 0, wobbleHigh = 64;
     static QString defaultCharacters() { return QStringLiteral(" .:-=+*#%@"); }
     DitherStyle style = DitherStyle::atkinson;
     // Each dithered pixel covers this many layer pixels a side.
@@ -44,6 +48,12 @@ struct DitherSettings {
     double cellSize = 8;
     // ASCII's line height in layer pixels; letters about 0.6 wide.
     double textSize = 14;
+    // Scanlines: the lines' distance apart, in layer pixels.
+    double lineSpacing = 4;
+    // Glow and dots 0–100%; wobble sideways in pixels.
+    double glow = 35;
+    double dots = 0;
+    double wobble = 0;
     // The halftone screen's angle, in degrees.
     double angle = 45;
     // Tones per channel; 2 is 1-bit.
@@ -76,4 +86,5 @@ struct DitherSettings {
 
 private:
     QImage dither(const QImage &image) const;
+    QImage glowing(const QImage &image) const;
 };
