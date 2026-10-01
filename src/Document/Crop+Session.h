@@ -2,6 +2,9 @@
 public:
     SnapGuides transformSnapTargets(const QSet<QUuid> &moving) const;
     LayerTransform snappedMove(const LayerTransform &draft, const QSet<QUuid> &moving, double tolerance);
+    // A resize handle's pointer, nudged so moved edges snap.
+    QPointF snappedResizePoint(QPointF point, const TransformDrag &drag, bool proportional, const QSet<QUuid> &moving,
+                               double tolerance, const std::function<LayerTransform(QPointF)> &update);
     SnapGuides cropSnapTargets() const;
     // A drawn corner, each axis to a target within reach.
     QPointF snappedPoint(QPointF point, double tolerance);

@@ -71,6 +71,8 @@ struct TransformEdit {
     std::optional<Corners> corners;
     // Ctrl+T on selected pixels: they float, then merge back.
     std::shared_ptr<const FloatingTransform> floating;
+    // The Move bar's fields: applied once they are done.
+    bool fromFields = false;
 };
 
 // Where a move has just snapped: guides while it lasts.

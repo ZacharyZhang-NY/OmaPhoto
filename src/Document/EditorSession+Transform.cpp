@@ -59,7 +59,7 @@ std::optional<LayerTransform> EditorSession::groupTransformBox() const
     return LayerTransform{.origin = low, .size = {std::max(1.0, high.x() - low.x()), std::max(1.0, high.y() - low.y())}};
 }
 
-void EditorSession::beginTransform(bool persistent)
+void EditorSession::beginTransform(bool persistent, bool fromFields)
 {
     cancelCrop();
     const std::optional<ImageLayer> layer = activeLayer();
@@ -73,11 +73,11 @@ void EditorSession::beginTransform(bool persistent)
         QHash<QUuid, LayerTransform> originals;
         for (const ImageLayer &member : groupTransformMembers())
             originals.insert(member.id, member.transform);
-        m_transformEdit = TransformEdit{layer->id, *box, TransformGroup{*box, originals}, false, persistent, std::nullopt, nullptr};
+        m_transformEdit = TransformEdit{layer->id, *box, TransformGroup{*box, originals}, false, persistent, std::nullopt, nullptr, fromFields};
     } else {
         // Linked, layer and mask move together as the layer.
         const bool maskAlone = transformTargetsMask();
-        m_transformEdit = TransformEdit{layer->id, maskAlone ? layer->maskTransform() : layer->transform, std::nullopt, maskAlone, persistent, std::nullopt, nullptr};
+        m_transformEdit = TransformEdit{layer->id, maskAlone ? layer->maskTransform() : layer->transform, std::nullopt, maskAlone, persistent, std::nullopt, nullptr, fromFields};
     }
     notify();
 }

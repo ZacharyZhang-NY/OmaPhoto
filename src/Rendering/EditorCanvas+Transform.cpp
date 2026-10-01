@@ -137,7 +137,7 @@ QCursor CanvasView::rotationCursor(double ratio)
     return QCursor(pixmap, 12, 12);
 }
 
-// The layer a press off the handles drags; Ctrl picks.
+// What a press off the handles drags; Ctrl flips picking.
 std::optional<CanvasView::PressTarget> CanvasView::transformPressLayer(QPointF pixel, Qt::KeyboardModifiers modifiers) const
 {
     const std::optional<CanvasDocument> &document = m_session.document();
@@ -154,21 +154,23 @@ std::optional<CanvasView::PressTarget> CanvasView::transformPressLayer(QPointF p
         active = std::nullopt;
     const bool picks = !m_session.transformEdit();
     const bool control = modifiers.testFlag(Qt::ControlModifier);
-    if (control && picks && underPointer)
+    const bool autoSelect = m_session.transformAutoSelect() != control;
+    // Ctrl+Shift adds the layer under the pointer either way.
+    if (control && (modifiers.testFlag(Qt::ShiftModifier) || !m_session.transformAutoSelect()) && picks && underPointer)
         return PressTarget{*underPointer, true};
     // A group's box drags them all; outside, unless auto-select picks.
     if (m_session.transformsAsGroup() && m_session.activeLayerID()) {
         const std::optional<LayerTransform> box = m_session.transformEdit() ? std::optional(m_session.transformEdit()->draft) : m_session.groupTransformBox();
-        if ((box && box->contains(pixel)) || !(picks && m_session.transformAutoSelect()) || !underPointer)
+        if ((box && box->contains(pixel)) || !(picks && autoSelect) || !underPointer)
             return PressTarget{*m_session.activeLayerID(), false};
     }
     if (active && m_session.editedTransform(*active).contains(pixel)) {
         // Auto Select prefers a layer above, as over a background.
-        if (picks && m_session.transformAutoSelect() && underPointer && above(rendered, *underPointer, active->id))
+        if (picks && autoSelect && underPointer && above(rendered, *underPointer, active->id))
             return PressTarget{*underPointer, true};
         return PressTarget{active->id, false};
     }
-    if (picks && (m_session.transformAutoSelect() || control) && underPointer)
+    if (picks && autoSelect && underPointer)
         return PressTarget{*underPointer, true};
     if (active)
         return PressTarget{active->id, false};
@@ -230,6 +232,9 @@ void CanvasView::beginTransformDrag(QPointF point, Qt::KeyboardModifiers modifie
         mode = TransformDrag::Mode{TransformDrag::Kind::move};
     }
     m_duplicatesTransformOnDrag = mode->kind == TransformDrag::Kind::move && modifiers.testFlag(Qt::AltModifier);
+    // A value the bar's fields were changing applies first.
+    if (m_session.transformEdit() && m_session.transformEdit()->fromFields)
+        m_session.commitTransform();
     if (!m_session.transformEdit())
         m_session.beginTransform(false);
     if (!m_session.transformEdit())
@@ -265,21 +270,28 @@ void CanvasView::dragTransform(QPointF point, Qt::KeyboardModifiers modifiers)
         synchronizeDisplay();
         return;
     }
-    // Drags land on whole pixels and degrees; typing stays exact.
-    LayerTransform draft = m_transformDrag->updated(pixel, m_session.locksTransformRatio(), modifiers.testFlag(Qt::ShiftModifier),
-                                                    modifiers.testFlag(Qt::AltModifier)).rounded();
+    const bool shift = modifiers.testFlag(Qt::ShiftModifier), option = modifiers.testFlag(Qt::AltModifier);
     const std::optional<TransformEdit> &edit = m_session.transformEdit();
-    // A move snaps to canvas and layers; Ctrl frees it.
-    if (m_transformDrag->mode.kind == TransformDrag::Kind::move && !modifiers.testFlag(Qt::ControlModifier) && edit) {
-        QSet<QUuid> moving;
-        if (edit->group) {
-            for (auto original = edit->group->originals.constBegin(); original != edit->group->originals.constEnd(); ++original)
-                moving.insert(original.key());
-        } else {
-            moving.insert(edit->layerID);
-        }
-        draft = m_session.snappedMove(draft, moving, TransformSnap::distance / std::max(m_session.viewport.pointsPerPixel(), 0.0001));
+    QSet<QUuid> moving;
+    if (edit && edit->group) {
+        for (auto original = edit->group->originals.constBegin(); original != edit->group->originals.constEnd(); ++original)
+            moving.insert(original.key());
+    } else if (edit) {
+        moving.insert(edit->layerID);
     }
+    const double tolerance = TransformSnap::distance / std::max(m_session.viewport.pointsPerPixel(), 0.0001);
+    const TransformDrag &drag = *m_transformDrag;
+    // Moves and resized edges snap, not turns; Ctrl frees both.
+    QPointF target = pixel;
+    if (drag.mode.kind == TransformDrag::Kind::resize && !modifiers.testFlag(Qt::ControlModifier)) {
+        target = m_session.snappedResizePoint(pixel, drag, m_session.locksTransformRatio() != shift, moving, tolerance, [&](QPointF to) {
+            return drag.updated(to, m_session.locksTransformRatio(), shift, option);
+        });
+    }
+    // Drags land on whole pixels and degrees; typing stays exact.
+    LayerTransform draft = drag.updated(target, m_session.locksTransformRatio(), shift, option).rounded();
+    if (drag.mode.kind == TransformDrag::Kind::move && !modifiers.testFlag(Qt::ControlModifier) && edit)
+        draft = m_session.snappedMove(draft, moving, tolerance);
     m_session.previewTransform(draft);
     synchronizeDisplay();
 }

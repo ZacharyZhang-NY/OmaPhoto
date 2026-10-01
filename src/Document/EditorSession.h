@@ -112,7 +112,7 @@ public:
     bool transformsAsGroup() const;
     std::vector<ImageLayer> groupTransformMembers() const;
     std::optional<LayerTransform> groupTransformBox() const;
-    void beginTransform(bool persistent = true);
+    void beginTransform(bool persistent = true, bool fromFields = false);
     // Alt-drag: the selection's copies move, one step.
     void beginDuplicateTransform();
     // The Move tool's settings (TransformInspector, Ctrl+H).

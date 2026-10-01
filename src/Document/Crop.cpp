@@ -168,6 +168,58 @@ LayerTransform EditorSession::snappedMove(const LayerTransform &draft, const QSe
     return snapped;
 }
 
+// A resize handle's point, nudged onto targets; upright only.
+QPointF EditorSession::snappedResizePoint(QPointF point, const TransformDrag &drag, bool proportional, const QSet<QUuid> &moving,
+                                          double tolerance, const std::function<LayerTransform(QPointF)> &update)
+{
+    if (!m_snappingEnabled || drag.mode.kind != TransformDrag::Kind::resize || drag.original.radians() != 0) {
+        snapGuides = {};
+        return point;
+    }
+    const QPointF handle = LayerTransform::handles[size_t(drag.mode.index)];
+    const SnapGuides targets = transformSnapTargets(moving);
+    // The dragged handle's place tells its edge apart.
+    const QPointF at = drag.original.point(handle) + point - drag.start;
+    const auto edge = [at](const LayerTransform &transform, bool horizontal) {
+        const QRectF box(transform.origin, transform.size);
+        if (horizontal)
+            return std::abs(box.left() - at.x()) <= std::abs(box.right() - at.x()) ? box.left() : box.right();
+        return std::abs(box.top() - at.y()) <= std::abs(box.bottom() - at.y()) ? box.top() : box.bottom();
+    };
+    struct Snap {
+        bool horizontal;
+        double target;
+    };
+    const LayerTransform draft = update(point);
+    std::vector<Snap> snaps;
+    if (handle.x() != 0.5)
+        if (const std::optional<double> x = nearest(edge(draft, true), targets.xs, tolerance))
+            snaps.push_back({true, *x});
+    if (handle.y() != 0.5)
+        if (const std::optional<double> y = nearest(edge(draft, false), targets.ys, tolerance))
+            snaps.push_back({false, *y});
+    // Proportional, the nearer edge snaps; the ratio moves the other.
+    if (proportional && snaps.size() == 2) {
+        const auto distance = [&](const Snap &snap) { return std::abs(snap.target - edge(draft, snap.horizontal)); };
+        snaps = {distance(snaps[1]) < distance(snaps[0]) ? snaps[1] : snaps[0]};
+    }
+    // Edges follow the pointer linearly: one pixel measures the step.
+    QPointF result = point;
+    for (const Snap &snap : snaps) {
+        const double before = edge(update(result), snap.horizontal);
+        const QPointF nudged = result + (snap.horizontal ? QPointF(1, 0) : QPointF(0, 1));
+        const double perPixel = edge(update(nudged), snap.horizontal) - before;
+        if (std::abs(perPixel) <= 0.01)
+            continue;
+        const double shift = (snap.target - before) / perPixel;
+        result += snap.horizontal ? QPointF(shift, 0) : QPointF(0, shift);
+    }
+    snapGuides = {};
+    for (const Snap &snap : snaps)
+        (snap.horizontal ? snapGuides.xs : snapGuides.ys).push_back(snap.target);
+    return result;
+}
+
 // View > Snap To's targets, without the centres.
 SnapGuides EditorSession::cropSnapTargets() const
 {

@@ -27,62 +27,72 @@ void ScrubbableTransformTests::theTransformLabelsScrubWholeNumbersOverTyping()
     bar.activateWindow();
     QVERIFY(QTest::qWaitForWindowActive(&bar));
     const QPointF origin = session.activeLayer().value().transform.origin;
-    // The first drag begins the edit, as typing does.
+    const int base = session.history.undoCount();
+    const auto shown = [&] { return session.activeLayer().value().transform; };
+    // Each drag applies when let go, one step.
     drag(scrubbed(bar, "X"), 7);
-    QCOMPARE(session.transformEdit().value().draft.origin.x(), std::round(origin.x()) + 7);
+    QVERIFY(!session.transformEdit().has_value());
+    QCOMPARE(shown().origin.x(), std::round(origin.x()) + 7);
+    QCOMPARE(session.history.undoCount(), base + 1);
+    QCOMPARE(session.history.undoName(), QString("Transform Layer"));
     // A scrub writes over what is typed in its field.
     QLineEdit &width = find<QLineEdit>(bar, "transformW");
     width.setFocus();
     width.selectAll();
     QTest::keyClicks(&width, QStringLiteral("3"));
     drag(scrubbed(bar, "W"), 10);
-    QCOMPARE(session.transformEdit().value().draft.size, QSizeF(13, 20));
+    QCOMPARE(shown().size, QSizeF(13, 20));
     QCOMPARE(width.text(), QString("13"));
     drag(scrubbed(bar, "W"), -100);
-    QCOMPARE(session.transformEdit().value().draft.size.width(), 1.0);
+    QCOMPARE(shown().size.width(), 1.0);
     drag(scrubbed(bar, "H"), 40000);
-    QCOMPARE(session.transformEdit().value().draft.size.height(), 30000.0);
+    QCOMPARE(shown().size.height(), 30000.0);
     drag(scrubbed(bar, "°"), 30);
-    QCOMPARE(session.transformEdit().value().draft.rotation, 30.0);
+    QCOMPARE(shown().rotation, 30.0);
     drag(scrubbed(bar, "°"), -900);
-    QCOMPARE(session.transformEdit().value().draft.rotation, -0.0);
+    QCOMPARE(shown().rotation, -0.0);
     // Unfocused, the field shows what the session keeps.
     QCOMPARE(find<QLineEdit>(bar, "transform°").text(), QString("0"));
     QCOMPARE(width.text(), QString("1"));
     drag(scrubbed(bar, "Y"), -90000);
-    QCOMPARE(session.transformEdit().value().draft.origin.y(), -30000.0);
+    QCOMPARE(shown().origin.y(), -30000.0);
     // A fractional start lands on a whole number.
     QLineEdit &x = find<QLineEdit>(bar, "transformX");
     x.setFocus();
     x.selectAll();
     QTest::keyClicks(&x, QStringLiteral("10.4"));
+    QVERIFY(session.transformEdit().value().fromFields);
     QCOMPARE(session.transformEdit().value().draft.origin.x(), 10.4);
     drag(scrubbed(bar, "X"), 3);
-    QCOMPARE(session.transformEdit().value().draft.origin.x(), 13.0);
+    QCOMPARE(shown().origin.x(), 13.0);
     QCOMPARE(x.text(), QString("13"));
     // Every range reaches its ends exactly.
     drag(scrubbed(bar, "X"), -90000);
-    QCOMPARE(session.transformEdit().value().draft.origin.x(), -30000.0);
+    QCOMPARE(shown().origin.x(), -30000.0);
     drag(scrubbed(bar, "X"), 90000);
-    QCOMPARE(session.transformEdit().value().draft.origin.x(), 30000.0);
+    QCOMPARE(shown().origin.x(), 30000.0);
     drag(scrubbed(bar, "Y"), 90000);
-    QCOMPARE(session.transformEdit().value().draft.origin.y(), 30000.0);
+    QCOMPARE(shown().origin.y(), 30000.0);
     drag(scrubbed(bar, "W"), 90000);
-    QCOMPARE(session.transformEdit().value().draft.size.width(), 30000.0);
+    QCOMPARE(shown().size.width(), 30000.0);
     drag(scrubbed(bar, "H"), -90000);
-    QCOMPARE(session.transformEdit().value().draft.size.height(), 1.0);
+    QCOMPARE(shown().size.height(), 1.0);
     // 360 reaches the setter, whose remainder leaves none.
     drag(scrubbed(bar, "°"), 9000);
-    QCOMPARE(session.transformEdit().value().draft.rotation, 0.0);
+    QCOMPARE(shown().rotation, 0.0);
     drag(scrubbed(bar, "°"), 359);
-    QCOMPARE(session.transformEdit().value().draft.rotation, 359.0);
+    QCOMPARE(shown().rotation, 359.0);
     // Scale snaps whole percents too.
-    session.cancelTransform();
+    const auto restart = [&] {
+        while (session.history.undoCount() > base)
+            session.undo();
+    };
+    restart();
     drag(scrubbed(bar, "Scale"), 5);
-    QCOMPARE(session.transformEdit().value().draft.size, QSizeF(42, 21));
-    session.cancelTransform();
+    QCOMPARE(shown().size, QSizeF(42, 21));
+    restart();
     drag(scrubbed(bar, "Scale"), 90000);
-    QCOMPARE(session.transformEdit().value().draft.size, QSizeF(12000, 6000));
+    QCOMPARE(shown().size, QSizeF(12000, 6000));
     QCOMPARE(find<QLineEdit>(bar, "transformScale").text(), QString("30000"));
     // While distorted the numbers rest, labels included.
     session.cancelTransform();
@@ -101,7 +111,7 @@ void ScrubbableTransformTests::scaleScrubsDownToATenth()
     TransformInspector bar(session);
     bar.show();
     drag(scrubbed(bar, "Scale"), -90000);
-    QCOMPARE(session.transformEdit().value().draft.size, QSizeF(2, 1));
+    QCOMPARE(session.activeLayer().value().transform.size, QSizeF(2, 1));
     QCOMPARE(find<QLineEdit>(bar, "transformScale").text(), QString("0.10"));
 }
 
@@ -204,9 +214,10 @@ void ScrubbableTransformTests::aTransformScrubEndsWithItsLayer()
     QVERIFY(!session.transformEdit().has_value());
     QCOMPARE(layerWith(session, first).transform.origin.x(), x);
     QCOMPARE(layerWith(session, second).transform.origin.x(), std::round(x) + 10);
-    // A fresh press scrubs the new layer.
+    // A fresh press scrubs the new layer, applied on release.
     drag(label, 5);
-    QCOMPARE(session.transformEdit().value().draft.origin.x(), std::round(x) + 5);
+    QVERIFY(!session.transformEdit().has_value());
+    QCOMPARE(layerWith(session, first).transform.origin.x(), std::round(x) + 5);
 }
 
 QTEST_MAIN(ScrubbableTransformTests)

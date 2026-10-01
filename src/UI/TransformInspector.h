@@ -17,7 +17,7 @@ class TransformValueField : public QWidget {
 public:
     // The label scrubs within low and high, in whole steps.
     TransformValueField(const QString &label, const QString &suffix, double low, double high, EditorSession &session,
-                        std::function<void(double)> change, QWidget *parent = nullptr);
+                        std::function<void()> finish, std::function<void(double)> change, QWidget *parent = nullptr);
 
     // Shown when the field is not being edited.
     void sync(double value);
@@ -33,6 +33,8 @@ protected:
 
 private:
     EditorSession &m_session;
+    // Done with its value: a scrub let go, or left.
+    const std::function<void()> m_finish;
     const std::function<void(double)> m_change;
     NumericScrub *m_scrub = nullptr;
     double m_value = 0;
@@ -56,6 +58,8 @@ private:
     LayerTransform value() const;
     QSizeF pixelSize() const;
     void change(const std::function<void(LayerTransform &)> &update);
+    // What the fields changed applies, one step.
+    void finish();
     // Swift's `resize`; the name would hide QWidget's.
     void resizeBox(double number, bool width);
     void synchronize();

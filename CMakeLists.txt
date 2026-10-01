@@ -132,6 +132,7 @@ add_library(compositor_core STATIC
     src/UI/NativeLayerList+Menu.cpp
     src/UI/NavigationToolHeader.cpp
     src/UI/NumericScrub.cpp
+    src/UI/HeldModifiers.cpp
     src/UI/TransformInspector.cpp
     src/UI/EffectsSheet.cpp
     src/UI/CameraRawColorControls.cpp

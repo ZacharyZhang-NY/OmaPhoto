@@ -1,4 +1,5 @@
 #include "UI/TransformInspector.h"
+#include "UI/HeldModifiers.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/LayerIcons.h"
 #include "UI/NumericScrub.h"
@@ -8,8 +9,8 @@
 #include <cmath>
 
 TransformValueField::TransformValueField(const QString &label, const QString &suffix, double low, double high, EditorSession &session,
-                                         std::function<void(double)> change, QWidget *parent)
-    : QWidget(parent), field(new QLineEdit(this)), m_session(session), m_change(std::move(change))
+                                         std::function<void()> finish, std::function<void(double)> change, QWidget *parent)
+    : QWidget(parent), field(new QLineEdit(this)), m_session(session), m_finish(std::move(finish)), m_change(std::move(change))
 {
     auto *row = new QHBoxLayout(this);
     row->setContentsMargins(0, 0, 0, 0);
@@ -21,7 +22,7 @@ TransformValueField::TransformValueField(const QString &label, const QString &su
     m_scrub = new NumericScrub(name, {.sensitivity = 1, .low = low, .high = high, .step = 1, .value = [this] { return m_value; }, .set = [this](double value) {
                                 field->setText(formatted(value));
                                 m_change(value);
-                            }});
+                            }, .onEnd = m_finish});
     row->addWidget(name);
     field->setObjectName(QStringLiteral("transform") + label);
     field->setAccessibleName(label);
@@ -64,15 +65,22 @@ bool TransformValueField::eventFilter(QObject *watched, QEvent *event)
 {
     if (event->type() == QEvent::FocusOut) {
         const Qt::FocusReason reason = static_cast<QFocusEvent *>(event)->reason();
-        m_borrowed = reason == Qt::MenuBarFocusReason || reason == Qt::PopupFocusReason;
-        if (!m_borrowed)
+        // Another window in front keeps the field, as AppKit does.
+        m_borrowed = reason == Qt::MenuBarFocusReason || reason == Qt::PopupFocusReason || reason == Qt::ActiveWindowFocusReason;
+        if (!m_borrowed) {
+            m_finish();
             field->setText(formatted(m_value));
+        }
     }
     if (event->type() != QEvent::KeyPress)
         return QWidget::eventFilter(watched, event);
     const auto *key = static_cast<QKeyEvent *>(event);
     // Return and Escape hand the canvas the keys.
     if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter || key->key() == Qt::Key_Escape) {
+        // Escape throws the fields' own change away, as Swift's Cancel.
+        const std::optional<TransformEdit> &edit = m_session.transformEdit();
+        if (key->key() == Qt::Key_Escape && edit && edit->fromFields)
+            m_session.cancelTransform();
         field->clearFocus();
         m_session.requestCanvasFocus();
         return true;
@@ -90,22 +98,25 @@ bool TransformValueField::eventFilter(QObject *watched, QEvent *event)
 TransformInspector::TransformInspector(EditorSession &session, QWidget *parent)
     : ToolHeaderBar(QStringLiteral("Transform"), parent), m_session(session), m_autoSelect(new QCheckBox(QStringLiteral("Auto Select"), this)),
       m_showControls(new QCheckBox(QStringLiteral("Show Controls"), this)), m_fields(new QScrollArea(this)),
-      m_x(new TransformValueField(QStringLiteral("X"), QString(), -30000, 30000, session, [this](double number) { change([number](LayerTransform &value) { value.origin.setX(number); }); })),
-      m_y(new TransformValueField(QStringLiteral("Y"), QString(), -30000, 30000, session, [this](double number) { change([number](LayerTransform &value) { value.origin.setY(number); }); })),
-      m_width(new TransformValueField(QStringLiteral("W"), QString(), 1, 30000, session, [this](double number) { resizeBox(number, true); })),
-      m_height(new TransformValueField(QStringLiteral("H"), QString(), 1, 30000, session, [this](double number) { resizeBox(number, false); })),
+      m_x(new TransformValueField(QStringLiteral("X"), QString(), -30000, 30000, session, [this] { finish(); }, [this](double number) { change([number](LayerTransform &value) { value.origin.setX(number); }); })),
+      m_y(new TransformValueField(QStringLiteral("Y"), QString(), -30000, 30000, session, [this] { finish(); }, [this](double number) { change([number](LayerTransform &value) { value.origin.setY(number); }); })),
+      m_width(new TransformValueField(QStringLiteral("W"), QString(), 1, 30000, session, [this] { finish(); }, [this](double number) { resizeBox(number, true); })),
+      m_height(new TransformValueField(QStringLiteral("H"), QString(), 1, 30000, session, [this] { finish(); }, [this](double number) { resizeBox(number, false); })),
       m_lock(new QToolButton(this)),
-      m_scale(new TransformValueField(QStringLiteral("Scale"), QStringLiteral("%"), 0.1, 30000, session, [this](double number) {
+      m_scale(new TransformValueField(QStringLiteral("Scale"), QStringLiteral("%"), 0.1, 30000, session, [this] { finish(); }, [this](double number) {
           change([&](LayerTransform &value) { value = value.scaled(number, pixelSize()); });
       })),
-      m_rotation(new TransformValueField(QStringLiteral("°"), QString(), -360, 360, session, [this](double number) {
+      m_rotation(new TransformValueField(QStringLiteral("°"), QString(), -360, 360, session, [this] { finish(); }, [this](double number) {
           change([number](LayerTransform &value) { value.rotation = std::fmod(number, 360.0); });
       })),
       m_sampling(new QComboBox(this)), m_cancel(new QPushButton(QStringLiteral("Cancel"), this)), m_apply(new QPushButton(QStringLiteral("Apply"), this))
 {
     m_autoSelect->setObjectName(QStringLiteral("transformAutoSelect"));
-    m_autoSelect->setToolTip(QStringLiteral("Select layers by clicking the canvas. When off, hold Ctrl to select a layer."));
-    connect(m_autoSelect, &QCheckBox::toggled, this, [this](bool picks) { m_session.setTransformAutoSelect(picks); });
+    m_autoSelect->setToolTip(QStringLiteral("Select layers by clicking the canvas. Hold Ctrl to turn it the other way while you click."));
+    // Held Ctrl flips Auto Select, and the box shows it.
+    connect(m_autoSelect, &QCheckBox::toggled, this, [this](bool picks) {
+        m_session.setTransformAutoSelect(picks != HeldModifiers::shared().flags().testFlag(Qt::ControlModifier));
+    });
     m_showControls->setObjectName(QStringLiteral("showTransformControls"));
     m_showControls->setToolTip(QStringLiteral("Show the transform box and handles (Ctrl+H). When hidden, drag anywhere to move the layer."));
     connect(m_showControls, &QCheckBox::toggled, this, [this](bool shows) { m_session.setShowsTransformControls(shows); });
@@ -122,9 +133,12 @@ TransformInspector::TransformInspector(EditorSession &session, QWidget *parent)
     m_lock->setObjectName(QStringLiteral("locksTransformRatio"));
     m_lock->setCheckable(true);
     m_lock->setAutoRaise(true);
-    m_lock->setToolTip(QStringLiteral("Lock aspect ratio"));
+    m_lock->setToolTip(QStringLiteral("Lock aspect ratio. Hold Shift while dragging a handle to turn it the other way."));
     applyLockIcon();
-    connect(m_lock, &QToolButton::toggled, this, [this](bool locks) { m_session.setLocksTransformRatio(locks); });
+    // Held Shift flips the lock, and the button shows it.
+    connect(m_lock, &QToolButton::toggled, this, [this](bool locks) {
+        m_session.setLocksTransformRatio(locks != HeldModifiers::shared().flags().testFlag(Qt::ShiftModifier));
+    });
     fields->addWidget(m_lock);
     m_scale->setFixedWidth(110);
     m_scale->setToolTip(QStringLiteral("Scale width and height together, about the center"));
@@ -168,6 +182,7 @@ TransformInspector::TransformInspector(EditorSession &session, QWidget *parent)
     // The scroll view takes the spare room, as SwiftUI's does.
     row->setStretch(row->count() - 1, 0);
     connect(&m_session, &EditorSession::changed, this, &TransformInspector::synchronize);
+    connect(&HeldModifiers::shared(), &HeldModifiers::changed, this, &TransformInspector::synchronize);
     synchronize();
 }
 
@@ -216,15 +231,22 @@ QSizeF TransformInspector::pixelSize() const
     return active ? active->size() : value().size;
 }
 
+// Shown at once, applied without Apply; Ctrl+T's edit takes it.
 void TransformInspector::change(const std::function<void(LayerTransform &)> &update)
 {
     if (!m_session.transformEdit())
-        m_session.beginTransform();
+        m_session.beginTransform(false, true);
     if (!m_session.transformEdit())
         return;
     LayerTransform next = m_session.transformEdit()->draft;
     update(next);
     m_session.previewTransform(next);
+}
+
+void TransformInspector::finish()
+{
+    if (m_session.transformEdit() && m_session.transformEdit()->fromFields)
+        m_session.commitTransform();
 }
 
 void TransformInspector::resizeBox(double number, bool width)
@@ -258,9 +280,10 @@ void TransformInspector::synchronize()
         const QSignalBlocker blocker(button);
         button->setChecked(checked);
     };
-    set(m_autoSelect, m_session.transformAutoSelect());
+    const Qt::KeyboardModifiers held = HeldModifiers::shared().flags();
+    set(m_autoSelect, m_session.transformAutoSelect() != held.testFlag(Qt::ControlModifier));
     set(m_showControls, m_session.showsTransformControls());
-    set(m_lock, m_session.locksTransformRatio());
+    set(m_lock, m_session.locksTransformRatio() != held.testFlag(Qt::ShiftModifier));
     const LayerTransform shown = value();
     m_x->sync(shown.origin.x());
     m_y->sync(shown.origin.y());

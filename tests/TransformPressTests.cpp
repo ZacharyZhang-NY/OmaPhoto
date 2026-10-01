@@ -51,6 +51,10 @@ private slots:
     void escapeMidDragRestoresAndAPersistentEditWaitsForReturn();
     void losingTheKeysOrTheWheelMidDrag();
     void aSelectionDragsAsOneBox();
+    void ctrlFlipsAutoSelectWhileHeld_data();
+    void ctrlFlipsAutoSelectWhileHeld();
+    void ctrlShiftClickAddsALayerWithAutoSelectOn();
+    void aCanvasDragAppliesTheFieldsEditFirst();
 };
 
 void TransformPressTests::draggingOutsideTheLayerMovesIt()
@@ -120,12 +124,13 @@ void TransformPressTests::handlesResizeAndTheGripRotates()
     // An edge, away from its handle, resizes too.
     shown.drag(QPointF(300, 170), QPointF(320, 170));
     QCOMPARE(layerWith(shown.session, shown.red).transform.size, QSizeF(170, 100));
-    // Resizing never snaps: five past the middle stays five past.
+    // The dragged edge snaps: five past the middle lands there.
     shown.drag(QPointF(320, 170), QPointF(205, 170));
-    QCOMPARE(layerWith(shown.session, shown.red).transform, (LayerTransform{.origin = {150, 100}, .size = {55, 100}}));
+    QCOMPARE(layerWith(shown.session, shown.red).transform, (LayerTransform{.origin = {150, 100}, .size = {50, 100}}));
     // The grip: a quarter turn about the middle.
     const QPointF center = layerWith(shown.session, shown.red).transform.center();
     const QPointF grip = center + QPointF(0, -78);
+    QVERIFY(center == QPointF(175, 150));
     shown.drag(grip, center + QPointF(78, 0));
     transform = layerWith(shown.session, shown.red).transform;
     QCOMPARE(transform.rotation, 90.0);
@@ -379,6 +384,85 @@ void TransformPressTests::aSelectionDragsAsOneBox()
     QCOMPARE(layerWith(session, blue).transform.origin, QPointF(310, 262));
     QCOMPARE(session.history.undoName(), QString("Transform Layers"));
     QCOMPARE(session.selectedLayerIDs(), (QSet<QUuid>{shown.red, blue}));
+}
+
+// A full-canvas blue layer under the red, and active.
+static QUuid blueBelow(Canvas &shown)
+{
+    shown.session.insert(filled(400, 300, qRgba(0, 0, 255, 255), "Blue"));
+    const QUuid blue = shown.session.activeLayerID().value();
+    shown.session.reorderLayers({1}, 0);
+    if (shown.session.document().value().layers[0].id != blue || shown.session.activeLayerID() != blue)
+        throw std::runtime_error("the blue layer is not active at the bottom");
+    shown.canvas->synchronizeDisplay();
+    return blue;
+}
+
+void TransformPressTests::ctrlFlipsAutoSelectWhileHeld_data()
+{
+    QTest::addColumn<bool>("autoSelect");
+    QTest::newRow("off") << false;
+    QTest::newRow("on") << true;
+}
+
+// Swift's commandFlipsAutoSelectWhileHeld: Ctrl turns it the other way.
+void TransformPressTests::ctrlFlipsAutoSelectWhileHeld()
+{
+    QFETCH(bool, autoSelect);
+    Canvas shown;
+    const QUuid blue = blueBelow(shown);
+    shown.session.setTransformAutoSelect(autoSelect);
+    shown.drag(QPointF(210, 170), QPointF(230, 180), Qt::ControlModifier);
+    const QUuid moved = autoSelect ? blue : shown.red;
+    QCOMPARE(shown.session.activeLayerID(), std::optional(moved));
+    QCOMPARE(layerWith(shown.session, moved).transform.origin, autoSelect ? QPointF(20, 10) : QPointF(170, 110));
+    QCOMPARE(layerWith(shown.session, autoSelect ? shown.red : blue).transform.origin, autoSelect ? QPointF(150, 100) : QPointF(0, 0));
+    // Without Ctrl it picks as set.
+    shown.session.undo();
+    shown.session.selectLayer(blue);
+    shown.drag(QPointF(210, 170), QPointF(230, 180));
+    QCOMPARE(shown.session.activeLayerID(), std::optional(autoSelect ? shown.red : blue));
+}
+
+void TransformPressTests::ctrlShiftClickAddsALayerWithAutoSelectOn()
+{
+    Canvas shown;
+    const QUuid blue = blueBelow(shown);
+    shown.session.setTransformAutoSelect(true);
+    shown.click(QPointF(210, 170), Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(shown.session.selectedLayerIDs(), (QSet<QUuid>{shown.red, blue}));
+    // Past the active layer's box, Ctrl still keeps it.
+    shown.session.insert(filled(50, 50, qRgba(0, 255, 0, 255), "Green"), QPointF(330, 20));
+    shown.session.selectLayer(shown.red);
+    shown.drag(QPointF(340, 30), QPointF(353, 30), Qt::ControlModifier);
+    QCOMPARE(shown.session.activeLayerID(), std::optional(shown.red));
+    QCOMPARE(shown.origin(), QPointF(163, 100));
+}
+
+// The bar's pending value applies first, its own step.
+void TransformPressTests::aCanvasDragAppliesTheFieldsEditFirst()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    const int steps = session.history.undoCount();
+    session.beginTransform(false, true);
+    LayerTransform flipped = session.transformEdit().value().draft;
+    flipped.flipX = true;
+    session.previewTransform(flipped);
+    shown.drag(QPointF(20, 20), QPointF(40, 33));
+    QVERIFY(!session.transformEdit().has_value());
+    QCOMPARE(session.history.undoCount(), steps + 2);
+    QCOMPARE(shown.origin(), QPointF(170, 113));
+    QVERIFY(layerWith(session, shown.red).transform.flipX);
+    session.undo();
+    QCOMPARE(shown.origin(), QPointF(150, 100));
+    QVERIFY(layerWith(session, shown.red).transform.flipX);
+    // A Ctrl+T edit takes the drag into itself.
+    session.undo();
+    session.beginTransform();
+    shown.drag(QPointF(20, 20), QPointF(40, 33));
+    QCOMPARE(session.transformEdit().value().draft.origin, QPointF(170, 113));
+    QCOMPARE(session.history.undoCount(), steps);
 }
 
 QTEST_MAIN(TransformPressTests)
