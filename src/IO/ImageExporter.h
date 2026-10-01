@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QImage>
 #include <functional>
+#include <optional>
 #include <stdexcept>
 
 class ExportError : public std::runtime_error {
@@ -39,6 +40,8 @@ struct JPEGResult {
 
 namespace ImageExporter {
 ExportRaster render(const ProjectSnapshot &snapshot);
+// Flattened on white, 1024 a side; none past 50 megapixels.
+std::optional<QuickLookImages> quickLookImages(const ProjectSnapshot &snapshot);
 QByteArray pngData(const ProjectSnapshot &snapshot);
 // Stops at Swift's three points once `cancelled` says so.
 JPEGResult jpeg(const ExportRaster &raster, const JPEGOptions &options, const std::function<bool()> &cancelled = {});

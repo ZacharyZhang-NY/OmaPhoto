@@ -97,9 +97,14 @@ private:
     ProjectError(Kind kind, std::optional<qint64> version, const QString &description);
 };
 
+// Swift's, in ImageExporter.swift; here, as the exporter includes the store.
+struct QuickLookImages {
+    QByteArray preview;
+};
+
 // A .comp project: a directory holding manifest.json and images/.
 namespace ProjectStore {
 // Replaces the project in one step or leaves it untouched.
-void save(const ProjectSnapshot &snapshot, const QString &path);
+void save(const ProjectSnapshot &snapshot, const QString &path, const std::optional<QuickLookImages> &quickLook = std::nullopt);
 ProjectSnapshot load(const QString &path);
 }

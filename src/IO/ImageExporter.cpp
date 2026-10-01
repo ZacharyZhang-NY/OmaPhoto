@@ -45,6 +45,24 @@ QByteArray encode(QImage image, const char *format, int quality, double resoluti
         throw ExportError(ExportError::Kind::encode);
     return data;
 }
+
+QByteArray scaledJPEG(const QImage &image, double longSide)
+try {
+    const double scale = std::min(1.0, longSide / std::max(image.width(), image.height()));
+    const QSize size(std::max(1, int(std::round(image.width() * scale))), std::max(1, int(std::round(image.height() * scale))));
+    const QImage scaled = image.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    QImage flattened(size, QImage::Format_RGB888);
+    if (scaled.isNull() || flattened.isNull())
+        throw ExportError(ExportError::Kind::render);
+    flattened.fill(Qt::white);
+    {
+        QPainter painter(&flattened);
+        painter.drawImage(QRectF(flattened.rect()), scaled);
+    }
+    return encode(flattened, "jpeg", 80, 72);
+} catch (const std::bad_alloc &) {
+    throw ExportError(ExportError::Kind::render);
+}
 }
 
 ExportError::ExportError(Kind kind) : std::runtime_error(description(kind)), kind(kind) {}
@@ -116,6 +134,21 @@ try {
 } catch (const std::bad_alloc &) {
     // Memory that runs out fails the render, as contexts do.
     throw ExportError(ExportError::Kind::render);
+}
+
+std::optional<QuickLookImages> ImageExporter::quickLookImages(const ProjectSnapshot &snapshot)
+{
+    if (snapshot.manifest.width * snapshot.manifest.height > 50'000'000) {
+        qCInfo(lcIO) << "no Quick Look preview for" << snapshot.manifest.width << "x" << snapshot.manifest.height;
+        return std::nullopt;
+    }
+    try {
+        return QuickLookImages{scaledJPEG(render(snapshot).image, 1024)};
+    } catch (const std::runtime_error &error) {
+        // Swift's try? saves without one; the log says why.
+        qCWarning(lcIO) << "no Quick Look preview:" << error.what();
+        return std::nullopt;
+    }
 }
 
 QByteArray ImageExporter::pngData(const ProjectSnapshot &snapshot)

@@ -3,6 +3,7 @@
 #include <QClipboard>
 #include <QImageReader>
 #include <QImageWriter>
+#include <QMenu>
 #include <QtTest>
 
 // The welcome sheet: sizes, its three ways on, the clipboard.
@@ -16,6 +17,31 @@ struct Sheet {
     QLineEdit &height = *sheet.findChild<QLineEdit *>("heightInput");
     QLabel &note = *sheet.findChild<QLabel *>("canvasNote");
     QPushButton &create = *sheet.findChild<QPushButton *>("createCanvas");
+    QToolButton &presets = *sheet.findChild<QToolButton *>("presetSizes");
+
+    // The menu's entries, a separator as "-".
+    QStringList entries() const
+    {
+        QStringList titles;
+        for (const QAction *action : presets.menu()->actions())
+            titles << (action->isSeparator() ? QStringLiteral("-") : action->text());
+        return titles;
+    }
+    QString checked() const
+    {
+        QStringList titles;
+        for (const QAction *action : presets.menu()->actions())
+            if (action->isChecked())
+                titles << action->text();
+        return titles.join(',');
+    }
+    QAction &entry(const QString &title) const
+    {
+        for (QAction *action : presets.menu()->actions())
+            if (action->text() == title)
+                return *action;
+        throw std::runtime_error("no such preset");
+    }
 };
 
 QByteArray encoded(const QImage &image, const char *format, QImageIOHandler::Transformations turned = QImageIOHandler::TransformationNone)
@@ -42,6 +68,9 @@ private slots:
     void aCopiedPicturesSizeIsSuggestedOnce();
     void theFirstTabSkipsTheClipboardOnce();
     void clipboardSizesComeFromHeadersAlone();
+    void presetsAreSwiftsGroups();
+    void aPresetFillsTheFieldsAndTheMatchIsChecked();
+    void theMoreButtonDrawsThreeDotsAndOpensTheMenu();
 };
 
 void NewCanvasSheetTests::cleanup()
@@ -225,6 +254,84 @@ void NewCanvasSheetTests::clipboardSizesComeFromHeadersAlone()
     QMimeData turned;
     turned.setData("image/tiff", encoded(QImage(30, 50, QImage::Format_RGBA8888), "tiff", QImageIOHandler::TransformationRotate90));
     QCOMPARE(NewCanvasSheet::clipboardDimensions(&turned), std::optional(QSize(50, 30)));
+}
+
+void NewCanvasSheetTests::presetsAreSwiftsGroups()
+{
+    QStringList sizes;
+    for (const std::vector<CanvasPreset> &group : CanvasPreset::groups) {
+        for (const CanvasPreset &preset : group)
+            sizes << QStringLiteral("%1 %2x%3").arg(preset.title).arg(preset.width).arg(preset.height);
+        sizes << "-";
+    }
+    QCOMPARE(sizes, (QStringList{"4K 3840x2160", "1440p 2560x1440", "1080p 1920x1080", "-", "iPhone 18 Pro 1206x2622", "iPhone 18 Pro Max 1320x2868",
+                                 "MacBook Pro 14\" 3024x1964", "MacBook Pro 16\" 3456x2234", "Studio Display 5120x2880", "-", "Instagram Square 1080x1080",
+                                 "Instagram Portrait 1080x1350", "Instagram Story 1080x1920", "YouTube Thumb 1080x608", "-"}));
+    QCOMPARE(CanvasPreset::all.size(), size_t(12));
+    QCOMPARE(CanvasPreset::all.back().title, QString("YouTube Thumb"));
+    Sheet fixture;
+    QCOMPARE(fixture.entries(), (QStringList{"Custom", "-", "4K", "1440p", "1080p", "-", "iPhone 18 Pro", "iPhone 18 Pro Max", "MacBook Pro 14\"",
+                                             "MacBook Pro 16\"", "Studio Display", "-", "Instagram Square", "Instagram Portrait", "Instagram Story",
+                                             "YouTube Thumb"}));
+    QCOMPARE(fixture.presets.toolTip(), QString("Preset sizes for screens and common formats"));
+    QCOMPARE(fixture.presets.accessibleName(), QString("Preset sizes"));
+    QCOMPARE(fixture.presets.size(), QSize(28, 28));
+    QCOMPARE(fixture.presets.popupMode(), QToolButton::InstantPopup);
+}
+
+void NewCanvasSheetTests::aPresetFillsTheFieldsAndTheMatchIsChecked()
+{
+    Sheet fixture;
+    QCOMPARE(fixture.checked(), QString("1080p"));
+    fixture.entry("Instagram Story").trigger();
+    QCOMPARE(fixture.width.text(), QString("1080"));
+    QCOMPARE(fixture.height.text(), QString("1920"));
+    QCOMPARE(fixture.checked(), QString("Instagram Story"));
+    fixture.entry("Studio Display").trigger();
+    QCOMPARE(fixture.width.text() + "x" + fixture.height.text(), QString("5120x2880"));
+    QCOMPARE(fixture.checked(), QString("Studio Display"));
+    // A size no preset has is Custom, matched as text.
+    fixture.height.setText("2881");
+    QCOMPARE(fixture.checked(), QString("Custom"));
+    fixture.height.setText("2880");
+    QCOMPARE(fixture.checked(), QString("Studio Display"));
+    fixture.width.setText("05120");
+    QCOMPARE(fixture.checked(), QString("Custom"));
+    fixture.width.setText("1080");
+    fixture.height.setText("608");
+    QCOMPARE(fixture.checked(), QString("YouTube Thumb"));
+    // Custom fills nothing in.
+    fixture.entry("Custom").trigger();
+    QCOMPARE(fixture.width.text() + "x" + fixture.height.text(), QString("1080x608"));
+    QCOMPARE(fixture.checked(), QString("YouTube Thumb"));
+    fixture.entry("4K").trigger();
+    QCOMPARE(fixture.checked(), QString("4K"));
+    QVERIFY(fixture.create.isEnabled());
+    QTest::mouseClick(&fixture.create, Qt::LeftButton);
+    QCOMPARE(fixture.created, (QList<QSize>{QSize(3840, 2160)}));
+}
+
+void NewCanvasSheetTests::theMoreButtonDrawsThreeDotsAndOpensTheMenu()
+{
+    Sheet fixture;
+    fixture.sheet.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&fixture.sheet));
+    // Flush with the content's right edge, 28 points in.
+    QCOMPARE(fixture.presets.geometry().right() + 1, 500 - 28);
+    const QImage image = fixture.presets.grab().toImage();
+    const QColor ground = image.pixelColor(2, 2), ink = fixture.presets.palette().color(QPalette::WindowText);
+    // Dots centred at x 26.75, y 9, 14 and 19.
+    for (const int y : {9, 14, 19})
+        QVERIFY2(std::abs(qGray(image.pixel(26, y)) - qGray(ink.rgb())) < std::abs(qGray(image.pixel(26, y)) - qGray(ground.rgb())), qPrintable(QString::number(y)));
+    for (const QPoint clear : {QPoint(26, 11), QPoint(26, 16), QPoint(26, 5), QPoint(26, 23), QPoint(22, 14), QPoint(14, 14)})
+        QCOMPARE(image.pixelColor(clear), ground);
+    bool shown = false;
+    QTimer::singleShot(0, fixture.presets.menu(), [&] {
+        shown = fixture.presets.menu()->isVisible();
+        fixture.presets.menu()->close();
+    });
+    QTest::mouseClick(&fixture.presets, Qt::LeftButton);
+    QVERIFY(shown);
 }
 
 QTEST_MAIN(NewCanvasSheetTests)

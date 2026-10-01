@@ -1,6 +1,7 @@
 #include "IO/ProjectController.h"
 #include "IO/RecentProjects.h"
 #include "Document/ProjectWorkspace.h"
+#include "IO/ImageExporter.h"
 #include "IO/ProjectStore.h"
 #include "Logging.h"
 #include <QFileDialog>
@@ -199,7 +200,7 @@ void ProjectController::write(const Prepared &prepared, std::function<void(bool)
     // The store blocks on the disk: off the UI thread.
     watcher->setFuture(QtConcurrent::run([snapshot, destination]() -> std::optional<QString> {
         try {
-            ProjectStore::save(snapshot, destination);
+            ProjectStore::save(snapshot, destination, ImageExporter::quickLookImages(snapshot));
             return std::nullopt;
         } catch (const std::runtime_error &error) {
             return QString::fromUtf8(error.what());

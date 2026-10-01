@@ -83,6 +83,8 @@ To change an existing layer, keep its `id` and overwrite its PNG, then rewrite t
 
 Remove images you no longer reference once the manifest no longer lists them.
 
+A project OmaPhoto saved also has a `QuickLook` folder (`Preview.jpg`), which Finder shows as its Space-bar preview on a Mac. When you change a project, delete that folder, so Finder doesn't preview an out-of-date picture; OmaPhoto writes it again the next time it saves.
+
 ## What the open app does
 
 - It reloads about a third of a second after writes stop. Several writes in quick succession arrive as one update, so pause briefly between steps if a viewer should see each one.
