@@ -90,6 +90,8 @@ void ProjectTabDragTests::aDraggedTabFollowsThePointerAndLandsInTheGap()
     // Two points stay a press; three drag, and select.
     fixture.move(start + QPoint(2, 0));
     QCOMPARE(fixture.workspace.selectedID(), fixture.workspace.tabs()[2]->id);
+    fixture.move(start + QPoint(3, 0));
+    QCOMPARE(fixture.workspace.selectedID(), fixture.workspace.tabs()[0]->id);
     fixture.move(start + QPoint(40, 0));
     QCOMPARE(fixture.workspace.selectedID(), fixture.workspace.tabs()[0]->id);
     QCOMPARE(first.x(), 40);
@@ -104,10 +106,11 @@ void ProjectTabDragTests::aDraggedTabFollowsThePointerAndLandsInTheGap()
     QVERIFY(slide && slide->duration() == 150 && slide->easingCurve() == QEasingCurve::OutQuad);
     QCOMPARE(slide->endValue().toPoint(), QPoint(0, 3));
     QVERIFY(!first.findChild<QPropertyAnimation *>() && !third.findChild<QPropertyAnimation *>());
+    QTRY_VERIFY(settled(fixture.strip));
     // The dragged tab lies over the one it crosses.
+    QVERIFY(first.x() < second.x() + second.width());
     QWidget *hit = fixture.strip.childAt(first.x() + 2, 14);
     QVERIFY(hit == &first || first.isAncestorOf(hit));
-    QTRY_VERIFY(settled(fixture.strip));
     QCOMPARE(second.x(), 0);
     QCOMPARE(third.x(), w1 + 6 + w2 + 6);
     // Far right: held at the row's end, the others compacted.
@@ -154,6 +157,12 @@ void ProjectTabDragTests::aSmallOrUpwardMoveIsAClick()
     // Three points up, two across: no drag, no selection yet.
     fixture.move(start + QPoint(2, -3));
     QCOMPARE(fixture.workspace.selectedID(), fixture.workspace.tabs()[2]->id);
+    QCOMPARE(button(fixture.strip, "Untitled").x(), 0);
+    // A move with the button let go unseen drags nothing.
+    QMouseEvent unheld(QEvent::MouseMove, QPointF(fixture.pressed->mapFrom(&fixture.strip, start + QPoint(200, 0))),
+                       QPointF(fixture.pressed->mapToGlobal(fixture.pressed->mapFrom(&fixture.strip, start + QPoint(200, 0)))), Qt::NoButton,
+                       Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(fixture.pressed, &unheld);
     QCOMPARE(button(fixture.strip, "Untitled").x(), 0);
     fixture.release("Untitled", start + QPoint(2, -3));
     // The click selects; the order stays.

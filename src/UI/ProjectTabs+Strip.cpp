@@ -24,11 +24,6 @@ QSize ProjectTabStrip::sizeHint() const
     return {int(std::ceil(projectTabOverflow(order, widths(), m_workspace.selectedID(), 0, &OverflowTabsPill::pillWidth).contentWidth())), 34};
 }
 
-QSize ProjectTabStrip::minimumSizeHint() const
-{
-    return {0, 34};
-}
-
 QList<ProjectTabButton *> ProjectTabStrip::buttons() const
 {
     return QList<ProjectTabButton *>(m_buttons.begin(), m_buttons.end());

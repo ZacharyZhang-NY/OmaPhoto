@@ -92,7 +92,6 @@ public:
     OverflowTabsPill *pill() const { return m_pill; }
 
     QSize sizeHint() const override;
-    QSize minimumSizeHint() const override;
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
