@@ -423,7 +423,8 @@ Reviews for this section ran on codex `gpt-6.1-sol` at `max` (agent `codex-sol`)
 - 13.3b review (Fable 5.1): round 1 FAIL (the sheet's native keys unbound; test gaps: the click's rows and floor, stale and foreign results, the selection kept on error, the preview's truncation); round 2 FAIL (OK after an error, the antialiased flag; two dead gate terms noted); round 3 PASS.
 - [x] 13.4a Version 1.3.5, part one: Export JPEG and Canvas Size take the app's colour picker (`c580a38`); `908bed9` and `158cd53` judged: Qt signals arrive on the GUI thread, and the digest already hashes a local's bytes.
 - 13.4a review (Fable 5.1): round 1 FAIL (the swatch's minimize case, its white ring and radius untested); round 2 PASS.
-- [ ] 13.4b Part two: Export JPEG's zoomable preview and tidier layout, the View menu's zoom on it, one OK on the import error (`ac6f309`).
+- [x] 13.4b Part two: Export JPEG's zoomable preview and tidier layout, the View menu's zoom on it, one OK on the import error (`ac6f309`).
+- 13.4b review (Fable 5.1): round 1 FAIL (the full-size preview passed Qt's 128 MB decode limit on large canvases, so they could not export; the kept middle's `min` untested); round 2 PASS.
 - [ ] 13.5 Part two: the marquee, shapes and a moved selection snap to View › Snap To (`d6e3e93`, `8b1369a`); View › Grid Settings… with Restore Defaults (`1c819d0`, `db5eafa`).
 - [ ] 13.6 Part three: Ctrl+Z while typing takes back what was typed (`ee68ba9`); font previews in the Type bar (`1bd1df4`).
 - [ ] 13.7 Versions 1.3.6–1.3.7: New Canvas presets in a More menu (`aaf3dc0`); the project's Quick Look preview (`14aad18`, `4868465`) judged: the package's preview file is format, Finder's thumbnail extension is macOS alone.

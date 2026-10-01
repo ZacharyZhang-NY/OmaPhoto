@@ -229,7 +229,9 @@ void RemappedKeysTests::everySheetBindsSwiftsKeys()
     QCOMPARE(keys(CanvasSizeSheet(canvas, session, [](std::optional<CanvasSizeOptions>) {})), both);
     QCOMPARE(keys(ImageSizeSheet(canvas, [](std::optional<ImageSizeOptions>) {})), both);
     QCOMPARE(keys(TrimSheet([](std::optional<TrimOptions>) {})), both);
-    QCOMPARE(keys(JPEGExportSheet(ExportRaster{red, 72}, session, [](std::optional<QByteArray>) {})), both);
+    // Export JPEG also takes the View menu's four zoom keys.
+    const QSet<QString> zooms{"Ctrl+K", "Ctrl+Q", "Ctrl+0", "Ctrl+1", "Ctrl+=", "Ctrl+-"};
+    QCOMPARE(keys(JPEGExportSheet(ExportRaster{red, 72}, session, [](std::optional<QByteArray>) {})), zooms);
     QCOMPARE(keys(ColorPickerSheet(session, [](bool) {})), both);
     QCOMPARE(keys(NewCanvasSheet(session, [](int, int) {}, [] {})), QSet<QString>{"Ctrl+K"});
     QCOMPARE(keys(TransformInspector(session)), both);

@@ -4,6 +4,7 @@
 #include "Document/LayerGroups.h"
 #include "Document/LayerMask.h"
 #include "Document/LiveLayerMask.h"
+#include "IO/ImageImporter.h"
 #include "Logging.h"
 #include "Rendering/LayerRenderer.h"
 #include "Rendering/LiveMaskRenderer.h"
@@ -143,12 +144,13 @@ try {
     QByteArray data = encode(flattened, "jpeg", qRound(std::clamp(options.quality, 0.0, 1.0) * 100), raster.resolution);
     check();
     // The preview shows what the file holds, compression and all.
+    ImageImporter::liftAllocationLimit();
     QBuffer buffer(&data);
     QImageReader reader(&buffer, "jpeg");
     const QSize size = reader.size();
-    // A thin image keeps one pixel across.
-    if (std::max(size.width(), size.height()) > 1000)
-        reader.setScaledSize(size.scaled(1000, 1000, Qt::KeepAspectRatio).expandedTo(QSize(1, 1)));
+    // Full size for the 100% view, capped; one pixel across.
+    if (std::max(size.width(), size.height()) > JPEGResult::previewLimit)
+        reader.setScaledSize(size.scaled(JPEGResult::previewLimit, JPEGResult::previewLimit, Qt::KeepAspectRatio).expandedTo(QSize(1, 1)));
     const QImage preview = reader.read();
     if (preview.isNull())
         throw ExportError(ExportError::Kind::encode);

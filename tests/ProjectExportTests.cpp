@@ -252,7 +252,17 @@ void ProjectExportTests::theFileMenuOffersBothExports()
     bar.window.show();
     bar.action("exportJPEG").trigger();
     QTRY_VERIFY(bar.window.findChild<JPEGExportSheet *>());
-    QTest::keyClick(bar.window.findChild<JPEGExportSheet *>(), Qt::Key_Escape);
+    // The menus' zoom keys reach the preview, not the canvas.
+    JPEGExportSheet &sheet = *bar.window.findChild<JPEGExportSheet *>();
+    QTRY_COMPARE(QApplication::activeWindow(), sheet.window());
+    const double zoom = bar.session().viewport.zoom();
+    QTest::keyClick(&sheet, Qt::Key_1, Qt::ControlModifier);
+    QCOMPARE(sheet.findChild<JPEGPreview *>()->zoom(), std::optional(1.0));
+    QCOMPARE(bar.session().viewport.zoom(), zoom);
+    // In the dialog only Export takes Return.
+    for (const char *name : {"jpegFit", "jpegZoomIn", "jpegZoomOut"})
+        QVERIFY(!sheet.findChild<QPushButton *>(QString::fromLatin1(name))->autoDefault());
+    QTest::keyClick(&sheet, Qt::Key_Escape);
     QTRY_VERIFY(!bar.session().isProjectBusy());
     QCOMPARE(desk.seen.size(), 1);
 }

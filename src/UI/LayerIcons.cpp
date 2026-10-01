@@ -241,6 +241,16 @@ void wind(QPainter &painter)
         painter.drawPath(path);
 }
 
+// The lens toward the top left, its handle down right.
+void magnifyingGlass(QPainter &painter, bool plus)
+{
+    painter.drawEllipse(QPointF(7.5, 7.5), 5.5, 5.5);
+    painter.drawLine(QPointF(11.4, 11.4), QPointF(16, 16));
+    painter.drawLine(QPointF(5, 7.5), QPointF(10, 7.5));
+    if (plus)
+        painter.drawLine(QPointF(7.5, 5), QPointF(7.5, 10));
+}
+
 // Swift's circle.dotted: twelve dots round a ring.
 void dottedCircle(QPainter &painter)
 {
@@ -301,6 +311,8 @@ void LayerIcons::paint(QPainter &painter, LayerIcon icon, QPointF origin, double
     case LayerIcon::drop: drop(painter); break;
     case LayerIcon::wind: wind(painter); break;
     case LayerIcon::dottedCircle: dottedCircle(painter); break;
+    case LayerIcon::plusMagnifyingGlass: magnifyingGlass(painter, true); break;
+    case LayerIcon::minusMagnifyingGlass: magnifyingGlass(painter, false); break;
     }
     painter.restore();
 }

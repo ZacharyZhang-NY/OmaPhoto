@@ -32,8 +32,9 @@ struct JPEGOptions {
 
 struct JPEGResult {
     QByteArray data;
-    // Decoded from `data`, at most 1000 pixels a side.
+    // Decoded from `data`, at most `previewLimit` pixels a side.
     QImage preview;
+    static constexpr int previewLimit = 8192;
 };
 
 namespace ImageExporter {

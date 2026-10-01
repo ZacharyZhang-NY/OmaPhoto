@@ -100,7 +100,7 @@ void JPEGExportSheetTests::theSheetShowsTheRasterAndWaitsForItsPreview()
     QCOMPARE(wait.interval(), 200);
     QCOMPARE(wait.timerType(), Qt::PreciseTimer);
     QVERIFY(!shown.ready());
-    QCOMPARE(shown.note(), QString("Updating preview…"));
+    QCOMPARE(shown.note(), QString("Updating…"));
     QVERIFY(shown.find<QProgressBar>("jpegSpinner").isVisible());
     QVERIFY(!shown.find<QLabel>("jpegBytes").isVisible() && !shown.find<QLabel>("jpegError").isVisible());
     // The material plate behind the spinner, over the dark gray.
@@ -111,8 +111,7 @@ void JPEGExportSheetTests::theSheetShowsTheRasterAndWaitsForItsPreview()
     QTRY_VERIFY(shown.ready());
     const JPEGResult expected = ImageExporter::jpeg(halfRed(1200, 800), {});
     QCOMPARE(shown.find<QLabel>("jpegBytes").text(), ByteCounts::file(expected.data.size()));
-    QVERIFY(shown.find<QLabel>("jpegBytes").isVisible());
-    QCOMPARE(shown.note(), QString("· encoded preview, fitted to window"));
+    QVERIFY(shown.find<QLabel>("jpegBytes").isVisible() && !shown.find<QLabel>("jpegNote").isVisible());
     QVERIFY(!shown.find<QProgressBar>("jpegSpinner").isVisible());
     // Fitted to 495 × 330 and centred: white, then red.
     QCOMPARE(shown.previewAt({2, 2}), QColor(31, 31, 31));
@@ -131,7 +130,7 @@ void JPEGExportSheetTests::aChangeSupersedesThePreview()
     quality.setValue(10);
     QCOMPARE(shown.find<QLabel>("jpegPercent").text(), QString("10%"));
     QVERIFY(!shown.ready());
-    QCOMPARE(shown.note(), QString("Updating preview…"));
+    QCOMPARE(shown.note(), QString("Updating…"));
     QVERIFY(shown.find<QTimer>("jpegWait").isActive());
     QVERIFY(shown.find<QProgressBar>("jpegSpinner").isVisible());
     quality.setValue(100);
@@ -171,7 +170,7 @@ void JPEGExportSheetTests::theMatteComesFromTheAppsPicker()
     QTRY_VERIFY(shown.ready());
     auto &matte = shown.find<DialogColorSwatch>("jpegMatte");
     QVERIFY(matte.accessibleName() == QString("JPEG Background") && matte.toolTip() == QString("Color that fills transparent areas"));
-    QCOMPARE(qobject_cast<QHBoxLayout *>(shown.sheet.layout()->itemAt(3)->layout())->spacing(), 8);
+    QCOMPARE(qobject_cast<QHBoxLayout *>(shown.sheet.layout()->itemAt(2)->layout())->spacing(), 8);
     matte.click();
     QCOMPARE(shown.session.colorPicker().value().target.title(), QString("Color Picker (JPEG Background)"));
     QVERIFY(shown.session.colorPicker().value().original == PaletteColor::white());
@@ -266,7 +265,7 @@ void JPEGExportSheetTests::anEncodingThatFailsIsShown()
     // A change clears the error while it waits.
     shown.find<QSlider>("jpegQuality").setValue(50);
     QVERIFY(!error.isVisible());
-    QCOMPARE(shown.note(), QString("Updating preview…"));
+    QCOMPARE(shown.note(), QString("Updating…"));
     QTRY_VERIFY(error.isVisible());
 }
 

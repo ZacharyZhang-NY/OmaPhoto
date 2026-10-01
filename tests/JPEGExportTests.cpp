@@ -14,7 +14,7 @@ private slots:
     void transparencyUsesChosenMatteAndProducesOpaqueSRGB_data();
     void transparencyUsesChosenMatteAndProducesOpaqueSRGB();
     void qualityChangesBytesAndDecodedPixels();
-    void thePreviewIsDecodedFromTheFileAndKeptSmall();
+    void thePreviewIsDecodedFromTheFileUpToItsLimit();
     void pixelsLieOverTheMatteOnce();
     void whatCannotBeEncodedDecodedOrAllocatedThrows();
     void cancellationStopsAtSwiftsThreePoints();
@@ -88,22 +88,25 @@ void JPEGExportTests::qualityChangesBytesAndDecodedPixels()
     QCOMPARE(written.readAll(), high.data);
 }
 
-void JPEGExportTests::thePreviewIsDecodedFromTheFileAndKeptSmall()
+void JPEGExportTests::thePreviewIsDecodedFromTheFileUpToItsLimit()
 {
     const JPEGResult small = ImageExporter::jpeg({noise(64, 48, 1)}, {.quality = 0.1});
     QCOMPARE(small.preview.size(), QSize(64, 48));
     // Compression shows in the preview: it is not the source.
     QCOMPARE(small.preview.convertToFormat(QImage::Format_RGB888), QImage::fromData(small.data).convertToFormat(QImage::Format_RGB888));
     QVERIFY(small.preview.convertToFormat(QImage::Format_RGB888) != noise(64, 48, 1).convertToFormat(QImage::Format_RGB888));
-    const JPEGResult wide = ImageExporter::jpeg({solid(2400, 600, qRgba(10, 200, 30, 255))}, {});
-    QCOMPARE(wide.preview.size(), QSize(1000, 250));
-    QCOMPARE(QImage::fromData(wide.data).size(), QSize(2400, 600));
-    const JPEGResult tall = ImageExporter::jpeg({solid(500, 2000, qRgba(10, 200, 30, 255))}, {});
-    QCOMPARE(tall.preview.size(), QSize(250, 1000));
-    QCOMPARE(ImageExporter::jpeg({solid(1000, 1000, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(1000, 1000));
+    // Full size for 100%, past Qt's 128 MB decode limit.
+    QCOMPARE(ImageExporter::jpeg({solid(6000, 6000, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(6000, 6000));
+    QCOMPARE(ImageExporter::jpeg({solid(2400, 600, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(2400, 600));
+    QCOMPARE(JPEGResult::previewLimit, 8192);
+    QCOMPARE(ImageExporter::jpeg({solid(8192, 4, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(8192, 4));
+    const JPEGResult wide = ImageExporter::jpeg({solid(9000, 900, qRgba(10, 200, 30, 255))}, {});
+    QCOMPARE(wide.preview.size(), QSize(8192, 819));
+    QCOMPARE(QImage::fromData(wide.data).size(), QSize(9000, 900));
+    QCOMPARE(ImageExporter::jpeg({solid(900, 9000, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(819, 8192));
     // Thin images keep a pixel across.
-    QCOMPARE(ImageExporter::jpeg({solid(2400, 1, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(1000, 1));
-    QCOMPARE(ImageExporter::jpeg({solid(1, 2400, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(1, 1000));
+    QCOMPARE(ImageExporter::jpeg({solid(9000, 1, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(8192, 1));
+    QCOMPARE(ImageExporter::jpeg({solid(1, 9000, qRgba(10, 200, 30, 255))}, {}).preview.size(), QSize(1, 8192));
 }
 
 void JPEGExportTests::pixelsLieOverTheMatteOnce()

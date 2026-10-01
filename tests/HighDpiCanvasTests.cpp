@@ -2,7 +2,9 @@
 #include "Rendering/AdjustmentSurface.h"
 #include "Rendering/EditorCanvas.h"
 #include "RenderFixtures.h"
+#include "UI/JPEGExportSheet.h"
 #include "UI/LevelsSheet.h"
+#include <QScrollBar>
 #include <QtTest>
 
 // Widgets at device pixel ratio 2: two coordinate systems.
@@ -41,6 +43,7 @@ private slots:
     void theSurfaceCoversAnOffsetWidgetInDevicePixels();
     void theCanvasDrawsDevicePixels();
     void levelsEyedroppersDrawDevicePixels();
+    void theJPEGPreviewCountsDevicePixels();
 };
 
 void HighDpiCanvasTests::theScreenScalesByTwo()
@@ -166,6 +169,28 @@ void HighDpiCanvasTests::levelsEyedroppersDrawDevicePixels()
             QVERIFY(right > 20);
         }
     }
+}
+
+void HighDpiCanvasTests::theJPEGPreviewCountsDevicePixels()
+{
+    QImage image(1200, 800, QImage::Format_RGBA8888_Premultiplied);
+    for (int y = 0; y < 800; ++y)
+        for (int x = 0; x < 1200; ++x)
+            image.setPixelColor(x, y, QColor((x * 7 + y) % 256, (x + y * 3) % 256, (x * y) % 256));
+    JPEGPreview preview(QSize(1200, 800), [] {}, nullptr);
+    preview.setImage(image, false);
+    preview.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&preview));
+    // 600 by 400 points: Fit 0.825, averaged per device pixel.
+    QCOMPARE(preview.shownZoom(), 0.825);
+    QImage fitted = preview.viewport()->grab().toImage().convertToFormat(QImage::Format_RGB32);
+    fitted.setDevicePixelRatio(1);
+    QCOMPARE(fitted.size(), QSize(1120, 660));
+    QCOMPARE(fitted.copy(65, 0, 990, 660), image.scaled(990, 660, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).convertToFormat(QImage::Format_RGB32));
+    // At 100% an image pixel is a device pixel.
+    preview.setZoom(1);
+    QCoreApplication::processEvents();
+    QCOMPARE(preview.horizontalScrollBar()->maximum(), int(std::ceil(600 - preview.viewport()->width())));
 }
 
 int main(int argc, char **argv)
