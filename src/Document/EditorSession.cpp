@@ -35,7 +35,7 @@ void EditorSession::setActiveLayerID(std::optional<QUuid> id)
 {
     // Another layer: its pixels are the target again.
     if (id != m_activeLayerID)
-        m_isMaskSelected = false;
+        setIsMaskSelected(false);
     m_activeLayerID = id;
     m_selectedLayerIDs = id ? QSet<QUuid>{*id} : QSet<QUuid>();
     notify();
@@ -234,7 +234,7 @@ void EditorSession::restore(const DocumentHistory::Snapshot &snapshot)
     m_document = snapshot.document;
     setActiveLayerID(snapshot.activeLayerID);
     const std::optional<ImageLayer> active = activeLayer();
-    m_isMaskSelected = keepsMaskTarget && active && active->mask;
+    setIsMaskSelected(keepsMaskTarget && active && active->mask);
     if (changedCanvas && m_document)
         viewport.fit(m_document->size());
     qCInfo(lcApp) << "restored a history snapshot of" << (m_document ? int(m_document->layers.size()) : 0) << "layers";
@@ -379,5 +379,20 @@ void EditorSession::setShowsSampleRing(bool shows)
 void EditorSession::requestCanvasFocus()
 {
     ++m_canvasFocusRequest;
+    notify();
+}
+
+void EditorSession::setIsMaskSelected(bool value)
+{
+    m_isMaskSelected = value;
+    if (!value)
+        m_viewsMaskAlone = false;
+}
+
+void EditorSession::setViewsMaskAlone(bool value)
+{
+    if (m_viewsMaskAlone == value)
+        return;
+    m_viewsMaskAlone = value;
     notify();
 }

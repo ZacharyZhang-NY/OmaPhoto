@@ -85,7 +85,8 @@ CanvasView::DisplayState CanvasView::displayState() const
                        .layers = {},
                        .folderMasks = {},
                        .textStyle = m_session.textDraft() ? std::optional(m_session.textDraft()->style) : std::nullopt,
-                       .textTransform = m_session.textDraft() && m_inlineTextEditor ? std::optional(m_inlineTextEditor->shownTransform()) : std::nullopt};
+                       .textTransform = m_session.textDraft() && m_inlineTextEditor ? std::optional(m_inlineTextEditor->shownTransform()) : std::nullopt,
+                       .maskAlone = m_session.maskAloneLayer() ? std::optional(m_session.maskAloneLayer()->mask->asset.identity()) : std::nullopt};
     if (!document)
         return state;
     // A hidden source still clips: live masks count every layer.
@@ -299,6 +300,10 @@ FolderMaskClip::Applier CanvasView::liveFolderMaskClip(const BrushStroke &edit, 
 
 void CanvasView::drawLayers(const CanvasDocument &document, double scale, const Center &center, QPainter &context)
 {
+    if (const std::optional<ImageLayer> alone = m_session.maskAloneLayer()) {
+        drawMaskAlone(*alone, document, scale, center, context);
+        return;
+    }
     handOnDraftEffects(document);
     m_session.effectsPreviews.prepare(document.layers);
     std::map<QUuid, ImageLayer> byID;

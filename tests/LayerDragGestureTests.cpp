@@ -36,7 +36,7 @@ private slots:
     void hoverOverRowsAndCtrlKeepTheCursorRight();
     void aSpentPressArmsNothingLater();
     void aMaskPressReleasedInAPopupIsOver();
-    void altClicksOnAMaskThroughTheWindowChooseAndToggle();
+    void altClicksOnAMaskThroughTheWindowShowItAloneAndBack();
     void anotherButtonsReleaseLeavesAMaskPress();
 };
 
@@ -260,7 +260,7 @@ void LayerDragGestureTests::aMaskPressReleasedInAPopupIsOver()
     QCOMPARE(startedDrags.back().rows, uuidString(shown.id(0)).toUtf8());
 }
 
-void LayerDragGestureTests::altClicksOnAMaskThroughTheWindowChooseAndToggle()
+void LayerDragGestureTests::altClicksOnAMaskThroughTheWindowShowItAloneAndBack()
 {
     const auto session = sessionWithLayers(2);
     Shown shown(*session);
@@ -272,11 +272,11 @@ void LayerDragGestureTests::altClicksOnAMaskThroughTheWindowChooseAndToggle()
     const QPoint at = mask.mapTo(&shown.list, QPoint(5, 5));
     // The window sees the release first; the click still lands.
     QTest::mouseClick(shown.list.windowHandle(), Qt::LeftButton, Qt::AltModifier, at);
-    QVERIFY(session->isMaskSelected());
-    QVERIFY(session->activeLayer().value().mask.value().isEnabled);
+    QVERIFY(session->isMaskSelected() && session->viewsMaskAlone());
+    // Again, the image; Shift no longer toggles the mask.
     QTest::mouseClick(shown.list.windowHandle(), Qt::LeftButton, Qt::AltModifier | Qt::ShiftModifier, at);
-    QVERIFY(session->isMaskSelected());
-    QVERIFY(!session->activeLayer().value().mask.value().isEnabled);
+    QVERIFY(session->isMaskSelected() && !session->viewsMaskAlone());
+    QVERIFY(session->activeLayer().value().mask.value().isEnabled);
     QCOMPARE(startedDrags.size(), size_t(0));
 }
 

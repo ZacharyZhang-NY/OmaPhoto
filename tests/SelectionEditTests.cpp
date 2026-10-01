@@ -55,8 +55,8 @@ void invert(EditorSession &session)
 class SelectionEditTests : public QObject {
     Q_OBJECT
 private slots:
-    void maskButtonAddsWhiteMaskOrHidesTheSelection();
-    void layerMenuMasksUseTheSelection();
+    void maskButtonAddsWhiteMaskOrRevealsTheSelection();
+    void hidingMasksUseTheSelection();
     void maskFromSelectionLinesUpOnScaledLayers();
     void deletingWithTheMaskTargetedRemovesOnlyTheMask();
     void invertKeepsTransparencyStaysInSelectionAndWorksOnMasks();
@@ -67,7 +67,7 @@ private slots:
     void aPaintedAssetThatCannotFlattenReportsAndFreesTheProject();
 };
 
-void SelectionEditTests::maskButtonAddsWhiteMaskOrHidesTheSelection()
+void SelectionEditTests::maskButtonAddsWhiteMaskOrRevealsTheSelection()
 {
     const auto session = editSession();
     session->insert(filledRed());
@@ -79,12 +79,12 @@ void SelectionEditTests::maskButtonAddsWhiteMaskOrHidesTheSelection()
     QVERIFY(!session->activeLayer().value().mask.has_value());
     select(*session, QRectF(20, 10, 30, 20));
     session->addMask();
-    QCOMPARE(session->history.undoName(), QString("Add Mask from Selection"));
+    QCOMPARE(session->history.undoName(), QString("Reveal Selection"));
     QVERIFY(!session->selection().has_value() && session->isMaskSelected());
     const QImage result = render(*session);
-    // The selected area is black, hidden; the rest white.
-    QCOMPARE(pixel(result, 30, 20)[3], 0);
-    QCOMPARE(pixel(result, 5, 5)[3], 255);
+    // The selected area is white, visible; the rest black.
+    QCOMPARE(pixel(result, 30, 20)[3], 255);
+    QCOMPARE(pixel(result, 5, 5)[3], 0);
     session->undo();
     QVERIFY(!session->activeLayer().value().mask.has_value() && session->selection().has_value());
     // A layer with a mask takes no second one.
@@ -95,18 +95,18 @@ void SelectionEditTests::maskButtonAddsWhiteMaskOrHidesTheSelection()
     QCOMPARE(session->history.undoCount(), count + 1);
 }
 
-void SelectionEditTests::layerMenuMasksUseTheSelection()
+void SelectionEditTests::hidingMasksUseTheSelection()
 {
     const auto session = editSession();
     session->insert(filledRed());
     select(*session, QRectF(20, 10, 30, 20));
     session->addMask(false);
-    QCOMPARE(session->history.undoName(), QString("Add Mask from Selection"));
+    QCOMPARE(session->history.undoName(), QString("Hide Selection"));
     QVERIFY(!session->selection().has_value() && session->isMaskSelected());
     const QImage result = render(*session);
-    // The selected area is white, visible; the rest black.
-    QCOMPARE(pixel(result, 30, 20)[3], 255);
-    QCOMPARE(pixel(result, 5, 5)[3], 0);
+    // The selected area is black, hidden; the rest white.
+    QCOMPARE(pixel(result, 30, 20)[3], 0);
+    QCOMPARE(pixel(result, 5, 5)[3], 255);
     session->undo();
     QVERIFY(!session->activeLayer().value().mask.has_value() && session->selection().has_value());
     session->deselect();
@@ -128,7 +128,7 @@ void SelectionEditTests::maskFromSelectionLinesUpOnScaledLayers()
         record(snapshot, id).transform.size = QSizeF(100, 100);
     });
     select(*session, QRectF(0, 0, 50, 50));
-    session->addMask();
+    session->addMask(false);
     // The mask uses the layer's pixel grid.
     QCOMPARE(session->activeLayer().value().mask.value().asset.size(), QSize(50, 50));
     const QImage result = render(*session);
@@ -139,7 +139,7 @@ void SelectionEditTests::maskFromSelectionLinesUpOnScaledLayers()
     session->undo();
     session->addBlankLayer();
     select(*session, QRectF(10, 10, 20, 20));
-    session->addMask();
+    session->addMask(false);
     QCOMPARE(session->activeLayer().value().mask.value().asset.size(), QSize(100, 100));
     QCOMPARE(int(session->activeLayer().value().mask.value().asset.image().constScanLine(15)[15]), 0);
     QCOMPARE(int(session->activeLayer().value().mask.value().asset.image().constScanLine(5)[5]), 255);
@@ -153,7 +153,7 @@ void SelectionEditTests::maskFromSelectionLinesUpOnScaledLayers()
         session->undo();
         session->setSelectionAntialiased(soft);
         session->applySelection(triangle, SelectionMode::replace, "Select");
-        session->addMask();
+        session->addMask(false);
         const QImage edge = session->activeLayer().value().mask.value().asset.image();
         int partial = 0;
         for (int x = 0; x < 100; ++x) {

@@ -122,6 +122,8 @@ private:
         // Typed text, which the canvas draws as pixels.
         std::optional<LayerTextStyle> textStyle;
         std::optional<LayerTransform> textTransform;
+        // The mask shown alone, though the composite may skip it.
+        std::optional<ImageIdentity> maskAlone;
         friend bool operator==(const DisplayState &, const DisplayState &) = default;
     };
     // A Zoom press: drags zoom about it, clicks step.
@@ -146,6 +148,8 @@ private:
     void drawStroke(const BrushStroke &stroke, const ImageLayer &layer, const LayerTransform &transform, const std::optional<QImage> &mask,
                     const LayerRenderer::Options &options, double scale, const Center &center, QPainter &target);
     void drawLayers(const CanvasDocument &document, double scale, const Center &center, QPainter &context);
+    // Alt-click's view: the mask in gray, strokes included.
+    void drawMaskAlone(const ImageLayer &layer, const CanvasDocument &document, double scale, const Center &center, QPainter &context);
     // Typed text as pixels, where the editor shows it.
     struct DraftText {
         QImage image;

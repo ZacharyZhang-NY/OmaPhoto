@@ -62,7 +62,7 @@ private slots:
     void tabAndTheBrushKeysStayWithTheList();
     void aSliderDragReleasedOverAPopupStillEnds();
     void anotherButtonsReleaseLeavesTheSwipe();
-    void altDoubleClickOnTheStripClipsTwiceAndAltShiftTogglesAMask();
+    void altDoubleClickOnTheStripClipsTwiceAndAltShowsAMaskAlone();
 };
 
 void LayerListFocusTests::aMenuBorrowingFocusKeepsTheRenameAndTheField()
@@ -321,7 +321,7 @@ void LayerListFocusTests::anotherButtonsReleaseLeavesTheSwipe()
     QVERIFY(session->canUndo());
 }
 
-void LayerListFocusTests::altDoubleClickOnTheStripClipsTwiceAndAltShiftTogglesAMask()
+void LayerListFocusTests::altDoubleClickOnTheStripClipsTwiceAndAltShowsAMaskAlone()
 {
     const auto session = sessionWithLayers(2);
     NativeLayerList list(*session);
@@ -339,13 +339,13 @@ void LayerListFocusTests::altDoubleClickOnTheStripClipsTwiceAndAltShiftTogglesAM
     session->undo();
     QCOMPARE(layerWith(*session, top.layerID()).maskSourceID, std::optional(list.cells().at(1)->layerID()));
     session->redo();
-    // Alt+Shift on a mask chooses it and toggles it.
+    // Alt on a mask shows it alone; Shift adds nothing.
     session->selectLayers({top.layerID()}, top.layerID());
     session->addLayerMask();
     session->selectLayerTarget(top.layerID(), false);
     QTest::mouseClick(&top.maskThumbnail(), Qt::LeftButton, Qt::AltModifier | Qt::ShiftModifier, QPoint(5, 5));
-    QVERIFY(session->isMaskSelected());
-    QVERIFY(!session->activeLayer().value().mask.value().isEnabled);
+    QVERIFY(session->isMaskSelected() && session->viewsMaskAlone());
+    QVERIFY(session->activeLayer().value().mask.value().isEnabled);
 }
 
 void LayerListFocusTests::tabAndTheBrushKeysStayWithTheList()
