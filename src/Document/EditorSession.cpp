@@ -198,8 +198,8 @@ void EditorSession::cycleToolMode()
 
 bool EditorSession::canUseHistory() const
 {
-    return !m_selectionAmountOperation && !m_textDraft && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_warpStroke && !m_showsNewDocument
-        && !m_showsImporter && !m_renamingLayerID && !m_importError && !m_transformEdit && !m_levels;
+    return !m_selectionAmountOperation && !m_colorRange && !m_textDraft && !m_isProjectBusy && !m_isImporting && !m_brushStroke && !m_warpStroke
+        && !m_showsNewDocument && !m_showsImporter && !m_renamingLayerID && !m_importError && !m_transformEdit && !m_levels;
 }
 
 void EditorSession::undo()
@@ -256,7 +256,7 @@ void EditorSession::endEdit()
 
 bool EditorSession::canEditLayers() const
 {
-    return !m_selectionAmountOperation && !m_textDraft && m_document && !m_brushStroke && !m_warpStroke && !m_isProjectBusy && !m_isImporting
+    return !m_selectionAmountOperation && !m_colorRange && !m_textDraft && m_document && !m_brushStroke && !m_warpStroke && !m_isProjectBusy && !m_isImporting
         && !m_showsNewDocument && !m_showsImporter
         && !m_renamingLayerID && !m_transformEdit && !m_cropRect && !m_gradientEdit && !m_filterEdit && !m_pixelMove && !m_levels
         && !m_hueSaturation && !m_adjustmentEditingID;

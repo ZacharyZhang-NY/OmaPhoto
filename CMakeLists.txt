@@ -91,6 +91,7 @@ add_library(compositor_core STATIC
     src/Document/ShapeTool.cpp
     src/Document/TypeTool.cpp
     src/Document/TypeTool+Runs.cpp
+    src/Document/ColorRangeSelection.cpp
     src/Document/SmudgeLiquify.cpp
     src/UI/BlendModePicker.cpp
     src/UI/BrushControls.cpp
@@ -116,6 +117,8 @@ add_library(compositor_core STATIC
     src/UI/LayersPanel.cpp
     src/UI/LevelsSheet.cpp
     src/UI/HueSaturationSheet.cpp
+    src/UI/SampleButton.cpp
+    src/UI/ColorRangeSheet.cpp
     src/UI/HueSaturationSheet+Spectrum.cpp
     src/UI/CurvesControls.cpp
     src/UI/NativeLayerList.cpp

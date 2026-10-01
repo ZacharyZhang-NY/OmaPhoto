@@ -1,6 +1,7 @@
 #include "InlineTextFixtures.h"
 #include "UI/CanvasSizeSheet.h"
 #include "UI/ColorPickerSheet.h"
+#include "UI/ColorRangeSheet.h"
 #include "UI/EffectsSheet.h"
 #include "UI/FilterSheet.h"
 #include "UI/HueSaturationSheet.h"
@@ -245,6 +246,9 @@ void RemappedKeysTests::everySheetBindsSwiftsKeys()
     session.beginFilter(FilterKind::gaussianBlur);
     QCOMPARE(keys(FilterSheet(session)), both);
     session.cancelFilter();
+    session.beginColorRange();
+    QCOMPARE(keys(ColorRangeSheet(session)), both);
+    session.cancelColorRange();
 }
 
 void RemappedKeysTests::aKeyLeftAloneReachesTheParent()

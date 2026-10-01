@@ -1,4 +1,5 @@
 #include "ContentView.h"
+#include "UI/ColorRangeSheet.h"
 #include "UI/LassoControls.h"
 #include "UI/EffectsSheet.h"
 #include "UI/FilterSheet.h"
@@ -39,6 +40,16 @@ void ContentView::synchronizePanels()
                                         new SelectionAmountSheet(m_session, *m_selectionAmountShown));
         } else {
             m_selectionAmountPanel.close();
+        }
+    }
+    // Swift's onChange of colorRange == nil.
+    if (m_colorRangeShown != m_session.colorRange().has_value()) {
+        m_colorRangeShown = m_session.colorRange().has_value();
+        if (m_colorRangeShown) {
+            m_colorRangePanel.onClose = [this] { m_session.cancelColorRange(); };
+            m_colorRangePanel.show(QStringLiteral("Color Range"), new ColorRangeSheet(m_session));
+        } else {
+            m_colorRangePanel.close();
         }
     }
     if (m_filterShown != m_session.filterEdit().has_value()) {

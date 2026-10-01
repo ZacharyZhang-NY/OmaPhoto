@@ -156,6 +156,13 @@ void CanvasView::press(QMouseEvent *event, int clicks)
     // Open Levels leaves the canvas to panning and zooming.
     if (m_session.levels() && !m_spaceHeld && m_session.tool() != NavigationTool::hand && m_session.tool() != NavigationTool::zoom)
         return;
+    // Color Range takes the colour; its panel keeps the keys.
+    if (m_session.colorRange() && !m_spaceHeld) {
+        m_session.sampleColorRange(m_session.viewport.documentPoint(point, m_session.document()->size()), event->modifiers().testFlag(Qt::ShiftModifier),
+                                   event->modifiers().testFlag(Qt::AltModifier));
+        FloatingPanel::refocus(QStringLiteral("colorRangePanel"));
+        return;
+    }
     if (!m_spaceHeld && pickingPress(point))
         return;
     if (m_spaceHeld || m_session.tool() == NavigationTool::hand) {

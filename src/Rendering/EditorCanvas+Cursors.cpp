@@ -200,7 +200,7 @@ QCursor CanvasView::wandCursor(SelectionMode mode, double ratio)
     return QCursor(pixmap, int(hotSpot.x()), int(hotSpot.y()));
 }
 
-QCursor CanvasView::eyedropperCursor(double ratio)
+QCursor CanvasView::eyedropperCursor(double ratio, HueSampleMode badge)
 {
     QPixmap pixmap = cursorPixmap(QSize(24, 24), ratio);
     QPainter painter(&pixmap);
@@ -220,6 +220,18 @@ QCursor CanvasView::eyedropperCursor(double ratio)
     for (int step = 0; step < 16; ++step)
         draw(QPointF(std::cos(step * M_PI / 8), std::sin(step * M_PI / 8)) * 1.25, Qt::white);
     draw(QPointF(), Qt::black);
+    if (badge != HueSampleMode::replace) {
+        // Bottom right, clear of the tip: a signed disc.
+        const QRectF spot(12.5, 12.5, 11, 11);
+        painter.setPen(QPen(Qt::black, 1));
+        painter.setBrush(Qt::white);
+        painter.drawEllipse(spot);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Qt::black);
+        painter.drawRect(QRectF(spot.center().x() - 3, spot.center().y() - 0.8, 6, 1.6));
+        if (badge == HueSampleMode::add)
+            painter.drawRect(QRectF(spot.center().x() - 0.8, spot.center().y() - 3, 1.6, 6));
+    }
     // The dropper's tip is the hot spot, as Swift's.
     const QPointF tip = glyph.topLeft() + EyedropperIcon::tip() * scale;
     return QCursor(pixmap, int(std::round(tip.x())), int(std::round(tip.y())));
@@ -263,7 +275,7 @@ void CanvasView::updateCursor()
         setCursor(Qt::ClosedHandCursor);
     // Picking outranks Space and the tools, as Swift's cursor rects.
     else if (picking())
-        setCursor(eyedropperCursor(devicePixelRatio()));
+        setCursor(eyedropperCursor(devicePixelRatio(), m_session.colorRange() ? m_session.colorRange().value().effectiveMode() : HueSampleMode::replace));
     else if (m_session.hueTargeting())
         setCursor(Qt::SizeHorCursor);
     else if (m_spaceHeld || tool == NavigationTool::hand)
@@ -365,6 +377,9 @@ void CanvasView::modifiersChanged()
     // As Swift's monitor: Alt may start or end picking.
     synchronizeDisplay();
     m_session.updateHeldSelectionKeys(m_shiftHeld, m_optionHeld);
+    // Color Range: Shift adds and Alt takes away while held.
+    if (m_session.colorRange())
+        m_session.setColorRangeHeld(m_optionHeld ? std::optional(HueSampleMode::remove) : m_shiftHeld ? std::optional(HueSampleMode::add) : std::nullopt);
     updateCursor();
     updateBrushCursor();
 }

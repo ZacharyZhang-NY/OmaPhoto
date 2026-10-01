@@ -34,7 +34,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         {"layerViaCopy", "Ctrl+J"}, {"cut", "Ctrl+X"}, {"copy", "Ctrl+C"}, {"copyMerged", "Ctrl+Shift+C"}, {"paste", "Ctrl+V"}, {"keyboardShortcuts", ""}, {"fillForeground", "Alt+Backspace"}, {"fillBackground", "Ctrl+Backspace"}, {"clearSelectionPixels", ""}, {"contentAwareFill", "Shift+Backspace"}, {"clippingMask", "Ctrl+Alt+G"}, {"groupLayers", "Ctrl+G"},
         {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
         {"mergeLayers", "Ctrl+E"}, {"flipHorizontal", ""}, {"flipVertical", ""}, {"deleteLayer", ""},
-        {"selectAll", "Ctrl+A"}, {"deselect", "Ctrl+D"}, {"inverse", "Ctrl+Shift+I"}, {"layerPixels", ""}, {"subject", "Ctrl+Alt+A"}, {"maskBlackAreas", ""},
+        {"selectAll", "Ctrl+A"}, {"deselect", "Ctrl+D"}, {"inverse", "Ctrl+Shift+I"}, {"layerPixels", ""}, {"subject", "Ctrl+Alt+A"}, {"colorRange", ""}, {"maskBlackAreas", ""},
         {"expandSelection", ""}, {"contractSelection", ""}, {"featherSelection", ""}, {"curves", "Ctrl+M"}, {"levels", "Ctrl+L"}, {"hueSaturation", "Ctrl+U"}, {"blackWhite", ""}, {"colorBalance", ""}, {"exposure", ""}, {"gradientMap", ""}, {"grain", ""}, {"invert", "Ctrl+I"},
         {"canvasSize", "Ctrl+Alt+C"}, {"imageSize", "Ctrl+Alt+I"}, {"trim", ""}, {"flipCanvasHorizontal", ""}, {"flipCanvasVertical", ""},
         {"gaussianBlur", ""}, {"motionBlur", ""}, {"addNoise", ""}, {"lensCorrection", ""}, {"removeBackground", ""}, {"newAdjustmentLayer", ""}, {"editAdjustment", ""},
@@ -53,7 +53,10 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     QCOMPARE(menus[0]->actions().size(), 12);
     QCOMPARE(menus[1]->actions().size(), 13);
     QCOMPARE(menus[2]->actions().size(), 16);
-    QCOMPARE(menus[3]->actions().size(), 10);
+    QCOMPARE(menus[3]->actions().size(), 11);
+    // Swift 1.3.4's Color Range… follows Subject.
+    const QList<QAction *> select = menus[3]->actions();
+    QCOMPARE(select.indexOf(&bar.action("colorRange")), select.indexOf(&bar.action("subject")) + 1);
     QCOMPARE(menus[4]->actions().size(), 16);
     // Swift's Trim… follows Image Size….
     const QList<QAction *> image = menus[4]->actions();

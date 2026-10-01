@@ -14,7 +14,7 @@ bool CanvasView::palettePicking() const
 bool CanvasView::picking() const
 {
     const std::optional<FilterEdit> &edit = m_session.filterEdit();
-    return palettePicking() || m_session.colorPicker() || m_session.hueSampleMode() || (m_session.levels() && m_session.levels()->sampleMode)
+    return palettePicking() || m_session.colorPicker() || m_session.hueSampleMode() || (m_session.levels() && m_session.levels()->sampleMode) || m_session.colorRange()
         || (edit
             && (edit->rawPanel.samplesWhiteBalance || edit->rawPanel.samplesPointColor || edit->rawPanel.samplesDefringe
                 || edit->rawPanel.drawingGeometryGuide));
@@ -23,6 +23,12 @@ bool CanvasView::picking() const
 // Picking or targeting begins or ends: a sampling goes.
 void CanvasView::syncPicking()
 {
+    // The sheet's eyedroppers change the badge, not the sampling.
+    const std::optional<HueSampleMode> range = m_session.colorRange() ? std::optional(m_session.colorRange().value().effectiveMode()) : std::nullopt;
+    if (range != m_displayedRangeMode) {
+        m_displayedRangeMode = range;
+        updateCursor();
+    }
     if (m_displayedPicking == picking() && m_displayedTargeting == m_session.hueTargeting())
         return;
     m_displayedPicking = picking();

@@ -51,8 +51,8 @@ public:
     static QCursor selectionCursor(SelectionIcon icon, SelectionMode mode, double ratio);
     // The wand, its sparkle at the hot spot, badged alike.
     static QCursor wandCursor(SelectionMode mode, double ratio);
-    // Swift's eyedropper: haloed white, its tip the hot spot.
-    static QCursor eyedropperCursor(double ratio);
+    // Swift's eyedropper, haloed, its tip the hot spot; badged.
+    static QCursor eyedropperCursor(double ratio, HueSampleMode badge = HueSampleMode::replace);
     // The brush circle as last drawn, for tests.
     const BrushCursorOverlay &brushCursor() const { return m_brushCursor; }
     const SampleRingOverlay &sampleRing() const { return m_sampleRing; }
@@ -397,6 +397,8 @@ private:
     bool m_samplingColor = false;
     bool m_displayedPicking = false;
     bool m_displayedTargeting = false;
+    // Color Range's eyedropper, which its badge shows.
+    std::optional<HueSampleMode> m_displayedRangeMode;
     // Where a targeted drag began, in view points.
     std::optional<QPointF> m_hueTargetStart;
     std::optional<CropDrag> m_cropDrag;

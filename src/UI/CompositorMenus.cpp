@@ -198,6 +198,7 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     });
     add(select, QStringLiteral("subject"), QStringLiteral("Subject"), QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_A),
         [this] { session().selectSubject(SelectionMode::replace, {}); });
+    add(select, QStringLiteral("colorRange"), QStringLiteral("Color Range…"), QKeySequence(), [this] { session().beginColorRange(); });
     add(select, QStringLiteral("maskBlackAreas"), QStringLiteral("Mask's Black Areas"), QKeySequence(), [this] {
         if (const std::optional<QUuid> id = session().activeLayerID())
             session().loadMaskSelection(*id);
@@ -380,6 +381,7 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("layerPixels"))->setEnabled(active && active->asset && s.canEditSelection());
     action(QStringLiteral("maskBlackAreas"))->setEnabled(active && active->mask && s.canEditSelection());
     action(QStringLiteral("subject"))->setEnabled(s.canSelectSubject());
+    action(QStringLiteral("colorRange"))->setEnabled(s.canSelectColorRange());
     for (const char *name : {"expandSelection", "contractSelection", "featherSelection"})
         action(QString::fromLatin1(name))->setEnabled(s.canModifySelection());
     action(QStringLiteral("levels"))->setEnabled(s.canAdjustColors() && !s.hueSaturation());

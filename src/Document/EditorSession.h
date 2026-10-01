@@ -2,6 +2,7 @@
 #include "Document/BrushStroke.h"
 #include "Document/CloneStamp.h"
 #include "Document/ColorPalette.h"
+#include "Document/ColorRangeSelection.h"
 #include "Document/Gradient.h"
 #include "Document/Distort.h"
 #include "Document/DocumentLimits.h"
@@ -282,7 +283,6 @@ public:
     void setBrushError(std::optional<QString> error);
 
     void notify() { emit changed(); }
-
     // Swift's extensions, each declared in its twin's header.
 #include "Document/EditorSession+Projects.h"
 #include "IO/ImageResizer+Session.h"
@@ -319,6 +319,7 @@ public:
 #include "Document/CameraRaw+Session.h"
 #include "Document/Guides+Session.h"
 #include "Document/ObjectSelection+Session.h"
+#include "Document/ColorRangeSelection+Session.h"
 signals:
     void changed();
 
@@ -346,7 +347,6 @@ private:
     mutable std::map<QUuid, DistortPreviewCache> m_distortPreviewCache;
     mutable std::map<QUuid, DistortEffectsCache> m_distortEffectsCache;
     mutable std::optional<MaskDistortPreviewCache> m_maskDistortPreviewCache;
-
     std::optional<TransformEdit> m_transformEdit;
     std::optional<TransformDuplicate> m_transformDuplicate;
     bool m_transformAutoSelect = ToolDefaults::boolean(QStringLiteral("autoSelect"), false);
@@ -495,4 +495,5 @@ private:
     int m_selectionContractAmount = 1;
     int m_selectionFeatherAmount = 2;
     std::optional<SelectionAmountOperation> m_selectionAmountOperation;
+    std::optional<ColorRangeEdit> m_colorRange;
 };

@@ -102,5 +102,7 @@ private:
     FloatingPanel m_effectsPanel{QStringLiteral("effectsPanel"), *this};
     FloatingPanel m_selectionAmountPanel{QStringLiteral("selectionAmountPanel"), *this};
     std::optional<SelectionAmountOperation> m_selectionAmountShown;
+    FloatingPanel m_colorRangePanel{QStringLiteral("colorRangePanel"), *this};
+    bool m_colorRangeShown = false;
     std::optional<LayerEffectSelection> m_effectsShown;
 };
