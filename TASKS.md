@@ -421,7 +421,8 @@ Reviews for this section ran on codex `gpt-6.1-sol` at `max` (agent `codex-sol`)
 - 13.3a review (Fable 5.1): round 1 FAIL (test gaps: the face's divisor and the width's rounding at larger sizes, the coverage's mean, the Text Size row's ends, decimals and unit, the picked table over non-square cells); round 2 FAIL (the kernel's averaging window, height and width); round 3 PASS.
 - [x] 13.3b Part three: Select › Color Range (`c3e360a`: `ColorRangeSelection`, `WandPixels.c`, the sheet, the canvas's sampling).
 - 13.3b review (Fable 5.1): round 1 FAIL (the sheet's native keys unbound; test gaps: the click's rows and floor, stale and foreign results, the selection kept on error, the preview's truncation); round 2 FAIL (OK after an error, the antialiased flag; two dead gate terms noted); round 3 PASS.
-- [ ] 13.4a Version 1.3.5, part one: Export JPEG and Canvas Size take the app's colour picker (`c580a38`); `908bed9` and `158cd53` judged: Qt signals arrive on the GUI thread, and the digest already hashes a local's bytes.
+- [x] 13.4a Version 1.3.5, part one: Export JPEG and Canvas Size take the app's colour picker (`c580a38`); `908bed9` and `158cd53` judged: Qt signals arrive on the GUI thread, and the digest already hashes a local's bytes.
+- 13.4a review (Fable 5.1): round 1 FAIL (the swatch's minimize case, its white ring and radius untested); round 2 PASS.
 - [ ] 13.4b Part two: Export JPEG's zoomable preview and tidier layout, the View menu's zoom on it, one OK on the import error (`ac6f309`).
 - [ ] 13.5 Part two: the marquee, shapes and a moved selection snap to View › Snap To (`d6e3e93`, `8b1369a`); View › Grid Settings… with Restore Defaults (`1c819d0`, `db5eafa`).
 - [ ] 13.6 Part three: Ctrl+Z while typing takes back what was typed (`ee68ba9`); font previews in the Type bar (`1bd1df4`).

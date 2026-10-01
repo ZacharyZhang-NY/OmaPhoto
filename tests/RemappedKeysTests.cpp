@@ -226,10 +226,10 @@ void RemappedKeysTests::everySheetBindsSwiftsKeys()
     red.fill(Qt::red);
     session.insert(ImportedImage(red, red, "Red"));
     const CanvasDocument canvas = session.document().value();
-    QCOMPARE(keys(CanvasSizeSheet(canvas, PaletteColor::black(), PaletteColor::white(), [](std::optional<CanvasSizeOptions>) {})), both);
+    QCOMPARE(keys(CanvasSizeSheet(canvas, session, [](std::optional<CanvasSizeOptions>) {})), both);
     QCOMPARE(keys(ImageSizeSheet(canvas, [](std::optional<ImageSizeOptions>) {})), both);
     QCOMPARE(keys(TrimSheet([](std::optional<TrimOptions>) {})), both);
-    QCOMPARE(keys(JPEGExportSheet(ExportRaster{red, 72}, [](std::optional<QByteArray>) {})), both);
+    QCOMPARE(keys(JPEGExportSheet(ExportRaster{red, 72}, session, [](std::optional<QByteArray>) {})), both);
     QCOMPARE(keys(ColorPickerSheet(session, [](bool) {})), both);
     QCOMPARE(keys(NewCanvasSheet(session, [](int, int) {}, [] {})), QSet<QString>{"Ctrl+K"});
     QCOMPARE(keys(TransformInspector(session)), both);

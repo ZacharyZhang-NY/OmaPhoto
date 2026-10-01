@@ -12,7 +12,8 @@ class QProgressBar;
 class QPushButton;
 class QSlider;
 class QTimer;
-class SwatchButton;
+class DialogColorSwatch;
+class EditorSession;
 
 // Swift's JPEGExportSheet: quality, matte and the encoded preview.
 class JPEGExportSheet : public QWidget {
@@ -21,17 +22,18 @@ public:
     // The last export's quality, where the next one starts.
     static const QString qualityKey;
 
-    JPEGExportSheet(ExportRaster raster, std::function<void(std::optional<QByteArray>)> finish, QWidget *parent = nullptr);
+    JPEGExportSheet(ExportRaster raster, EditorSession &session, std::function<void(std::optional<QByteArray>)> finish, QWidget *parent = nullptr);
     ~JPEGExportSheet() override;
 
 private:
     class Preview;
     void request();
     void encode();
-    void pickMatte();
+    void setMatte(const PaletteColor &matte);
     void synchronize();
 
     const ExportRaster m_raster;
+    EditorSession &m_session;
     const std::function<void(std::optional<QByteArray>)> m_finish;
     JPEGOptions m_options;
     std::optional<JPEGResult> m_result;
@@ -44,7 +46,7 @@ private:
     QProgressBar *const m_spinner;
     QSlider *const m_quality;
     QLabel *const m_percent;
-    SwatchButton *const m_matteSwatch;
+    DialogColorSwatch *const m_matteSwatch;
     QLabel *const m_failure;
     QLabel *const m_bytes;
     QLabel *const m_note;

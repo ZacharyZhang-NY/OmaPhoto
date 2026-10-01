@@ -14,7 +14,8 @@ bool CanvasView::palettePicking() const
 bool CanvasView::picking() const
 {
     const std::optional<FilterEdit> &edit = m_session.filterEdit();
-    return palettePicking() || m_session.colorPicker() || m_session.hueSampleMode() || (m_session.levels() && m_session.levels()->sampleMode) || m_session.colorRange()
+    return palettePicking() || (m_session.colorPicker() && !m_session.pickingForDialog()) || m_session.hueSampleMode()
+        || (m_session.levels() && m_session.levels()->sampleMode) || m_session.colorRange()
         || (edit
             && (edit->rawPanel.samplesWhiteBalance || edit->rawPanel.samplesPointColor || edit->rawPanel.samplesDefringe
                 || edit->rawPanel.drawingGeometryGuide));

@@ -28,6 +28,11 @@ public:
     void openEffectColorPicker(LayerEffectKind kind);
     // The effect follows the picker's working colour.
     void previewEffectColor();
+    // The picker on a dialog's colour, which hears each change.
+    void openDialogColorPicker(const QString &title, const PaletteColor &color, std::function<void(const PaletteColor &)> change);
+    // A dialog covers the canvas: nothing to sample.
+    bool pickingForDialog() const;
+    void previewDialogColor() const;
     // The open text draft previews the picker's working colour.
     void previewTextColor();
     // Paints the open text's selected letters, or all of it.

@@ -235,19 +235,23 @@ ColorPickerSheet::ColorPickerSheet(EditorSession &session, std::function<void(bo
     m_hex->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     fields->addWidget(label(QStringLiteral("#"), this), 3, 0);
     fields->addWidget(m_hex, 3, 1, Qt::AlignLeft);
-    auto *hint = new QLabel(QStringLiteral("Click the canvas to sample"), this);
-    QFont small = hint->font();
-    small.setPixelSize(10);
-    hint->setFont(small);
-    hint->setForegroundRole(QPalette::PlaceholderText);
     auto *column = new QVBoxLayout;
     column->setSpacing(0);
     column->addLayout(top);
     column->addStretch();
     column->addSpacing(12);
     column->addLayout(fields);
-    column->addSpacing(8);
-    column->addWidget(hint);
+    // A dialog covers the canvas: nothing to sample.
+    if (!m_session.pickingForDialog()) {
+        auto *hint = new QLabel(QStringLiteral("Click the canvas to sample"), this);
+        hint->setObjectName(QStringLiteral("pickerHint"));
+        QFont small = hint->font();
+        small.setPixelSize(10);
+        hint->setFont(small);
+        hint->setForegroundRole(QPalette::PlaceholderText);
+        column->addSpacing(8);
+        column->addWidget(hint);
+    }
     auto *side = new QWidget(this);
     side->setFixedSize(180, int(fieldSize));
     side->setLayout(column);

@@ -1,7 +1,10 @@
 #include "DialogDesk.h"
 #include "IO/ProjectController.h"
 #include "UI/CanvasSizeSheet.h"
+#include "UI/ColorPaletteControls.h"
+#include "UI/ColorPickerSheet+Dialog.h"
 #include "UI/ColorPickerSheet.h"
+#include <QComboBox>
 #include "UI/ImageSizeSheet.h"
 #include <QDialog>
 #include <QPushButton>
@@ -15,6 +18,7 @@ private slots:
     void aCancelledOrRefusedSheetChangesNothing();
     void theImageSizeSheetScalesThePixelsAsOneStep();
     void aResizeThatFailsIsExplained();
+    void theSheetsColourOpensTheAppsPickerOverIt();
 };
 
 namespace {
@@ -157,6 +161,37 @@ void ProjectResizeTests::aResizeThatFailsIsExplained()
     QTRY_VERIFY(desk.done);
     QCOMPARE(alerts.seen.size(), 2);
     QVERIFY(alerts.seen.last().startsWith("alert|2|Couldn’t change canvas size|"));
+}
+
+void ProjectResizeTests::theSheetsColourOpensTheAppsPickerOverIt()
+{
+    Desk desk;
+    new ColorPaletteControls(desk.session, &desk.window);
+    desk.controller.canvasSize(desk.finished());
+    auto &extension = *desk.dialog().findChild<QComboBox *>(QStringLiteral("canvasExtension"));
+    extension.setCurrentIndex(5);
+    emit extension.activated(5);
+    desk.dialog().findChild<DialogColorSwatch *>()->click();
+    // The panel sits over the sheet and takes the keys.
+    QWidget *panel = nullptr;
+    QTRY_VERIFY((panel = desk.dialog().findChild<QDialog *>(ColorPickerPanelController::identifier())) && panel->isVisible());
+    QTRY_COMPARE(QApplication::activeWindow(), panel);
+    desk.session.setColorPickerHSB(PickerHSB(PaletteColor{0, 0, 1}));
+    // Escape there cancels the picker; the sheet stays.
+    QTest::keyClick(panel, Qt::Key_Escape);
+    QTRY_VERIFY(!desk.session.colorPicker() && !panel->isVisible());
+    QVERIFY(desk.dialog().isVisible() && !desk.done);
+    desk.dialog().findChild<DialogColorSwatch *>()->click();
+    QTRY_VERIFY(panel->isVisible());
+    desk.session.setColorPickerHSB(PickerHSB(PaletteColor{0, 0, 1}));
+    panel->findChild<QPushButton *>(QStringLiteral("pickerOK"))->click();
+    QVERIFY(!desk.session.colorPicker());
+    desk.type("canvasWidth", "200");
+    QTRY_VERIFY(desk.done);
+    // The added canvas takes the colour picked.
+    const ImageLayer bottom = desk.session.document().value().layers.front();
+    QCOMPARE(bottom.asset.value().image().pixelColor(0, 25), QColor(0, 0, 255));
+    QVERIFY(!desk.session.isProjectBusy());
 }
 
 QTEST_MAIN(ProjectResizeTests)

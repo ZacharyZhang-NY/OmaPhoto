@@ -31,7 +31,7 @@ void ProjectController::canvasSize(std::function<void()> done)
     }
     QDialog *dialog = sheet(QStringLiteral("Canvas Size"));
     auto chosen = std::make_shared<std::optional<CanvasSizeOptions>>();
-    dialog->layout()->addWidget(new CanvasSizeSheet(session.document().value(), session.foregroundColor(), session.backgroundColor(),
+    dialog->layout()->addWidget(new CanvasSizeSheet(session.document().value(), session,
                                                     [dialog, chosen](std::optional<CanvasSizeOptions> options) {
                                                         *chosen = options;
                                                         dialog->done(options ? QDialog::Accepted : QDialog::Rejected);

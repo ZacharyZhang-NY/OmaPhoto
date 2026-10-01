@@ -1,8 +1,7 @@
 #include "UI/JPEGExportSheet.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/ByteCounts.h"
-#include "UI/ColorPaletteControls.h"
-#include <QColorDialog>
+#include "UI/ColorPickerSheet+Dialog.h"
 #include <QFutureWatcher>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -83,10 +82,12 @@ protected:
     }
 };
 
-JPEGExportSheet::JPEGExportSheet(ExportRaster raster, std::function<void(std::optional<QByteArray>)> finish, QWidget *parent)
-    : QWidget(parent), m_raster(std::move(raster)), m_finish(std::move(finish)), m_wait(new QTimer(this)), m_preview(new Preview(this)),
+JPEGExportSheet::JPEGExportSheet(ExportRaster raster, EditorSession &session, std::function<void(std::optional<QByteArray>)> finish, QWidget *parent)
+    : QWidget(parent), m_raster(std::move(raster)), m_session(session), m_finish(std::move(finish)), m_wait(new QTimer(this)), m_preview(new Preview(this)),
       m_spinner(new QProgressBar(m_preview)), m_quality(new QSlider(Qt::Horizontal, this)),
-      m_percent(text(QString(), 13, QFont::Normal, QPalette::WindowText, this)), m_matteSwatch(new SwatchButton([this] { return PaletteColor{m_options.red, m_options.green, m_options.blue}; }, 3, 0, 0.5, this)),
+      m_percent(text(QString(), 13, QFont::Normal, QPalette::WindowText, this)), m_matteSwatch(new DialogColorSwatch(
+          QStringLiteral("JPEG Background"), [this] { return PaletteColor{m_options.red, m_options.green, m_options.blue}; },
+          [this](const PaletteColor &matte) { setMatte(matte); }, session, this)),
       m_failure(text(QString(), 13, QFont::Normal, QPalette::BrightText, this)), m_bytes(text(QString(), 13, QFont::Normal, QPalette::WindowText, this)),
       m_note(text(QString(), 13, QFont::Normal, QPalette::PlaceholderText, this)), m_export(new QPushButton(QStringLiteral("Export…"), this))
 {
@@ -122,13 +123,12 @@ JPEGExportSheet::JPEGExportSheet(ExportRaster raster, std::function<void(std::op
     quality->addWidget(m_percent);
     column->addLayout(quality);
 
-    // Swift's ColorPicker: its label and a well, no opacity.
+    // Its label and the app's picker on a swatch.
     auto *matte = new QHBoxLayout;
+    matte->setSpacing(8);
     matte->addWidget(new QLabel(QStringLiteral("Background for transparency"), this));
     m_matteSwatch->setObjectName(QStringLiteral("jpegMatte"));
-    m_matteSwatch->setFixedSize(36, 18);
-    m_matteSwatch->setAccessibleName(QStringLiteral("Background for transparency"));
-    connect(m_matteSwatch, &QAbstractButton::clicked, this, &JPEGExportSheet::pickMatte);
+    m_matteSwatch->setToolTip(QStringLiteral("Color that fills transparent areas"));
     matte->addWidget(m_matteSwatch);
     matte->addStretch(1);
     column->addLayout(matte);
@@ -146,13 +146,17 @@ JPEGExportSheet::JPEGExportSheet(ExportRaster raster, std::function<void(std::op
     auto *cancel = new QPushButton(QStringLiteral("Cancel"), this);
     cancel->setObjectName(QStringLiteral("jpegCancel"));
     cancel->setAutoDefault(false);
-    connect(cancel, &QPushButton::clicked, this, [this] { m_finish(std::nullopt); });
+    connect(cancel, &QPushButton::clicked, this, [this] {
+        DialogColorSwatch::closePicker(m_session);
+        m_finish(std::nullopt);
+    });
     m_export->setObjectName(QStringLiteral("jpegExport"));
     m_export->setDefault(true);
     // Swift's configuredNativeShortcut: Return and Escape, as remapped.
     NativeShortcut::bind(*this, m_export, cancel);
     // Export rests until a result is ready.
     connect(m_export, &QPushButton::clicked, this, [this] {
+        DialogColorSwatch::closePicker(m_session);
         QSettings().setValue(qualityKey, m_options.quality);
         m_finish(m_result.value().data);
     });
@@ -172,6 +176,7 @@ JPEGExportSheet::JPEGExportSheet(ExportRaster raster, std::function<void(std::op
 JPEGExportSheet::~JPEGExportSheet()
 {
     m_cancelled->store(true);
+    DialogColorSwatch::closePicker(m_session);
 }
 
 // Swift's task(id:): the last request stops; this waits 200 ms.
@@ -215,26 +220,17 @@ void JPEGExportSheet::encode()
     }));
 }
 
-// The desktop's colour dialog, SwiftUI's colour panel, without alpha.
-void JPEGExportSheet::pickMatte()
+void JPEGExportSheet::setMatte(const PaletteColor &matte)
 {
-    auto *dialog = new QColorDialog(QColor::fromRgbF(float(m_options.red), float(m_options.green), float(m_options.blue)), this);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QStringLiteral("Background for transparency"));
-    connect(dialog, &QColorDialog::colorSelected, this, [this](const QColor &picked) {
-        const QColor srgb = picked.toRgb();
-        JPEGOptions next = m_options;
-        next.red = srgb.redF();
-        next.green = srgb.greenF();
-        next.blue = srgb.blueF();
-        // Swift's onChange: the same colour asks nothing.
-        if (next == m_options)
-            return;
-        m_options = next;
-        m_matteSwatch->update();
-        request();
-    });
-    dialog->open();
+    JPEGOptions next = m_options;
+    next.red = matte.red;
+    next.green = matte.green;
+    next.blue = matte.blue;
+    // Equal options ask nothing, as Swift's task id.
+    if (next == m_options)
+        return;
+    m_options = next;
+    request();
 }
 
 void JPEGExportSheet::synchronize()

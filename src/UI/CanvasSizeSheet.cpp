@@ -2,12 +2,11 @@
 #include "Document/DocumentLimits.h"
 #include "UI/KeyboardShortcuts.h"
 #include "UI/ByteCounts.h"
-#include "UI/ColorPaletteControls.h"
+#include "UI/ColorPickerSheet+Dialog.h"
 #include "UI/ColorPickerSheet.h"
 #include "UI/NumericScrub.h"
 #include <QButtonGroup>
 #include <QCheckBox>
-#include <QColorDialog>
 #include <QComboBox>
 #include <QFrame>
 #include <QGridLayout>
@@ -109,13 +108,14 @@ protected:
 };
 }
 
-CanvasSizeSheet::CanvasSizeSheet(const CanvasDocument &document, PaletteColor foreground, PaletteColor background,
-                                 std::function<void(std::optional<CanvasSizeOptions>)> finish, QWidget *parent)
-    : QWidget(parent), m_foreground(foreground), m_background(background), m_finish(std::move(finish)),
+CanvasSizeSheet::CanvasSizeSheet(const CanvasDocument &document, EditorSession &session, std::function<void(std::optional<CanvasSizeOptions>)> finish,
+                                 QWidget *parent)
+    : QWidget(parent), m_session(session), m_foreground(session.foregroundColor()), m_background(session.backgroundColor()), m_finish(std::move(finish)),
       m_draft(document.width, document.height, document.resolution), m_width(dimension(true)), m_height(dimension(false)),
       m_note(text(QString(), 12, QFont::Normal, QPalette::PlaceholderText, this)),
       m_anchors(new QButtonGroup(this)), m_anchorName(text(QString(), 12, QFont::Bold, QPalette::WindowText, this)), m_extension(new QComboBox(this)),
-      m_customRow(new QWidget(this)), m_customSwatch(new SwatchButton([this] { return m_custom; }, 3, 0, 0.5, m_customRow)),
+      m_customRow(new QWidget(this)), m_customSwatch(new DialogColorSwatch(
+          QStringLiteral("Extension Color"), [this] { return m_custom; }, [this](const PaletteColor &custom) { m_custom = custom; }, session, m_customRow)),
       m_ok(new QPushButton(QStringLiteral("OK"), this))
 {
     setFixedWidth(450);
@@ -224,14 +224,13 @@ CanvasSizeSheet::CanvasSizeSheet(const CanvasDocument &document, PaletteColor fo
     extension->addWidget(extensionLabel);
     extension->addWidget(m_extension, 1);
     column->addLayout(extension);
-    // Swift's ColorPicker: its label and a well, no opacity.
+    // Its label and the app's picker on a swatch.
     m_customRow->setObjectName(QStringLiteral("extensionColorRow"));
     m_customSwatch->setObjectName(QStringLiteral("extensionColor"));
-    m_customSwatch->setFixedSize(36, 18);
-    m_customSwatch->setAccessibleName(QStringLiteral("Extension color"));
-    connect(m_customSwatch, &QAbstractButton::clicked, this, &CanvasSizeSheet::pickCustomColor);
+    m_customSwatch->setToolTip(QStringLiteral("Color for the added canvas"));
     auto *customLayout = new QHBoxLayout(m_customRow);
     customLayout->setContentsMargins(0, 0, 0, 0);
+    customLayout->setSpacing(8);
     customLayout->addWidget(new QLabel(QStringLiteral("Extension color"), m_customRow));
     customLayout->addWidget(m_customSwatch);
     customLayout->addStretch(1);
@@ -240,13 +239,18 @@ CanvasSizeSheet::CanvasSizeSheet(const CanvasDocument &document, PaletteColor fo
     auto *cancel = new QPushButton(QStringLiteral("Cancel"), this);
     cancel->setObjectName(QStringLiteral("canvasCancel"));
     cancel->setAutoDefault(false);
-    connect(cancel, &QPushButton::clicked, this, [this] { m_finish(std::nullopt); });
+    connect(cancel, &QPushButton::clicked, this, [this] {
+        DialogColorSwatch::closePicker(m_session);
+        m_finish(std::nullopt);
+    });
     m_ok->setObjectName(QStringLiteral("canvasOK"));
     m_ok->setDefault(true);
     // Swift's configuredNativeShortcut: Return and Escape, as remapped.
     NativeShortcut::bind(*this, m_ok, cancel);
     // OK rests while the draft is invalid: no guard needed.
     connect(m_ok, &QPushButton::clicked, this, [this] {
+        // An open picker's colour counts: it closes first.
+        DialogColorSwatch::closePicker(m_session);
         m_finish(CanvasSizeOptions{.width = qint64(std::round(m_draft.width)), .height = qint64(std::round(m_draft.height)), .anchor = m_anchor,
                                    .fill = fill()});
     });
@@ -300,20 +304,6 @@ std::optional<CanvasExtensionColor> CanvasSizeSheet::fill() const
     }
 }
 
-// The desktop's colour dialog, SwiftUI's colour panel, without alpha.
-void CanvasSizeSheet::pickCustomColor()
-{
-    auto *dialog = new QColorDialog(m_custom.color(), this);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowTitle(QStringLiteral("Extension color"));
-    connect(dialog, &QColorDialog::colorSelected, this, [this](const QColor &picked) {
-        const QColor srgb = picked.toRgb();
-        m_custom = PaletteColor{srgb.redF(), srgb.greenF(), srgb.blueF()};
-        m_customSwatch->update();
-    });
-    dialog->open();
-}
-
 // Units, Relative and Lock change only through their own controls.
 void CanvasSizeSheet::synchronize()
 {
@@ -347,4 +337,5 @@ void CanvasSizeSheet::synchronize()
 CanvasSizeSheet::~CanvasSizeSheet()
 {
     releaseFocus(*this);
+    DialogColorSwatch::closePicker(m_session);
 }

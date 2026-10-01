@@ -3,6 +3,7 @@
 #include <QColor>
 #include <QString>
 #include <QUuid>
+#include <functional>
 #include <optional>
 
 // Swift's PaletteColor: an sRGB colour without alpha.
@@ -38,7 +39,7 @@ enum class LayerEffectKind;
 
 // The picker's targets: palette, text, effect, a filter's colour.
 struct ColorPickerTarget {
-    enum class Kind { palette, text, gradientMap, effect, vignette, dither };
+    enum class Kind { palette, text, gradientMap, effect, vignette, dither, dialog };
     Kind kind;
     bool background = false;
     std::optional<QUuid> draftID = std::nullopt;
@@ -48,6 +49,8 @@ struct ColorPickerTarget {
     LayerEffectKind effect{};
     // Dither's Two Colors: the light one, else the dark.
     bool light = false;
+    // A dialog's own colour, such as Export JPEG's background.
+    QString dialogTitle{};
     QString title() const;
     friend bool operator==(const ColorPickerTarget &, const ColorPickerTarget &) = default;
 };
@@ -66,5 +69,7 @@ struct ColorPickerState {
         LayerTextStyle style;
     };
     std::optional<EditedText> editedText;
+    // A dialog's colour: told as it moves, then on closing.
+    std::function<void(const PaletteColor &)> dialogChange;
     PaletteColor color() const { return hsb.rgb().quantized(); }
 };

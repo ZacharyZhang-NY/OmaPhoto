@@ -1,7 +1,8 @@
 #include "UI/ByteCounts.h"
 #include "UI/ColorPaletteControls.h"
 #include "UI/JPEGExportSheet.h"
-#include <QColorDialog>
+#include "UI/ColorPickerSheet+Dialog.h"
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QProgressBar>
 #include <QPushButton>
@@ -19,7 +20,7 @@ private slots:
     void theSheetShowsTheRasterAndWaitsForItsPreview();
     void aChangeSupersedesThePreview();
     void aSupersededEncodingNeverLands();
-    void theMatteComesFromTheColorDialog();
+    void theMatteComesFromTheAppsPicker();
     void exportKeepsTheQualityAndCancelDoesNot();
     void theSavedQualityIsReadAsSwiftReadsIt();
     void anEncodingThatFailsIsShown();
@@ -39,9 +40,10 @@ ExportRaster halfRed(int width = 64, int height = 32)
 
 struct Sheet {
     std::optional<std::optional<QByteArray>> answer;
+    EditorSession session;
     JPEGExportSheet sheet;
     explicit Sheet(ExportRaster raster = halfRed())
-        : sheet(std::move(raster), [this](std::optional<QByteArray> data) { answer = std::move(data); })
+        : sheet(std::move(raster), session, [this](std::optional<QByteArray> data) { answer = std::move(data); })
     {
         sheet.show();
     }
@@ -162,36 +164,49 @@ void JPEGExportSheetTests::aSupersededEncodingNeverLands()
     QCOMPARE(shown.find<QLabel>("jpegPercent").text(), QString("50%"));
 }
 
-void JPEGExportSheetTests::theMatteComesFromTheColorDialog()
+void JPEGExportSheetTests::theMatteComesFromTheAppsPicker()
 {
     QSettings().remove(JPEGExportSheet::qualityKey);
     Sheet shown;
     QTRY_VERIFY(shown.ready());
-    shown.find<SwatchButton>("jpegMatte").click();
-    auto *dialog = shown.sheet.findChild<QColorDialog *>();
-    QVERIFY(dialog && dialog->isVisible());
-    QVERIFY(!dialog->testOption(QColorDialog::ShowAlphaChannel));
-    QCOMPARE(dialog->currentColor(), QColor(Qt::white));
+    auto &matte = shown.find<DialogColorSwatch>("jpegMatte");
+    QVERIFY(matte.accessibleName() == QString("JPEG Background") && matte.toolTip() == QString("Color that fills transparent areas"));
+    QCOMPARE(qobject_cast<QHBoxLayout *>(shown.sheet.layout()->itemAt(3)->layout())->spacing(), 8);
+    matte.click();
+    QCOMPARE(shown.session.colorPicker().value().target.title(), QString("Color Picker (JPEG Background)"));
+    QVERIFY(shown.session.colorPicker().value().original == PaletteColor::white());
     // The same colour asks for nothing.
-    dialog->setCurrentColor(Qt::white);
-    dialog->accept();
+    shown.session.closeColorPicker(true);
     QVERIFY(shown.ready() && !shown.find<QTimer>("jpegWait").isActive());
-    shown.find<SwatchButton>("jpegMatte").click();
-    dialog = shown.sheet.findChild<QColorDialog *>();
-    dialog->setCurrentColor(QColor(0, 0, 255));
-    // The well repaints with its colour.
-    PaintCount painted(shown.find<SwatchButton>("jpegMatte"));
-    dialog->accept();
-    QTRY_VERIFY(painted.count > 0);
+    // The working colour reaches the preview; Cancel takes it back.
+    matte.click();
+    shown.session.setColorPickerHSB(PickerHSB(PaletteColor{0, 0, 1}));
     QVERIFY(!shown.ready());
-    QCOMPARE(shown.find<SwatchButton>("jpegMatte").grab().toImage().pixelColor(18, 9), QColor(0, 0, 255));
+    QCOMPARE(matte.grab().toImage().pixelColor(17, 9), QColor(0, 0, 255));
+    shown.session.closeColorPicker(false);
+    QCOMPARE(matte.grab().toImage().pixelColor(17, 9), QColor(Qt::white));
+    QTRY_VERIFY(shown.ready());
+    // Export closes an open picker, keeping its colour.
+    matte.click();
+    shown.session.setColorPickerHSB(PickerHSB(PaletteColor{0, 0, 1}));
     QTRY_VERIFY(shown.ready());
     shown.find<QPushButton>("jpegExport").click();
+    QVERIFY(!shown.session.colorPicker());
     const QImage written = QImage::fromData(shown.answer.value().value(), "jpeg");
     const QColor left = written.pixelColor(8, 16), right = written.pixelColor(56, 16);
     QVERIFY(left.blue() > 240 && left.red() < 16 && left.green() < 16);
     QVERIFY(right.red() > 240 && right.blue() < 16);
     QCOMPARE(shown.answer.value().value(), ImageExporter::jpeg(halfRed(), {.red = 0, .green = 0, .blue = 1}).data);
+    // Cancel and the sheet going close it too.
+    Sheet cancelled;
+    cancelled.find<DialogColorSwatch>("jpegMatte").click();
+    cancelled.find<QPushButton>("jpegCancel").click();
+    QVERIFY(!cancelled.session.colorPicker() && !cancelled.answer.value());
+    EditorSession session;
+    auto gone = std::make_unique<JPEGExportSheet>(halfRed(), session, [](std::optional<QByteArray>) {});
+    gone->findChild<DialogColorSwatch *>()->click();
+    gone.reset();
+    QVERIFY(!session.colorPicker());
 }
 
 void JPEGExportSheetTests::exportKeepsTheQualityAndCancelDoesNot()

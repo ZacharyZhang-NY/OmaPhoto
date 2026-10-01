@@ -109,6 +109,8 @@ QString ColorPickerTarget::title() const
         return QStringLiteral("Color Picker (Vignette Color)");
     if (kind == Kind::dither)
         return light ? QStringLiteral("Color Picker (Dither Light Color)") : QStringLiteral("Color Picker (Dither Dark Color)");
+    if (kind == Kind::dialog)
+        return QStringLiteral("Color Picker (%1)").arg(dialogTitle);
     return background ? QStringLiteral("Color Picker (Background Color)") : QStringLiteral("Color Picker (Foreground Color)");
 }
 
@@ -257,6 +259,8 @@ void EditorSession::closeColorPicker(bool commit)
         setVignetteColor(commit ? color : picker.original);
     } else if (picker.target.kind == ColorPickerTarget::Kind::dither) {
         setDitherColor(commit ? color : picker.original, picker.target.light);
+    } else if (picker.target.kind == ColorPickerTarget::Kind::dialog) {
+        picker.dialogChange(commit ? color : picker.original);
     } else if (picker.target.kind == ColorPickerTarget::Kind::effect) {
         const PaletteColor chosen = commit ? color : picker.original;
         changeEffects([&](LayerEffects &effects) { effects.setColor(chosen, picker.target.effect); });
@@ -439,4 +443,27 @@ std::optional<PaletteColor> EditorSession::sampleCompositeColor(QPointF point) c
         qCWarning(lcApp) << "the colour under the pointer cannot be read:" << error.what();
         return std::nullopt;
     }
+}
+
+void EditorSession::openDialogColorPicker(const QString &title, const PaletteColor &color, std::function<void(const PaletteColor &)> change)
+{
+    if (m_colorPicker)
+        return;
+    ColorPickerTarget target{ColorPickerTarget::Kind::dialog};
+    target.dialogTitle = title;
+    m_colorPicker.emplace(target, color);
+    m_colorPicker->dialogChange = std::move(change);
+    notify();
+}
+
+bool EditorSession::pickingForDialog() const
+{
+    return m_colorPicker && m_colorPicker->target.kind == ColorPickerTarget::Kind::dialog;
+}
+
+// The dialog follows the working colour; the session keeps nothing.
+void EditorSession::previewDialogColor() const
+{
+    if (pickingForDialog())
+        m_colorPicker->dialogChange(m_colorPicker->color());
 }

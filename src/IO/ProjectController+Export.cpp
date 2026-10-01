@@ -140,7 +140,7 @@ void ProjectController::exportJPEG(std::function<void()> done)
         }
         QDialog *dialog = sheet(QStringLiteral("Export JPEG"));
         auto chosen = std::make_shared<std::optional<QByteArray>>();
-        dialog->layout()->addWidget(new JPEGExportSheet(std::move(*rendered.raster), [dialog, chosen](std::optional<QByteArray> data) {
+        dialog->layout()->addWidget(new JPEGExportSheet(std::move(*rendered.raster), session, [dialog, chosen](std::optional<QByteArray> data) {
             *chosen = std::move(data);
             dialog->done(*chosen ? QDialog::Accepted : QDialog::Rejected);
         }, dialog));

@@ -1,8 +1,9 @@
 #include "UI/CanvasSizeSheet.h"
 #include "UI/ColorPaletteControls.h"
+#include "UI/ColorPickerSheet+Dialog.h"
 #include "UI/ColorPickerSheet.h"
 #include <QCheckBox>
-#include <QColorDialog>
+#include <QHBoxLayout>
 #include <QComboBox>
 #include <QLabel>
 #include <QPushButton>
@@ -19,7 +20,7 @@ private slots:
     void fieldsSetTheDraftInItsUnits();
     void anInvalidSizeRestsOK();
     void theAnchorAndTheExtensionGoWithOK();
-    void aCustomColorComesFromTheColorDialog();
+    void aCustomColorComesFromTheAppsPicker();
     void theAnchorsDrawTheirCircles();
     void aFieldKeepsItsTypingAndItsNumber();
     void aWheelOverUnitsCommitsTheTypingFirst();
@@ -34,12 +35,22 @@ CanvasDocument document(qint64 width, qint64 height)
     return canvas;
 }
 
+// A session whose palette holds these two colours.
+EditorSession &painted(EditorSession &session, PaletteColor foreground, PaletteColor background)
+{
+    session.setPaletteColor(foreground, false);
+    session.setPaletteColor(background, true);
+    return session;
+}
+
 struct Sheet {
     std::optional<std::optional<CanvasSizeOptions>> answer;
+    EditorSession session;
     CanvasSizeSheet sheet;
     explicit Sheet(qint64 width = 1200, qint64 height = 800, PaletteColor foreground = PaletteColor::black(),
                    PaletteColor background = PaletteColor::white())
-        : sheet(document(width, height), foreground, background, [this](std::optional<CanvasSizeOptions> options) { answer = options; })
+        : sheet(document(width, height), painted(session, foreground, background),
+                [this](std::optional<CanvasSizeOptions> options) { answer = options; })
     {
         sheet.show();
     }
@@ -187,47 +198,51 @@ void CanvasSizeSheetTests::theAnchorAndTheExtensionGoWithOK()
     }
 }
 
-void CanvasSizeSheetTests::aCustomColorComesFromTheColorDialog()
+void CanvasSizeSheetTests::aCustomColorComesFromTheAppsPicker()
 {
     Sheet shown;
     auto &extension = shown.find<QComboBox>("canvasExtension");
     extension.setCurrentIndex(5);
     emit extension.activated(5);
     QVERIFY(shown.find<QWidget>("extensionColorRow").isVisible());
-    auto &swatch = shown.find<SwatchButton>("extensionColor");
-    QCOMPARE(swatch.accessibleName(), QString("Extension color"));
+    QCOMPARE(qobject_cast<QHBoxLayout *>(shown.find<QWidget>("extensionColorRow").layout())->spacing(), 8);
+    auto &swatch = shown.find<DialogColorSwatch>("extensionColor");
+    QVERIFY(swatch.accessibleName() == QString("Extension Color") && swatch.toolTip() == QString("Color for the added canvas"));
     swatch.click();
-    auto *dialog = shown.sheet.findChild<QColorDialog *>();
-    QVERIFY(dialog && dialog->isVisible());
-    QVERIFY(!dialog->testOption(QColorDialog::ShowAlphaChannel));
-    QCOMPARE(dialog->currentColor(), QColor(Qt::white));
-    dialog->setCurrentColor(QColor(0, 128, 255));
-    // The swatch repaints with the colour chosen.
-    int painted = 0;
-    struct Spy : QObject {
-        int &count;
-        explicit Spy(int &count) : count(count) {}
-        bool eventFilter(QObject *, QEvent *event) override
-        {
-            count += event->type() == QEvent::Paint;
-            return false;
-        }
-    } spy(painted);
-    swatch.installEventFilter(&spy);
-    QApplication::processEvents();
-    const int before = painted;
-    dialog->accept();
-    QTRY_VERIFY(painted > before);
-    swatch.removeEventFilter(&spy);
+    QCOMPARE(shown.session.colorPicker().value().target.title(), QString("Color Picker (Extension Color)"));
+    QVERIFY(shown.session.colorPicker().value().original == PaletteColor::white());
+    // OK takes the open picker's colour, closing it first.
+    const PaletteColor sky{0, 128 / 255.0, 1};
+    shown.session.setColorPickerHSB(PickerHSB(sky));
+    QCOMPARE(swatch.grab().toImage().pixelColor(17, 9), QColor(0, 128, 255));
     shown.find<QPushButton>("canvasOK").click();
+    QVERIFY(!shown.session.colorPicker());
     const CanvasExtensionColor fill = shown.answer.value().value().fill.value();
-    QCOMPARE(fill.red, 0.0);
-    QCOMPARE(fill.green, QColor(0, 128, 255).greenF());
-    QCOMPARE(fill.blue, 1.0);
-    // Chosen again, the dialog opens on the colour kept.
+    QVERIFY(fill.red == 0 && fill.green == 128 / 255.0 && fill.blue == 1);
+    // Chosen again, the picker opens on the colour kept.
     swatch.click();
-    QTRY_VERIFY(shown.sheet.findChild<QColorDialog *>() && shown.sheet.findChild<QColorDialog *>()->isVisible());
-    QCOMPARE(shown.sheet.findChild<QColorDialog *>()->currentColor(), QColor(0, 128, 255));
+    QVERIFY(shown.session.colorPicker().value().original == sky);
+    shown.session.setColorPickerHSB(PickerHSB(PaletteColor{1, 0, 0}));
+    shown.session.closeColorPicker(false);
+    QCOMPARE(swatch.grab().toImage().pixelColor(17, 9), QColor(0, 128, 255));
+    // Another extension hides the swatch: the picker goes, colour kept.
+    swatch.click();
+    shown.session.setColorPickerHSB(PickerHSB(PaletteColor{1, 0, 0}));
+    extension.setCurrentIndex(0);
+    emit extension.activated(0);
+    QVERIFY(!shown.session.colorPicker());
+    extension.setCurrentIndex(5);
+    emit extension.activated(5);
+    QCOMPARE(swatch.grab().toImage().pixelColor(17, 9), QColor(255, 0, 0));
+    // Cancel and the sheet going close it too.
+    swatch.click();
+    shown.find<QPushButton>("canvasCancel").click();
+    QVERIFY(!shown.session.colorPicker() && !shown.answer.value());
+    EditorSession session;
+    auto gone = std::make_unique<CanvasSizeSheet>(document(10, 10), session, [](std::optional<CanvasSizeOptions>) {});
+    gone->findChild<DialogColorSwatch *>()->click();
+    gone.reset();
+    QVERIFY(!session.colorPicker());
 }
 
 void CanvasSizeSheetTests::theAnchorsDrawTheirCircles()
@@ -291,7 +306,8 @@ void CanvasSizeSheetTests::halfwayNumbersRoundToEven()
 {
     CanvasDocument canvas{17, 19};
     canvas.resolution = 16;
-    CanvasSizeSheet sheet(canvas, PaletteColor::black(), PaletteColor::white(), [](std::optional<CanvasSizeOptions>) {});
+    EditorSession session;
+    CanvasSizeSheet sheet(canvas, session, [](std::optional<CanvasSizeOptions>) {});
     auto &units = *sheet.findChild<QComboBox *>(QStringLiteral("canvasUnits"));
     const int inches = units.findText(QStringLiteral("Inches"));
     units.setCurrentIndex(inches);

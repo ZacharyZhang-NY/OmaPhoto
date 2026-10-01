@@ -65,8 +65,12 @@ void FloatingPanel::show(const QString &title, QWidget *content, QWidget *dock)
         showDocked(title, content, *dock);
         return;
     }
+    // A modal sheet blocks its window's panels, not its own.
+    QWidget *parent = QApplication::activeModalWidget() ? QApplication::activeModalWidget() : m_owner.window();
+    if (m_panel && m_panel->parentWidget() != parent)
+        m_panel->setParent(parent, m_panel->windowFlags());
     if (!m_panel) {
-        m_panel = new PanelWindow(*this, m_owner.window());
+        m_panel = new PanelWindow(*this, parent);
         m_panel->setObjectName(m_name);
     }
     const bool wasVisible = m_panel->isVisible();

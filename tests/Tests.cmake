@@ -178,6 +178,7 @@ compositor_test(TextFontControlsTests)
 compositor_test(ColorRangeTests)
 compositor_test(ColorRangeCanvasTests)
 compositor_test(ColorRangeSheetTests)
+compositor_test(DialogColorPickerTests)
 # It calls the colour-range kernel itself.
 target_include_directories(ColorRangeTests PRIVATE ${OMAPHOTO_KERNELS})
 compositor_test(DitherTests)

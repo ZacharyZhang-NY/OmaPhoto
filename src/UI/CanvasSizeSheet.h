@@ -12,14 +12,15 @@ class QButtonGroup;
 class QComboBox;
 class QLabel;
 class QPushButton;
-class SwatchButton;
+class DialogColorSwatch;
+class EditorSession;
 
 // Swift's CanvasSizeSheet: the new size, the point kept, the extension.
 class CanvasSizeSheet : public QWidget {
     Q_OBJECT
 public:
-    CanvasSizeSheet(const CanvasDocument &document, PaletteColor foreground, PaletteColor background,
-                    std::function<void(std::optional<CanvasSizeOptions>)> finish, QWidget *parent = nullptr);
+    CanvasSizeSheet(const CanvasDocument &document, EditorSession &session, std::function<void(std::optional<CanvasSizeOptions>)> finish,
+                    QWidget *parent = nullptr);
     ~CanvasSizeSheet() override;
 
 private:
@@ -27,9 +28,9 @@ private:
     // Swift's scrubbable Width or Height title.
     NumericScrub *scrub(QLabel *title, bool widthAxis);
     std::optional<CanvasExtensionColor> fill() const;
-    void pickCustomColor();
     void synchronize();
 
+    EditorSession &m_session;
     const PaletteColor m_foreground;
     const PaletteColor m_background;
     const std::function<void(std::optional<CanvasSizeOptions>)> m_finish;
@@ -45,6 +46,6 @@ private:
     QLabel *const m_anchorName;
     QComboBox *const m_extension;
     QWidget *const m_customRow;
-    SwatchButton *const m_customSwatch;
+    DialogColorSwatch *const m_customSwatch;
     QPushButton *const m_ok;
 };
