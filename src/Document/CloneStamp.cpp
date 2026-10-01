@@ -1,7 +1,6 @@
 #include "Document/EditorSession.h"
 #include "IO/ImageExporter.h"
 #include "Logging.h"
-#include "Rendering/LayerRenderer.h"
 #include <cmath>
 
 // Swift's CloneStamp extension: the source, its offset, the sample.
@@ -40,20 +39,20 @@ std::optional<QPointF> EditorSession::cloneSamplePoint(QPointF point) const
     return point + QPointF(m_cloneOffset->width(), m_cloneOffset->height());
 }
 
-std::optional<QImage> EditorSession::cloneSample(const CanvasDocument &document) const
+std::optional<BrushStroke::Clone> EditorSession::cloneSample(const CanvasDocument &document, const BrushStroke &stroke, QSizeF offset) const
 {
     try {
+        // A painted asset flattens here; the catch covers it too.
+        if (!m_cloneSettings.sampleAllLayers) {
+            if (!stroke.layer.asset)
+                return std::nullopt;
+            return BrushStroke::Clone{stroke.layer.asset->image(), stroke.gridRect(stroke.sourceRect, offset), true};
+        }
         QImage context = BrushRaster::context(document.width, document.height, false);
         QPainter painter(&context);
-        // A painted asset flattens here; the catch covers it too.
-        if (m_cloneSettings.sampleAllLayers) {
-            drawLiveComposite(document, painter);
-        } else if (const std::optional<ImageLayer> layer = activeLayer(); layer && layer->asset) {
-            const LayerTransform transform = displayedTransform(*layer);
-            LayerRenderer::draw(layer->asset->image(), transform, transform.center(), painter, {});
-        }
+        drawLiveComposite(document, painter);
         painter.end();
-        return context;
+        return BrushStroke::Clone{context, QRectF(-offset.width(), -offset.height(), context.width(), context.height()), false};
     } catch (const ExportError &error) {
         qCWarning(lcApp) << "Clone Stamp cannot sample the canvas:" << error.what();
         return std::nullopt;

@@ -2,6 +2,7 @@
 #include "UI/LayerIcons.h"
 #include "UI/TransformInspector.h"
 #include <QtTest>
+#include <cmath>
 
 // The Move tool's bar: fields, settings, Apply and Cancel.
 namespace {
@@ -57,6 +58,7 @@ private slots:
     void aMenuBorrowsTheFocusAndTheBarsKeysApplyOrCancel();
     void theLockIconFollowsThePalette();
     void theFieldsTakeTheSpareRoom();
+    void cancelAndApplyShowOnlyWhileAnEditWaits();
 };
 
 void TransformInspectorTests::theFieldsShowTheLayerAndTypingPreviews()
@@ -301,9 +303,56 @@ void TransformInspectorTests::theFieldsTakeTheSpareRoom()
     const QRect natural = flip.geometry();
     // Swift's ScrollView takes the room; its content keeps its size.
     bar.header->resize(1600, bar.header->height());
-    QTRY_VERIFY(bar.control<QPushButton>("applyTransform").geometry().right() > 1600 - 40);
+    QTRY_VERIFY(bar.control<QWidget>("pendingTransform").geometry().right() > 1600 - 40);
     QCOMPARE(flip.geometry(), natural);
     QCOMPARE(flip.width(), flip.sizeHint().width());
+}
+
+void TransformInspectorTests::cancelAndApplyShowOnlyWhileAnEditWaits()
+{
+    Bar bar;
+    QVERIFY(bar.active);
+    QWidget &buttons = bar.control<QWidget>("pendingTransform");
+    auto *fade = qobject_cast<QGraphicsOpacityEffect *>(buttons.graphicsEffect());
+    QVERIFY(fade);
+    QPushButton &apply = bar.control<QPushButton>("applyTransform");
+    QPushButton &cancel = bar.control<QPushButton>("cancelTransform");
+    const auto seen = [&](bool shown) {
+        return fade->opacity() == (shown ? 1.0 : 0.0) && buttons.testAttribute(Qt::WA_TransparentForMouseEvents) == !shown
+            && apply.focusPolicy() == (shown ? Qt::StrongFocus : Qt::NoFocus) && cancel.focusPolicy() == apply.focusPolicy();
+    };
+    QVERIFY(seen(false));
+    // SwiftUI's easeOut over 0.12 seconds; 12 points apart.
+    auto *fadeIn = bar.header->findChild<QPropertyAnimation *>();
+    QVERIFY(fadeIn && fadeIn->duration() == 120 && fadeIn->easingCurve().type() == QEasingCurve::BezierSpline);
+    // CSS's ease-out, 0, 0, 0.58, 1: about 0.685 halfway.
+    QVERIFY(std::abs(fadeIn->easingCurve().valueForProgress(0.5) - 0.685) < 0.01);
+    QCOMPARE(apply.geometry().left() - cancel.geometry().right() - 1, 12);
+    // A handle drag applies itself: nothing waits.
+    bar.session.beginTransform(false);
+    QVERIFY(apply.isEnabled());
+    QTest::qWait(200);
+    QVERIFY(seen(false));
+    // Unseen, the click falls through; Return still applies.
+    const QPoint middle = apply.mapTo(bar.header.get(), apply.rect().center());
+    QTest::mouseClick(bar.header->windowHandle(), Qt::LeftButton, Qt::NoModifier, middle);
+    QVERIFY(bar.session.transformEdit().has_value());
+    QTest::keyClick(bar.header.get(), Qt::Key_Return);
+    QVERIFY(!bar.session.transformEdit().has_value());
+    // Typed values wait: the buttons fade in, a click applies.
+    bar.session.beginTransform();
+    QVERIFY(fade->opacity() < 1);
+    QTRY_VERIFY(seen(true));
+    QVERIFY(apply.isVisible() && apply.isEnabled());
+    QTest::mouseClick(bar.header->windowHandle(), Qt::LeftButton, Qt::NoModifier, middle);
+    QVERIFY(!bar.session.transformEdit().has_value());
+    QTRY_VERIFY(seen(false));
+    // Waiting again, Cancel drops it.
+    bar.session.beginTransform();
+    QTRY_VERIFY(seen(true));
+    QTest::mouseClick(bar.header->windowHandle(), Qt::LeftButton, Qt::NoModifier, cancel.mapTo(bar.header.get(), cancel.rect().center()));
+    QVERIFY(!bar.session.transformEdit().has_value());
+    QTRY_VERIFY(seen(false));
 }
 
 QTEST_MAIN(TransformInspectorTests)

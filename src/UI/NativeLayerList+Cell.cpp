@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QContextMenuEvent>
 #include <QKeyEvent>
+#include <QLocale>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -115,7 +116,7 @@ void LayerCell::configure(const ImageLayer &layer, bool enabled, int depth, bool
     m_dimensions->setText(m_editableText   ? QStringLiteral("Text · Double-click to edit")
                           : m_isAdjustment ? QStringLiteral("Adjustment · Double-click to edit")
                           : layer.isGroup  ? QStringLiteral("Folder")
-                                          : QStringLiteral("%1 × %2 px").arg(std::lround(layer.size().width())).arg(std::lround(layer.size().height())));
+                                          : sizeLabel(layer));
     m_dimensions->setToolTip(QString());
     if (layer.maskSourceID && session.document()) {
         const int source = indexOf(session.document()->layers, layer.maskSourceID);
@@ -334,4 +335,19 @@ bool LayerCell::eventFilter(QObject *watched, QEvent *event)
     else
         return false;
     return true;
+}
+
+QString sizeLabel(const ImageLayer &layer)
+{
+    const QString text = QStringLiteral("%1 × %2 px").arg(std::lround(layer.size().width())).arg(std::lround(layer.size().height()));
+    const int pixels = layer.asset ? layer.asset->size().width() : 0;
+    if (pixels <= 0)
+        return text;
+    // Across the width, as the Move bar's Scale field.
+    const double percent = layer.size().width() / pixels * 100;
+    if (std::abs(percent - 100) < 0.05)
+        return text;
+    // Swift's .number to one place at most, ties to even.
+    const double rounded = std::nearbyint(percent * 10) / 10;
+    return text + QStringLiteral(" · ") + QLocale().toString(rounded, 'f', rounded == std::trunc(rounded) ? 0 : 1) + QStringLiteral("%");
 }

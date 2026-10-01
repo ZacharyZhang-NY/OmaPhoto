@@ -6,5 +6,5 @@ public:
     std::optional<QSizeF> cloneStrokeOffset(QPointF point) const;
     // The source for a brush at `point`: the canvas's crosshair.
     std::optional<QPointF> cloneSamplePoint(QPointF point) const;
-    // What a stroke copies from, document-sized, taken as it starts.
-    std::optional<QImage> cloneSample(const CanvasDocument &document) const;
+    // What `stroke` copies, `offset` away: its pixels or the canvas.
+    std::optional<BrushStroke::Clone> cloneSample(const CanvasDocument &document, const BrushStroke &stroke, QSizeF offset) const;

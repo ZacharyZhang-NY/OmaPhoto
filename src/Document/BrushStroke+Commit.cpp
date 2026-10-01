@@ -58,6 +58,14 @@ LayerTransform BrushStroke::transform(const QRectF &bounds) const
     return result;
 }
 
+// Offset into grid pixels, turned and scaled as the layer.
+QRectF BrushStroke::gridRect(const QRectF &rect, QSizeF offset) const
+{
+    const QTransform toGrid = pixelToDocument.inverted();
+    const QPointF shift = toGrid.map(QPointF(offset.width(), offset.height())) - toGrid.map(QPointF(0, 0));
+    return rect.translated(-shift);
+}
+
 // Swift's heal: the painted spot rebuilt from nearby texture.
 void BrushStroke::heal()
 {

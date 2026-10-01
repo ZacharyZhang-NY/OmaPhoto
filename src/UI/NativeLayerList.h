@@ -279,3 +279,6 @@ private:
     const QMimeData *m_dragData = nullptr;
     Qt::DropActions m_dragActions;
 };
+
+// The size on the canvas and, once scaled, how much.
+QString sizeLabel(const ImageLayer &layer);
