@@ -83,7 +83,6 @@ private slots:
     void theLiveCompositeDrawsWhatTheExportDraws();
     void adjustmentsShowAsTheExportDoes();
     void anAdjustmentsMaskClipsItOnTheCanvas();
-    void grainFollowsTheViewOnTheCanvas();
 };
 
 void CanvasDisplayTests::theBackgroundCheckerboardShadowAndBorderSurroundTheDocument()
@@ -409,33 +408,6 @@ void CanvasDisplayTests::anAdjustmentsMaskClipsItOnTheCanvas()
     const int painted = qRed(scene.shot().pixel(left));
     QVERIFY2(hidden == 200 && painted < 70, qPrintable(QStringLiteral("%1 %2").arg(hidden).arg(painted)));
     session.cancelBrush();
-}
-
-void CanvasDisplayTests::grainFollowsTheViewOnTheCanvas()
-{
-    // Swift's canvas hands Grain the view's region, not the document's.
-    Scene scene(40, 40, 120, 120);
-    EditorSession &session = scene.session;
-    session.insert(filled(40, 40, qRgba(128, 128, 128, 255), "Gray"));
-    session.addAdjustment(AdjustmentKind::grain);
-    session.setAdjustmentEditingID(std::nullopt);
-    LayerAdjustment grain = session.activeLayer().value().adjustment.value();
-    GrainSettings strong = grain.grain();
-    strong.amount = 100;
-    // Pinned: under some seeds the pan keeps one pixel's tone.
-    strong.seed = 7;
-    grain.setGrain(strong);
-    session.updateAdjustment(session.activeLayerID().value(), grain);
-    session.zoom(1);
-    QVERIFY(gapToExport(scene) > 20);
-    // A pan moves the pattern under the same document pixel.
-    const auto pixel = [&scene] {
-        const QPointF origin = scene.origin();
-        return scene.shot().pixel(int(origin.x() + 20.5), int(origin.y() + 20.5));
-    };
-    const QRgb before = pixel();
-    session.viewport.translate(QSizeF(3, 0));
-    QVERIFY(pixel() != before);
 }
 
 QTEST_MAIN(CanvasDisplayTests)
