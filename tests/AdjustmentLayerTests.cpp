@@ -187,7 +187,7 @@ void AdjustmentLayerTests::adjustmentBlendAndSoftMaskPreserveCoverage()
     s.updateAdjustment(id, value);
     s.setLayerBlendMode(LayerBlendMode::multiply);
     QVERIFY((rendered(s) == std::vector<int>{0, 0, 0, 255, 0, 0, 0, 128, 0, 0, 0, 32, 0, 0, 0, 0}));
-    // Green over red adds to yellow; Swift adjusts as Normal.
+    // Green over red adds to yellow, as Swift 1.4.
     s.setLayerBlendMode(LayerBlendMode::linearDodge);
     QVERIFY((part(rendered(s), 0, 4) == std::vector<int>{255, 255, 0, 255}));
     QCOMPARE(rendered(s)[7], 128);
