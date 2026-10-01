@@ -1,6 +1,6 @@
 # OmaPhoto — agent notes
 
-OmaPhoto is the Linux port of Compositor, the macOS app at https://github.com/robbietilton/Compositor. That repository's Swift tree (`Compositor/`, `CompositorTests/`) is the specification; this repository mirrors it. Its checkout at `../Compositor-spec`, pinned to the tag being ported (v1.3.3 since item 12), is where the Swift sources are read; never edit it for OmaPhoto work.
+OmaPhoto is the Linux port of Compositor, the macOS app at https://github.com/robbietilton/Compositor. That repository's Swift tree (`Compositor/`, `CompositorTests/`) is the specification; this repository mirrors it. Its checkout at `../Compositor-spec`, pinned to the tag being ported (v1.4.5 since item 13), is where the Swift sources are read; never edit it for OmaPhoto work.
 
 ## Designing or editing a project
 
