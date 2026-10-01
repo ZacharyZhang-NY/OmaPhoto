@@ -1,5 +1,8 @@
 #include "UI/TypeControls.h"
 #include <QAbstractItemView>
+#include <QFontInfo>
+#include <QRawFont>
+#include <QtConcurrent>
 #include <QStylePainter>
 #include <QSignalBlocker>
 #include "UI/ColorPaletteControls.h"
@@ -91,13 +94,71 @@ void TextStyleField::focusOutEvent(QFocusEvent *event)
     QLineEdit::focusOutEvent(event);
 }
 
-TypeFontPicker::TypeFontPicker(QWidget *parent) : QComboBox(parent)
-{
-    setAccessibleName(QStringLiteral("Font"));
-}
-
 namespace {
 const QString multiple = QStringLiteral("(Multiple)");
+
+// A face draws its own name: each letter, its glyph.
+bool drawsOwnName(const QString &name)
+{
+    const QRawFont face = QRawFont::fromFont(TextLayout::font(LayerTextStyle(), name));
+    for (const char32_t letter : name.toUcs4())
+        if (QChar::isLetter(letter) && !face.supportsCharacter(letter))
+            return false;
+    return true;
+}
+
+// Swift's styledNames: made once, ahead, off the UI thread.
+QHash<QString, bool> &ownNames()
+{
+    static QHash<QString, bool> names;
+    return names;
+}
+
+QFuture<QHash<QString, bool>> &preparing()
+{
+    static QFuture<QHash<QString, bool>> future;
+    return future;
+}
+
+void prepareOwnNames()
+{
+    if (preparing().isValid())
+        return;
+    preparing() = QtConcurrent::run([names = TextLayout::availableFonts()] {
+        QHash<QString, bool> made;
+        for (const QString &name : names)
+            made.insert(name, drawsOwnName(name));
+        return made;
+    });
+}
+
+// Finished names join; one still missing is made now.
+bool ownName(const QString &name)
+{
+    if (preparing().isFinished() && ownNames().isEmpty())
+        ownNames() = preparing().result();
+    if (!ownNames().contains(name))
+        ownNames().insert(name, drawsOwnName(name));
+    return ownNames().value(name);
+}
+}
+
+TypeFontPicker::TypeFontPicker(std::function<void(PreviewStep, const QString &)> preview, QWidget *parent) : QComboBox(parent), m_preview(std::move(preview))
+{
+    setAccessibleName(QStringLiteral("Font"));
+    prepareOwnNames();
+    // Only a face previews; (Multiple) leaves the last one showing.
+    connect(this, &QComboBox::highlighted, this, [this](int index) {
+        if (!isMultiple(index))
+            m_preview(PreviewStep::show, itemText(index));
+    });
+}
+
+// Qt reports a choice after the close: the revert waits.
+void TypeFontPicker::hidePopup()
+{
+    QComboBox::hidePopup();
+    QMetaObject::invokeMethod(this, [this] { m_preview(PreviewStep::revert, QString()); }, Qt::QueuedConnection);
 }
 
 bool TypeFontPicker::isMultiple(int index) const
@@ -144,6 +205,15 @@ void TypeFontPicker::showPopup()
         const QSignalBlocker quiet(this);
         clear();
         addItems(names);
+        // Each face's name in that face, at the menu's size.
+        const int pixels = QFontInfo(font()).pixelSize();
+        for (int index = 0; index < count(); ++index) {
+            if (!ownName(itemText(index)))
+                continue;
+            QFont face = TextLayout::font(LayerTextStyle(), itemText(index));
+            face.setPixelSize(pixels);
+            setItemData(index, face, Qt::FontRole);
+        }
         if (selected.isEmpty())
             showMultiple();
         else
@@ -166,7 +236,14 @@ void TypeFontPicker::paintEvent(QPaintEvent *)
 }
 
 TypeControls::TypeControls(EditorSession &session, QWidget *parent)
-    : ToolHeaderBar(QStringLiteral("Type"), parent), m_session(session), m_font(new TypeFontPicker),
+    : ToolHeaderBar(QStringLiteral("Type"), parent), m_session(session),
+      m_font(new TypeFontPicker([this](TypeFontPicker::PreviewStep step, const QString &name) {
+          switch (step) {
+          case TypeFontPicker::PreviewStep::show: m_session.previewFont(name); break;
+          case TypeFontPicker::PreviewStep::revert: m_session.endFontPreview(); break;
+          case TypeFontPicker::PreviewStep::keep: m_session.keepFontPreview(); break;
+          }
+      })),
       m_size(new TextStyleField(
           [this] { return number(m_session.currentTextStyle().fontSize, locale()); },
           [this](const QString &text) {
@@ -222,6 +299,8 @@ TypeControls::TypeControls(EditorSession &session, QWidget *parent)
     m_font->setFixedWidth(210);
     m_font->setToolTip(QStringLiteral("Font face, including bold and italic variants"));
     connect(m_font, &QComboBox::activated, this, [this](int index) {
+        // The text already shows the face under the pointer: kept.
+        m_session.keepFontPreview();
         const QString name = m_font->itemText(index);
         // (Multiple), or the face already shown, changes nothing.
         if (m_font->isMultiple(index) || name == shownFont())

@@ -322,6 +322,11 @@ void InlineTextDrawTests::theEditMenuReachesOpenText()
     QTRY_VERIFY(canvas->hasFocus());
     QTest::keyClicks(canvas, QStringLiteral("menu"));
     const auto content = [&] { return session.textDraft().value().style.content; };
+    // Swift 1.3.5: Ctrl+Z takes back the typing in one step.
+    QTest::keyClick(canvas, Qt::Key_Z, Qt::ControlModifier);
+    QCOMPARE(content(), QString());
+    QTest::keyClick(canvas, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(content(), QString("menu"));
     // Swift's text branch: bare entries, enabled, the text view's.
     QCOMPARE(bar.action("undo").text(), QString("Undo"));
     QVERIFY(bar.action("undo").isEnabled() && bar.action("redo").isEnabled());

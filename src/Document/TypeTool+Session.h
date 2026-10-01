@@ -17,6 +17,12 @@ public:
     bool recolorText(QUuid id, const PaletteColor &color);
     LayerTextStyle currentTextStyle() const;
     void changeTextStyle(const std::function<void(LayerTextStyle &)> &change);
+    // The open font menu tries the hovered face on text.
+    void previewFont(const QString &name);
+    // Chosen: the text stays as it shows.
+    void keepFontPreview();
+    // Closed without a choice: the text goes back.
+    void endFontPreview();
     // A text layer's name: its first words on one line.
     static QString layerName(const QString &content);
     // Point text's size: what it measures, plus padding.

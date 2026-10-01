@@ -39,10 +39,14 @@ private:
 class TypeFontPicker : public QComboBox {
     Q_OBJECT
 public:
-    explicit TypeFontPicker(QWidget *parent = nullptr);
+    // The open menu trying faces on the text, Swift's PreviewStep.
+    enum class PreviewStep { show, revert, keep };
+    explicit TypeFontPicker(std::function<void(PreviewStep, const QString &)> preview, QWidget *parent = nullptr);
     // Shows `name`, or (Multiple) when empty; an open menu stays.
     void sync(const QString &name);
     void showPopup() override;
+    // Closed, the text goes back; a choice already kept it.
+    void hidePopup() override;
     // Swift's isMultiple: the top item that is no font.
     bool isMultiple(int index) const;
 
@@ -53,6 +57,7 @@ protected:
 private:
     void showMultiple();
     void hideMultiple();
+    const std::function<void(PreviewStep, const QString &)> m_preview;
     bool m_loaded = false;
 };
 

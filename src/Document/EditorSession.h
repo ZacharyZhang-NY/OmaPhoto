@@ -85,12 +85,10 @@ public:
     // Where the project lives on disk, once opened or saved.
     const std::optional<QString> &projectPath() const { return m_projectPath; }
     void setProjectPath(std::optional<QString> path);
-
     bool canStartProjectOperation() const;
     // `ready` runs at once, or when the session allows.
     void waitForFileRequest(std::function<void()> ready);
     void waitForProjectAccess(std::function<void()> ready);
-
     void selectLayer(std::optional<QUuid> id);
     void selectTool(NavigationTool value);
     // Tab: the current tool's next mode.
@@ -432,6 +430,8 @@ private:
     mutable std::map<QUuid, ShapePreview> m_shapeTransformPreviewCache;
     std::optional<TextDraft> m_textDraft;
     LayerTextStyle m_textDefaults;
+    // The text's style before the font menu previewed faces.
+    std::optional<LayerTextStyle> m_fontPreviewOriginal;
     std::optional<QPointF> m_cloneSource;
     CloneSettings m_cloneSettings;
     // The offset aligned strokes keep, fixed as a stroke begins.

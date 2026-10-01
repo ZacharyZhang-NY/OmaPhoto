@@ -183,6 +183,7 @@ compositor_test(JPEGPreviewTests)
 compositor_test(SnapDrawingCanvasTests)
 compositor_test(GuideGridTests)
 compositor_test(GridSettingsSheetTests)
+compositor_test(TypeFontPreviewTests)
 # It calls the colour-range kernel itself.
 target_include_directories(ColorRangeTests PRIVATE ${OMAPHOTO_KERNELS})
 compositor_test(DitherTests)

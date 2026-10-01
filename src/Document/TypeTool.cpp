@@ -255,6 +255,39 @@ LayerTextStyle EditorSession::currentTextStyle() const
     return active && active->liveText() ? active->liveText()->style : m_textDefaults;
 }
 
+// Only text being edited; a selected layer is not opened.
+void EditorSession::previewFont(const QString &name)
+{
+    if (!m_textDraft)
+        return;
+    TextDraft draft = *m_textDraft;
+    if (!m_fontPreviewOriginal)
+        m_fontPreviewOriginal = draft.style;
+    LayerTextStyle style = *m_fontPreviewOriginal;
+    style.setFont(name, draft.selection);
+    if (!style.isValid() || style == draft.style)
+        return;
+    draft.style = style;
+    setTextDraft(draft);
+}
+
+void EditorSession::keepFontPreview()
+{
+    m_fontPreviewOriginal.reset();
+}
+
+void EditorSession::endFontPreview()
+{
+    if (!m_fontPreviewOriginal)
+        return;
+    const LayerTextStyle original = *std::exchange(m_fontPreviewOriginal, std::nullopt);
+    if (m_textDraft && m_textDraft->style != original) {
+        TextDraft draft = *m_textDraft;
+        draft.style = original;
+        setTextDraft(draft);
+    }
+}
+
 void EditorSession::changeTextStyle(const std::function<void(LayerTextStyle &)> &change)
 {
     const std::optional<ImageLayer> active = activeLayer();
