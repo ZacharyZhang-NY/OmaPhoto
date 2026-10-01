@@ -89,7 +89,7 @@ void CameraRawGroupDrawTests::theCurvePagesShowTheirOwnControls()
     QCOMPARE(preset.toolTip(), QString("Replaces this curve with a straight line or a contrast curve."));
     QCOMPARE(channel.toolTip(), QString("RGB changes brightness. Red, green, and blue also shift the color."));
     QCOMPARE(group.child<QWidget>(QStringLiteral("cameraRawCurveGraph")).toolTip(),
-             QString("Drag a point. Click the curve to add one. Double-click a point to remove it."));
+             QString("Drag a point. Click to add one. Double-click a point to remove it."));
     QCOMPARE(group.child<QWidget>(QStringLiteral("curveSelectedPoint")).toolTip(), QString("Input and output of the selected curve point."));
     QCOMPARE(group.child<QAbstractButton>(QStringLiteral("curveTargeted")).toolTip(),
              QString("Drag on the picture to move the curve for the tone under the pointer."));
@@ -126,20 +126,20 @@ void CameraRawGroupDrawTests::endPointsStayAndARealDoubleClickRemoves()
     group.arm([](CameraRawPanel &panel) { panel.curvePage = CameraRawCurvePage::point; });
     auto &graph = group.child<QWidget>(QStringLiteral("cameraRawCurveGraph"));
     const int w = graph.width(), h = graph.height();
-    // With no inner point a drag moves nothing.
+    // An end point keeps its x; its output follows.
     QTest::mousePress(&graph, Qt::LeftButton, {}, QPoint(2, h - 2));
     QMouseEvent move(QEvent::MouseMove, QPointF(40, 40), graph.mapToGlobal(QPointF(40, 40)), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
     QApplication::sendEvent(&graph, &move);
     QTest::mouseRelease(&graph, Qt::LeftButton, {}, QPoint(40, 40));
-    QVERIFY(group.raw().curve.rgb == CameraRawCurveSettings::linear());
-    // An inner point is held within 0.02 and 0.98.
+    QCOMPARE(group.raw().curve.rgb.size(), size_t(2));
+    QVERIFY(group.raw().curve.rgb[0].x == 0 && std::abs(group.raw().curve.rgb[0].y - (1 - 40.0 / h)) < 1e-9 && group.raw().curve.rgb[1] == (CurvePoint{1, 1}));
+    // Past the start: a hundredth in, then repaired away.
     group.set([](CameraRawSettings &settings) { settings.curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
     QTest::mousePress(&graph, Qt::LeftButton, {}, QPoint(w / 2, h / 2));
     QMouseEvent far(QEvent::MouseMove, QPointF(-50, h / 2), graph.mapToGlobal(QPointF(-50, h / 2)), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
     QApplication::sendEvent(&graph, &far);
     QTest::mouseRelease(&graph, Qt::LeftButton, {}, QPoint(-50, h / 2));
-    QCOMPARE(group.raw().curve.rgb.size(), size_t(3));
-    QVERIFY(std::abs(group.raw().curve.rgb[1].x - 0.02) < 1e-9 && group.raw().curve.rgb.front().x == 0 && group.raw().curve.rgb.back().x == 1);
+    QVERIFY(group.raw().curve.rgb == CameraRawCurveSettings::linear());
     // A real double click: press, release, double click, release.
     group.set([](CameraRawSettings &settings) { settings.curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
     doubleClick(graph, QPoint(w / 2, h / 2));

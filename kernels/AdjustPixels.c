@@ -729,7 +729,7 @@ static double point_weight(double h, double s, double l, const float *point) {
 }
 
 void adjust_camera_raw_curve_color(uint8_t *rgba, size_t width, size_t height, size_t stride,
-                                   const float *lumaLut, const float *redLut, const float *greenLut, const float *blueLut,
+                                   const float *toneLut, const float *redLut, const float *greenLut, const float *blueLut,
                                    double refineSaturation, const float *mixer, int pointCount, const float *points,
                                    const float *grade, double blending, double balance, int visualize) {
     for (size_t y = 0; y < height; ++y) {
@@ -739,16 +739,22 @@ void adjust_camera_raw_curve_color(uint8_t *rgba, size_t width, size_t height, s
             double alpha = p[3];
             if (!alpha) continue;
             double r = fmin(1.0, p[0] / alpha), g = fmin(1.0, p[1] / alpha), b = fmin(1.0, p[2] / alpha);
-            double tone = rec709(r, g, b);
-            double mapped = lut_at(lumaLut, tone);
-            scale_luminance(&r, &g, &b, mapped);
-            if (refineSaturation != 0 && tone > 1e-4) {
-                double factor = 1 + refineSaturation * (mapped / tone - 1);
-                double lum = rec709(r, g, b);
-                r = camera_clamp(lum + (r - lum) * factor);
-                g = camera_clamp(lum + (g - lum) * factor);
-                b = camera_clamp(lum + (b - lum) * factor);
+            // The tone curve works on red, green and blue alike, as Photoshop's does, so contrast brings color strength
+            // with it. Refine Saturation below zero eases toward changing brightness alone (−100), and above zero adds
+            // more color.
+            double curvedR = lut_at(toneLut, r), curvedG = lut_at(toneLut, g), curvedB = lut_at(toneLut, b);
+            if (refineSaturation < 0) {
+                double br = r, bg = g, bb = b;
+                scale_luminance(&br, &bg, &bb, lut_at(toneLut, rec709(r, g, b)));
+                double k = -refineSaturation;
+                curvedR += (br - curvedR) * k; curvedG += (bg - curvedG) * k; curvedB += (bb - curvedB) * k;
+            } else if (refineSaturation > 0) {
+                double lum = rec709(curvedR, curvedG, curvedB), factor = 1 + refineSaturation;
+                curvedR = camera_clamp(lum + (curvedR - lum) * factor);
+                curvedG = camera_clamp(lum + (curvedG - lum) * factor);
+                curvedB = camera_clamp(lum + (curvedB - lum) * factor);
             }
+            r = curvedR; g = curvedG; b = curvedB;
             r = lut_at(redLut, r); g = lut_at(greenLut, g); b = lut_at(blueLut, b);
             double h, s, l;
             rgb_to_hsl(r, g, b, &h, &s, &l);

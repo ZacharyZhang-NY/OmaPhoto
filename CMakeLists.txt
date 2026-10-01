@@ -137,6 +137,7 @@ add_library(compositor_core STATIC
     src/UI/TransformInspector.cpp
     src/UI/EffectsSheet.cpp
     src/UI/CameraRawColorControls.cpp
+    src/UI/CameraRawColorControls+Curve.cpp
     src/UI/CameraRawColorControls+Grading.cpp
     src/UI/CameraRawColorControls+Mixer.cpp
     src/UI/CameraRawControls.cpp

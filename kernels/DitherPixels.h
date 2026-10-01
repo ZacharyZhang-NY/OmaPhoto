@@ -8,7 +8,7 @@ enum {
     DITHER_ATKINSON, DITHER_FLOYD_STEINBERG,
     DITHER_BAYER_2, DITHER_BAYER_4, DITHER_BAYER_8,
     DITHER_DOTS, DITHER_LINES, DITHER_DIAMONDS,
-    DITHER_PATTERNS, DITHER_GLYPHS
+    DITHER_PATTERNS, DITHER_GLYPHS, DITHER_SCANLINES
 };
 
 typedef struct {
@@ -20,7 +20,8 @@ typedef struct {
     // −1…1: darker (more ink) or lighter, and flatter or punchier, before dithering.
     float density;
     float contrast;
-    // Halftone and glyph cells, in pixels, and the halftone screen's angle in radians.
+    // Halftone and glyph cells, in pixels (scanlines: the distance between lines), and the halftone screen's angle in
+    // radians.
     int cell;
     float angle;
     // Halftone dots, patterns and glyphs mark the light tones on the dark color instead of the dark on the light.
@@ -37,6 +38,9 @@ typedef struct {
     const uint8_t *glyphs;
     const float *glyphCoverage;
     int glyphCount;
+    // Scanlines: how far each line breaks into round dots (0–1), and how many pixels its wobble pushes it sideways.
+    float dots;
+    float wobble;
 } DitherParams;
 
 // Dithers premultiplied RGBA pixels (4 bytes per pixel, `stride` bytes per row) in place. Alpha is kept and fully
@@ -45,4 +49,6 @@ int dither_apply(uint8_t *rgba, size_t width, size_t height, size_t stride, cons
 // Turns each `block` × `block` square of premultiplied RGBA pixels into a round dot in its own color on `gap` (straight
 // sRGB), like the lit pixels of a dot-matrix screen. The dot's edge is smoothed and alpha is kept.
 void dither_dots(uint8_t *rgba, size_t width, size_t height, size_t stride, int block, const uint8_t *gap);
+// Adds `glow` (premultiplied RGBA, same layout) over the pixels at `amount`, never past their own alpha.
+void dither_glow(uint8_t *rgba, const uint8_t *glow, size_t width, size_t height, size_t stride, float amount);
 #endif

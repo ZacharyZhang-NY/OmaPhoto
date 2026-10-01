@@ -44,6 +44,8 @@ public:
     void close(QUuid id, std::function<void()> done = {});
     void removeTab(QUuid id);
     std::vector<std::shared_ptr<ProjectTab>> quitOrder() const;
+    // Applies canvas edits and cancels dialogs before a quit.
+    void settlePendingEdits(std::function<void()> done);
     void confirmQuit(std::function<void(bool)> done);
     void closeWindow(QWidget *closing);
     void receive(const QList<QUrl> &urls, std::optional<QUuid> destination = std::nullopt,
