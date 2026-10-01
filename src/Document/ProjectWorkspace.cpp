@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QTimer>
+#include <algorithm>
 
 const QString ProjectWorkspace::layerType = QStringLiteral("com.compositor.layer-row");
 
@@ -93,6 +94,20 @@ void ProjectWorkspace::select(QUuid id)
     m_selectedID = id;
     current().controller.window = window;
     current().controller.resumeExternalChangeCheck();
+    emit changed();
+}
+
+void ProjectWorkspace::moveTab(QUuid id, int index)
+{
+    const auto from = std::ranges::find_if(m_tabs, [id](const std::shared_ptr<ProjectTab> &tab) { return tab->id == id; });
+    if (from == m_tabs.end())
+        return;
+    const auto target = std::clamp<std::ptrdiff_t>(index, 0, std::ptrdiff_t(m_tabs.size()) - 1);
+    if (target == from - m_tabs.begin())
+        return;
+    const std::shared_ptr<ProjectTab> tab = *from;
+    m_tabs.erase(from);
+    m_tabs.insert(m_tabs.begin() + target, tab);
     emit changed();
 }
 

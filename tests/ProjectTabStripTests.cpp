@@ -1,6 +1,5 @@
 #include "UI/ProjectTabs.h"
 #include <QFontMetricsF>
-#include <QScrollBar>
 #include <QToolButton>
 #include <QtTest>
 
@@ -26,7 +25,6 @@ class ProjectTabStripTests : public QObject {
 private slots:
     void eachTabIsAsWideAsItsTitle();
     void aTitleMovesOnlyTheTabsAfterIt();
-    void onlyANewFrontTabScrollsIntoView();
 };
 
 void ProjectTabStripTests::eachTabIsAsWideAsItsTitle()
@@ -101,45 +99,6 @@ void ProjectTabStripTests::aTitleMovesOnlyTheTabsAfterIt()
     QCOMPARE(buttons[1]->x(), second);
     // Tabs sit six apart.
     QCOMPARE(buttons[1]->x() - (buttons[0]->x() + buttons[0]->width()), 6);
-}
-
-void ProjectTabStripTests::onlyANewFrontTabScrollsIntoView()
-{
-    ProjectWorkspace workspace;
-    for (int tab = 0; tab < 11; ++tab)
-        workspace.newCanvas();
-    ProjectTabStrip strip(workspace);
-    strip.resize(300, 34);
-    strip.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&strip));
-    QScrollBar &bar = *strip.horizontalScrollBar();
-    // Scrolled back, another tab's change keeps the offset.
-    QTRY_VERIFY(bar.value() == bar.maximum() && bar.maximum() > 0);
-    // Scrolled back by hand, another tab's change keeps the offset.
-    bar.setValue(40);
-    workspace.tabs()[3]->session.setProjectPath(QStringLiteral("/p/Renamed.comp"));
-    QCoreApplication::processEvents();
-    QCOMPARE(bar.value(), 40);
-    // The front tab turns unsaved: a dot, the offset kept.
-    workspace.current().session.createDocument(8, 8);
-    workspace.current().session.history.markSaved();
-    QVERIFY(!workspace.current().session.isModified());
-    workspace.current().session.addBlankLayer();
-    QVERIFY(workspace.current().session.isModified());
-    QCoreApplication::processEvents();
-    QVERIFY(select(*strip.buttons().last()).text().startsWith(QStringLiteral("●")));
-    QCOMPARE(bar.value(), 40);
-    // A tab closed behind is no new front tab either.
-    const QUuid front = workspace.selectedID();
-    workspace.removeTab(workspace.tabs()[5]->id);
-    QCOMPARE(workspace.selectedID(), front);
-    QCoreApplication::processEvents();
-    QCOMPARE(bar.value(), 40);
-    // Choosing another tab brings it in, as little as needed.
-    workspace.select(workspace.tabs()[0]->id);
-    QTRY_COMPARE(bar.value(), 0);
-    workspace.select(workspace.tabs()[1]->id);
-    QCOMPARE(bar.value(), 0);
 }
 
 QTEST_MAIN(ProjectTabStripTests)

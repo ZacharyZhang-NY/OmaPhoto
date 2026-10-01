@@ -156,6 +156,8 @@ add_library(compositor_core STATIC
     src/UI/RawDevelopSheet.cpp
     src/UI/OmarchyTheme.cpp
     src/UI/ProjectTabs.cpp
+    src/UI/ProjectTabs+Strip.cpp
+    src/UI/ProjectTabLayout.cpp
     src/UI/ProjectWorkspaceView.cpp
     src/UI/ToolHeaderStyle.cpp
     src/UI/ToolIcons.cpp

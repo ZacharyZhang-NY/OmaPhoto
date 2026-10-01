@@ -36,6 +36,8 @@ public:
     bool canSwitch() const;
     ProjectTab &addTab(bool reuseEmpty = true);
     void select(QUuid id);
+    // A dragged tab lands at `index`, clamped; chrome, never undone.
+    void moveTab(QUuid id, int index);
     void newCanvas();
     // Each `done` runs from the event loop, never inline.
     void open(std::optional<QString> path = std::nullopt, std::function<void(bool)> done = {});
