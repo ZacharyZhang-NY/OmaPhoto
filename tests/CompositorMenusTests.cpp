@@ -32,7 +32,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
         {"closeProject", "Ctrl+W"}, {"undo", "Ctrl+Z"}, {"redo", "Ctrl+Shift+Z"}, {"fit", "Ctrl+0"}, {"actualPixels", "Ctrl+1"},
         {"zoomIn", "Ctrl+="}, {"zoomOut", "Ctrl+-"}, {"pixelGrid", ""}, {"snap", ""}, {"showGrid", "Ctrl+'"}, {"showGuides", "Ctrl+;"}, {"gridSettings", ""}, {"showRulers", "Ctrl+R"}, {"snapEnabled", "Ctrl+Shift+;"}, {"snapToGuides", ""}, {"snapToGrid", ""}, {"snapToLayers", ""}, {"snapToDocumentBounds", ""}, {"lockGuides", "Ctrl+Alt+;"}, {"clearGuides", ""}, {"transformControls", "Ctrl+H"}, {"transformLayer", "Ctrl+T"},
         {"layerViaCopy", "Ctrl+J"}, {"cut", "Ctrl+X"}, {"copy", "Ctrl+C"}, {"copyMerged", "Ctrl+Shift+C"}, {"paste", "Ctrl+V"}, {"keyboardShortcuts", ""}, {"fillForeground", "Alt+Backspace"}, {"fillBackground", "Ctrl+Backspace"}, {"clearSelectionPixels", ""}, {"contentAwareFill", "Shift+Backspace"}, {"clippingMask", "Ctrl+Alt+G"}, {"groupLayers", "Ctrl+G"},
-        {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
+        {"ungroupLayers", "Ctrl+Shift+G"}, {"moveOutOfFolder", ""}, {"newBlankLayer", "Ctrl+Shift+N"}, {"renameLayer", ""}, {"layerVisibility", ""}, {"moveLayerUp", "Ctrl+]"}, {"moveLayerDown", "Ctrl+["},
         {"mergeLayers", "Ctrl+E"}, {"flipHorizontal", ""}, {"flipVertical", ""}, {"deleteLayer", ""},
         {"selectAll", "Ctrl+A"}, {"deselect", "Ctrl+D"}, {"inverse", "Ctrl+Shift+I"}, {"layerPixels", ""}, {"subject", "Ctrl+Alt+A"}, {"colorRange", ""}, {"maskBlackAreas", ""},
         {"expandSelection", ""}, {"contractSelection", ""}, {"featherSelection", ""}, {"curves", "Ctrl+M"}, {"levels", "Ctrl+L"}, {"hueSaturation", "Ctrl+U"}, {"blackWhite", ""}, {"colorBalance", ""}, {"exposure", ""}, {"gradientMap", ""}, {"grain", ""}, {"invert", "Ctrl+I"},
@@ -72,7 +72,7 @@ void CompositorMenusTests::everyEntryHasSwiftsShortcutWithCtrlForCommand()
     for (QAction *entry : menus[5]->actions())
         filters << entry->text();
     QCOMPARE(filters, (QStringList{"Gaussian Blur…", "Motion Blur…", "Add Noise…", "Vignette…", "Bloom / Glow…", "Dither…", "Tonal Contrast…", "Lens Correction…", "Camera Raw Filter…", "Remove Background…"}));
-    QCOMPARE(menus[6]->actions().size(), 22);
+    QCOMPARE(menus[6]->actions().size(), 23);
 }
 
 void CompositorMenusTests::fileEntriesFollowTheControllersGate()
@@ -255,7 +255,7 @@ void CompositorMenusTests::theMenuBarBorrowsFocusAndTheFieldKeepsUndo()
 void CompositorMenusTests::layerEntriesFollowTheActiveLayer()
 {
     Bar bar;
-    for (const char *name : {"clippingMask", "groupLayers", "moveOutOfFolder", "newBlankLayer", "renameLayer", "layerVisibility", "moveLayerUp", "moveLayerDown", "deleteLayer"})
+    for (const char *name : {"clippingMask", "groupLayers", "ungroupLayers", "moveOutOfFolder", "newBlankLayer", "renameLayer", "layerVisibility", "moveLayerUp", "moveLayerDown", "deleteLayer"})
         QVERIFY2(!bar.action(name).isEnabled(), name);
     bar.session().createDocument(8, 8);
     QVERIFY(bar.action("groupLayers").isEnabled() && bar.action("newBlankLayer").isEnabled());
@@ -297,9 +297,16 @@ void CompositorMenusTests::layerEntriesFollowTheActiveLayer()
     bar.action("moveOutOfFolder").trigger();
     QCOMPARE(bar.session().activeLayer().value().parentID, std::nullopt);
     QVERIFY(!bar.action("moveOutOfFolder").isEnabled());
+    QVERIFY(!bar.action("ungroupLayers").isEnabled());
+    bar.session().selectLayers({lower}, lower);
+    const std::optional<QUuid> outer = bar.session().activeLayer().value().parentID;
+    bar.action("groupLayers").trigger();
+    QVERIFY(bar.action("ungroupLayers").isEnabled() && bar.action("ungroupLayers").text() == "Ungroup Layers");
+    bar.action("ungroupLayers").trigger();
+    QVERIFY(outer && bar.session().activeLayer().value().parentID == outer && bar.session().history.undoName() == "Ungroup Layers");
     // A busy project closes every layer entry.
     bar.session().setIsProjectBusy(true);
-    for (const char *name : {"clippingMask", "groupLayers", "moveOutOfFolder", "newBlankLayer", "renameLayer", "layerVisibility", "moveLayerUp", "moveLayerDown", "deleteLayer"})
+    for (const char *name : {"clippingMask", "groupLayers", "ungroupLayers", "moveOutOfFolder", "newBlankLayer", "renameLayer", "layerVisibility", "moveLayerUp", "moveLayerDown", "deleteLayer"})
         QVERIFY2(!bar.action(name).isEnabled(), name);
 }
 

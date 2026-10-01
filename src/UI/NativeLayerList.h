@@ -242,6 +242,8 @@ public:
     // The cursor Alt asks for here: clip, duplicate, arrow.
     QCursor cursorFor(QPoint listPoint, Qt::KeyboardModifiers modifiers) const;
     static QCursor clippingCursor(bool releasing, double ratio);
+    // Alt over a mask: the duplicate pointer, an eye behind.
+    static QCursor showMaskCursor(double ratio);
 
 protected:
     bool event(QEvent *event) override;

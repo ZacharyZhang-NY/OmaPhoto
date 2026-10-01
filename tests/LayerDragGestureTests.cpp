@@ -74,15 +74,25 @@ void LayerDragGestureTests::altShowsTheClippingAndDuplicateCursors()
     QCOMPARE(image(shown.list.cursorFor(folderBody, Qt::AltModifier)), image(CanvasView::duplicateCursor(ratio)));
     const QPoint folderStrip = shown.list.cells().at(1)->mapTo(&shown.list, QPoint(200, LayerCell::rowHeight - 4));
     QCOMPARE(image(shown.list.cursorFor(folderStrip, Qt::AltModifier)), image(CanvasView::duplicateCursor(ratio)));
-    // A mask thumbnail copies, or loads with Ctrl; busy, nothing.
+    // Alt over a mask: an eye behind the pointer.
     session->selectLayer(shown.id(0));
     session->addLayerMask();
     LayerCell &top = *shown.list.cells().at(0);
     const QPoint mask = top.mapTo(&shown.list, top.maskThumbnail().geometry().center());
-    QCOMPARE(image(shown.list.cursorFor(mask, Qt::AltModifier)), image(CanvasView::duplicateCursor(ratio)));
+    QCOMPARE(image(shown.list.cursorFor(mask, Qt::AltModifier)), image(NativeLayerList::showMaskCursor(ratio)));
     QCOMPARE(image(shown.list.cursorFor(mask, Qt::ControlModifier)), image(CanvasView::loadSelectionCursor(ratio)));
+    // The pointer's hot spot; the eye sits below right.
+    const QCursor eye = NativeLayerList::showMaskCursor(1);
+    QCOMPARE(eye.hotSpot(), CanvasView::duplicateCursor(1).hotSpot());
+    QCOMPARE(eye.pixmap().size(), QSize(29, 32));
+    const QImage drawn = image(eye);
+    QCOMPARE(drawn.pixelColor(22, 23), QColor(Qt::black));
+    QVERIFY(drawn.pixelColor(21, 23).lightness() > 150);
+    QCOMPARE(drawn.pixelColor(25, 23).alpha(), 255);
+    QCOMPARE(drawn.copy(0, 0, 18, 18), image(CanvasView::duplicateCursor(1)).copy(0, 0, 18, 18));
+    QCOMPARE(image(CanvasView::duplicateCursor(1)).pixelColor(23, 23).alpha(), 0);
     session->setIsImporting(true);
-    QCOMPARE(shown.list.cursorFor(mask, Qt::AltModifier).shape(), Qt::ArrowCursor);
+    QCOMPARE(image(shown.list.cursorFor(mask, Qt::AltModifier)), image(NativeLayerList::showMaskCursor(ratio)));
     QCOMPARE(shown.list.cursorFor(mask, Qt::ControlModifier).shape(), Qt::ArrowCursor);
     QCOMPARE(shown.list.cursorFor(body, Qt::AltModifier).shape(), Qt::ArrowCursor);
     session->setIsImporting(false);

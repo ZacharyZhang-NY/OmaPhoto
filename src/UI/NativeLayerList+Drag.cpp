@@ -13,6 +13,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScrollBar>
+#include <cmath>
 
 const QString NativeLayerList::maskType = QStringLiteral("com.compositor.layer-mask");
 const QString NativeLayerList::sourceType = QStringLiteral("com.compositor.layer-list");
@@ -299,6 +300,37 @@ QCursor NativeLayerList::clippingCursor(bool releasing, double ratio)
     return QCursor(pixmap, 3, 3);
 }
 
+// Swift's eye.fill: an almond, a ring round the pupil.
+QCursor NativeLayerList::showMaskCursor(double ratio)
+{
+    const QCursor base = CanvasView::duplicateCursor(ratio);
+    const QPointF hotSpot = base.hotSpot();
+    const QRectF eye(hotSpot + QPointF(15, 18), QSizeF(7.5, 5.5));
+    const QSizeF baseSize = base.pixmap().deviceIndependentSize();
+    const QSize size(int(std::ceil(std::max(baseSize.width(), eye.right() + 2))), int(std::ceil(std::max(baseSize.height(), eye.bottom() + 2))));
+    QPixmap pixmap(size * ratio);
+    pixmap.setDevicePixelRatio(ratio);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QPainterPath shape;
+    shape.setFillRule(Qt::OddEvenFill);
+    shape.moveTo(eye.left(), eye.center().y());
+    shape.quadTo(eye.center().x(), eye.top() - eye.height() / 2, eye.right(), eye.center().y());
+    shape.quadTo(eye.center().x(), eye.bottom() + eye.height() / 2, eye.left(), eye.center().y());
+    shape.addEllipse(eye.center(), 1.9, 1.9);
+    shape.addEllipse(eye.center(), 1.1, 1.1);
+    // The eye first, haloed, so the arrows sit in front.
+    for (int step = 0; step < 16; ++step) {
+        const double angle = step * M_PI / 8;
+        painter.fillPath(shape.translated(std::cos(angle), std::sin(angle)), Qt::white);
+    }
+    painter.fillPath(shape, Qt::black);
+    painter.drawPixmap(QPointF(0, 0), base.pixmap());
+    painter.end();
+    return QCursor(pixmap, int(hotSpot.x()), int(hotSpot.y()));
+}
+
 QCursor NativeLayerList::cursorFor(QPoint listPoint, Qt::KeyboardModifiers modifiers) const
 {
     const int row = rowAt(listPoint);
@@ -317,9 +349,9 @@ QCursor NativeLayerList::cursorFor(QPoint listPoint, Qt::KeyboardModifiers modif
         return QCursor(Qt::ArrowCursor);
     }
     const bool editable = m_session.canEditLayers();
-    // A mask copies, the row duplicates, the strip clips.
+    // A mask shows alone, the row duplicates, the strip clips.
     if (cell.maskThumbnail().isVisible() && cell.maskThumbnail().geometry().contains(inCell))
-        return editable ? CanvasView::duplicateCursor(ratio) : QCursor(Qt::ArrowCursor);
+        return showMaskCursor(ratio);
     if (!isClippingZone(cell, inCell))
         return editable ? CanvasView::duplicateCursor(ratio) : QCursor(Qt::ArrowCursor);
     if (!m_session.canToggleClippingMask(layer.id))

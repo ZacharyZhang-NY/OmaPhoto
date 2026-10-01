@@ -134,7 +134,7 @@ const std::vector<ShortcutDefinition> &ShortcutDefinition::all()
             entry("Levels", "l", 1, true), entry("Hue/Saturation", "u", 1, true), entry("Invert Pixels / Mask", "i", 1, true),
             entry("Canvas Size", "c", 3, true), entry("Image Size", "i", 3, true), entry("Transform Layer / Selection", "t", 1, true),
             entry("Duplicate / Layer via Copy", "j", 1, true), entry("Toggle Clipping Mask", "g", 3, true),
-            entry("Group Layers", "g", 1, true), entry("New Blank Layer", "n", 9, true), entry("Move Layer Up", "]", 1, true),
+            entry("Group Layers", "g", 1, true), entry("Ungroup Layers", "g", 9, true), entry("New Blank Layer", "n", 9, true), entry("Move Layer Up", "]", 1, true),
             entry("Move Layer Down", "[", 1, true), entry("Merge Layers", "e", 1, true), entry("Show Grid", "'", 1, true),
             entry("Show Guides", ";", 1, true), entry("Show Rulers", "r", 1, true), entry("Snap", ";", 9, true), entry("Lock Guides", ";", 3, true)};
         const std::vector<std::pair<const char *, QString>> tools{

@@ -255,6 +255,7 @@ CompositorMenus::CompositorMenus(ProjectWorkspace &workspace, QMenuBar &bar, QWi
     });
     layer->addSeparator();
     add(layer, QStringLiteral("groupLayers"), QStringLiteral("Group Selected Layers"), QKeySequence(Qt::CTRL | Qt::Key_G), [this] { session().groupSelectedLayers(); });
+    add(layer, QStringLiteral("ungroupLayers"), QStringLiteral("Ungroup Layers"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G), [this] { session().ungroupLayers(); });
     add(layer, QStringLiteral("moveOutOfFolder"), QStringLiteral("Move Out of Folder"), QKeySequence(), [this] { session().moveActiveLayerOutOfGroup(); });
     add(layer, QStringLiteral("newBlankLayer"), QStringLiteral("New Blank Layer"), QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_N), [this] { session().addBlankLayer(); });
     add(layer, QStringLiteral("renameLayer"), QStringLiteral("Rename Layer…"), QKeySequence(), [this] { session().setRenamingLayerID(session().activeLayerID()); });
@@ -407,6 +408,7 @@ void CompositorMenus::synchronize()
     action(QStringLiteral("clippingMask"))->setText(active && active->maskSourceID ? QStringLiteral("Release Clipping Mask") : QStringLiteral("Create Clipping Mask"));
     action(QStringLiteral("clippingMask"))->setEnabled(s.activeLayerID() && s.canToggleClippingMask(*s.activeLayerID()));
     action(QStringLiteral("groupLayers"))->setEnabled(s.canEditLayers());
+    action(QStringLiteral("ungroupLayers"))->setEnabled(s.canUngroupLayers());
     action(QStringLiteral("moveOutOfFolder"))->setEnabled(s.canEditLayers() && active && active->parentID);
     action(QStringLiteral("newBlankLayer"))->setEnabled(s.canEditLayers());
     action(QStringLiteral("renameLayer"))->setEnabled(s.canEditLayers() && active);

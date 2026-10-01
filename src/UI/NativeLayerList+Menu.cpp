@@ -1,5 +1,6 @@
 #include "UI/NativeLayerList.h"
 #include <QMenu>
+#include <algorithm>
 
 // Swift's table-level context menu (1.2.5): entries and validation.
 std::unique_ptr<QMenu> NativeLayerList::contextMenu(QUuid id)
@@ -40,6 +41,9 @@ std::unique_ptr<QMenu> NativeLayerList::contextMenu(QUuid id)
     entry(*menu, "groupLayers", QStringLiteral("Group Selected Layers"),
           session.canEditLayers() && session.document() && session.document()->layers.size() < 10'000 && !session.selectedLayerIDs().isEmpty(),
           [&session] { session.groupSelectedLayers(); });
+    // A folder right-clicked can be ungrouped.
+    if (std::ranges::any_of(session.document()->layers, [id](const ImageLayer &layer) { return layer.id == id && layer.isGroup; }))
+        entry(*menu, "ungroupLayers", QStringLiteral("Ungroup Layers"), session.canUngroupLayers(), [&session] { session.ungroupLayers(); });
     entry(*menu, "moveOut", QStringLiteral("Move Out of Folder"), session.canEditLayers() && active && active->parentID,
           [&session] { session.moveActiveLayerOutOfGroup(); });
     entry(*menu, "mergeLayers", session.mergeTitle(), session.canMergeLayers(), [&session] { session.mergeLayers(); });

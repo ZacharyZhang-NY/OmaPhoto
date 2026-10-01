@@ -317,6 +317,44 @@ void EditorSession::groupSelectedLayers()
     endEdit();
 }
 
+bool EditorSession::canUngroupLayers() const
+{
+    const std::optional<ImageLayer> active = activeLayer();
+    return canEditLayers() && active && active->isGroup;
+}
+
+// The folder's children take its place, in order.
+void EditorSession::ungroupLayers()
+{
+    if (!canUngroupLayers())
+        return;
+    const ImageLayer group = activeLayer().value();
+    std::vector<ImageLayer> children;
+    for (const ImageLayer &layer : m_document->layers) {
+        if (layer.parentID == group.id) {
+            children.push_back(layer);
+            children.back().parentID = group.parentID;
+        }
+    }
+    std::vector<ImageLayer> layers;
+    QSet<QUuid> childIDs;
+    for (const ImageLayer &child : children)
+        childIDs.insert(child.id);
+    for (const ImageLayer &layer : m_document->layers) {
+        if (layer.id == group.id)
+            layers.insert(layers.end(), children.begin(), children.end());
+        else if (!childIDs.contains(layer.id))
+            layers.push_back(layer);
+    }
+    releaseDetachedClipping(layers);
+    finishOpacityEdit();
+    beginEdit(QStringLiteral("Ungroup Layers"));
+    m_document->layers = layers;
+    selectLayers(childIDs, children.empty() ? std::nullopt : std::optional(children.front().id));
+    m_collapsedGroupIDs.remove(group.id);
+    endEdit();
+}
+
 std::vector<LayerHierarchy::Entry> EditorSession::layerRows() const
 {
     std::vector<ProjectLayerRecord> records;
