@@ -104,15 +104,17 @@ QImage LevelsFilter::run(const LevelsJob &job)
 {
     if (job.settings.isIdentity())
         return job.image;
-    QImage context = drawn(job.image);
+    QImage context = BrushRaster::copy(job.image);
     // On the stack: a heap failure would escape the catch.
     std::array<float, 3 * 256> tables;
     for (size_t channel = 0; channel < 3; ++channel) {
         for (size_t value = 0; value <= 255; ++value)
             tables[channel * 256 + value] = float(job.settings.apply(double(value) / 255, allLevelsChannels[channel + 1]));
     }
-    // The kernel unpremultiplies each edge itself (Swift's cc5aac4 does twice).
-    levels_apply(context.bits(), size_t(context.width()) * size_t(context.height()), tables.data());
+    // The kernel unpremultiplies edges itself; bands use every core.
+    uchar *const pixels = context.bits();
+    BrushRaster::inBands(qsizetype(context.width()) * context.height(),
+                         [&](qsizetype start, qsizetype length) { levels_apply(pixels + start * 4, size_t(length), tables.data()); });
     if (job.selection)
         return PixelAdjust::blend(context, job.image, *job.selection, job.mapping, false);
     return context;

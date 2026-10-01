@@ -392,7 +392,7 @@ std::optional<LayerTransform> EditorSession::displayedMaskPlacement(const ImageL
     if (!layer.mask)
         return std::nullopt;
     // Previewed on a grown layer, the mask keeps its bounds.
-    if (m_filterEdit && m_filterEdit->grownTransform && m_filterEdit->previewImage(layer.id))
+    if (m_filterEdit && m_filterEdit->preparedTransform && m_filterEdit->previewImage(layer.id))
         return layer.mask->placement.value_or(layer.transform);
     if (m_transformEdit && m_transformEdit->group) {
         const TransformGroup &group = *m_transformEdit->group;

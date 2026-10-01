@@ -171,10 +171,12 @@ public:
     // Add Noise's grain, fixed while the panel is open.
     const quint32 seed = QRandomGenerator::global()->generate();
     std::optional<QImage> preparedPreview;
+    // Where the prepared preview sits; none: the layer's own place.
+    std::optional<LayerTransform> preparedTransform;
+    // The grown layer `pending` is made from.
+    std::optional<LayerTransform> pendingTransform;
     // The settings the prepared preview was made with.
     std::optional<FilterSettings> preparedSettings;
-    // Moves with each new grid: an older render lands nothing.
-    quint64 previewSourceVersion = 0;
     std::optional<FilterJob> pending;
     CameraRawPanel rawPanel;
     // Vignette on an empty layer: the canvas it fills.

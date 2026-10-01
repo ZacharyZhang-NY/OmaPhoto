@@ -180,8 +180,7 @@ PSDRecords::RawLayer PSDRecords::readRecord(Cursor &cursor, bool isPSB)
         layer.maskRight = cursor.i32();
         layer.sourceMaskTop = layer.maskTop, layer.sourceMaskLeft = layer.maskLeft;
         layer.sourceMaskBottom = layer.maskBottom, layer.sourceMaskRight = layer.maskRight;
-        // The mask's default colour is skipped, as Swift ignores it.
-        cursor.skip(1);
+        layer.maskDefault = cursor.u8();
         const uchar flags = cursor.u8();
         layer.maskDisabled = (flags & 2) != 0;
         layer.maskLinked = (flags & 1) == 0;

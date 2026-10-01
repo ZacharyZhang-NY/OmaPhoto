@@ -131,6 +131,8 @@ std::vector<HueResponse> hueResponse(const HueSaturationSettings &settings);
 std::vector<float> cube(const HueSaturationSettings &settings);
 Color adjust(double red, double green, double blue, const HueSaturationSettings &settings);
 Color adjust(double red, double green, double blue, const HueSaturationSettings &settings, const std::vector<HueResponse> &response);
+// Photoshop's: down toward gray, up by dividing by what's left.
+double adjustedSaturation(double saturation, double amount);
 // The hue a spectrum swatch becomes.
 double shiftedHue(double hue, const HueSaturationSettings &settings);
 }

@@ -111,6 +111,7 @@ private slots:
     void eyedroppersRecenterWidenAndNarrowTheBand();
     void targetedAdjustmentPicksTheRangeUnderTheCursor();
     void samplingNeedsAColorRangeAndAColorfulPixel();
+    void positiveSaturationMatchesPhotoshop();
 };
 
 void HueSaturationTests::defaultsAreAnExactNoOp()
@@ -317,6 +318,24 @@ void HueSaturationTests::samplingNeedsAColorRangeAndAColorfulPixel()
     gray->setHueSampleMode(HueSampleMode::replace);
     gray->sampleHueRange(QPointF(30, 5));
     QVERIFY(gray->hueSaturation().value().settings.band() == before);
+}
+
+// Photoshop divides by what's left: +50 doubles, +100 saturates.
+void HueSaturationTests::positiveSaturationMatchesPhotoshop()
+{
+    QVERIFY(std::abs(HueSaturationFilter::adjustedSaturation(0.2, 50) - 0.4) < 1e-9);
+    QVERIFY(std::abs(HueSaturationFilter::adjustedSaturation(0.3, 62) - 0.3 / 0.38) < 1e-9);
+    QCOMPARE(HueSaturationFilter::adjustedSaturation(0.1, 100), 1.0);
+    QCOMPARE(HueSaturationFilter::adjustedSaturation(0.8, 50), 1.0);
+    QCOMPARE(HueSaturationFilter::adjustedSaturation(0, 100), 0.0);
+    QVERIFY(std::abs(HueSaturationFilter::adjustedSaturation(0.6, -50) - 0.3) < 1e-9);
+    // Clamped past ±100.
+    QCOMPARE(HueSaturationFilter::adjustedSaturation(0.1, 150), 1.0);
+    QCOMPARE(HueSaturationFilter::adjustedSaturation(0.6, -150), 0.0);
+    QVERIFY(std::abs(HueSaturationFilter::adjustedSaturation(0.2, 0) - 0.2) < 1e-9);
+    // A red at saturation 0.2, lightness 0.5, raised by 50.
+    const HueSaturationFilter::Color color = HueSaturationFilter::adjust(0.6, 0.4, 0.4, HueSaturationSettings(0, 50, 0));
+    QVERIFY(std::abs(color.red - 0.7) < 1e-9 && std::abs(color.green - 0.3) < 1e-9 && std::abs(color.blue - 0.3) < 1e-9);
 }
 
 QTEST_GUILESS_MAIN(HueSaturationTests)

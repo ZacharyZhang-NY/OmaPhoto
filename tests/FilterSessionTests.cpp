@@ -119,7 +119,8 @@ void FilterSessionTests::updatesNormalizeGrowAndDropWhatPreviewOffHides()
     session->updateFilter(FilterSettings{.radius = 1000}, true);
     QCOMPARE(settings(*session).radius, 250.0);
     QCOMPARE(session->filterEdit().value().grownMargin, 752.0);
-    QVERIFY(!session->filterEdit().value().preparedPreview);
+    // The last preview stays up while the grown grid renders.
+    QVERIFY(session->filterEdit().value().preparedPreview);
     QVERIFY(settled(*session) && session->filterEdit().value().preparedPreview);
     // Off: the preview and the queue go at once.
     const int revision = session->brushRevision();

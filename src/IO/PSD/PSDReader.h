@@ -21,4 +21,8 @@ extern const std::set<QString> adjustmentKeys;
 // Levels, Curves and Hue/Saturation layers, as Swift reads them.
 namespace PSDAdjustments {
 std::optional<LayerAdjustment> parse(const std::map<QString, QByteArray> &extra);
+// 'levl': each channel's levels, gamma in hundredths.
+std::optional<LayerAdjustment> levels(const QByteArray &data);
+// 'hue2': Colorize or the Master, then each range's values.
+std::optional<LayerAdjustment> hue(const QByteArray &data);
 }

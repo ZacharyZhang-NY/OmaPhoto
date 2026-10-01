@@ -44,6 +44,7 @@ add_library(compositor_core STATIC
     src/Document/AdjustmentEditing.cpp
     src/Document/LayerAppearance.cpp
     src/Document/LayerGroups.cpp
+    src/Document/LayerGroups+Order.cpp
     src/Document/LayerMask.cpp
     src/Document/LayerTransform.cpp
     src/Document/LiveLayerMask.cpp

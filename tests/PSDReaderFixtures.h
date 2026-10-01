@@ -21,6 +21,7 @@ struct Record {
     uchar flags = 0;
     std::optional<QRect> mask;
     uchar maskFlags = 0;
+    uchar maskDefault = 255;
     QByteArray name = "Layer";
     std::vector<Extra> extras;
 };
@@ -81,7 +82,7 @@ inline QByteArray file(const std::vector<Record> &records, const QByteArray &res
             extra.i32(record.mask->left());
             extra.i32(record.mask->top() + record.mask->height());
             extra.i32(record.mask->left() + record.mask->width());
-            extra.u8(255);
+            extra.u8(record.maskDefault);
             extra.u8(record.maskFlags);
             extra.u16(0);
         } else {

@@ -71,8 +71,8 @@ private slots:
     void settingsKeepSwiftsDefaultsAndBounds();
     void nothingToChangeClosesWithoutAStep();
     void bloomGrowsItsGridAndIsTrimmed();
-    void aPreviewForAnOlderGridLandsNothing();
-    void aJobWaitingBehindAnotherEditTakesTheNewGrid();
+    void aPreviewForAnOlderGridShowsOnThatGrid();
+    void aJobWaitingBehindAnotherEditShowsOnItsGrid();
     void theVignettePickerPreviewsAndPutsBack();
     void theSheetShowsSwiftsControls();
 };
@@ -264,28 +264,33 @@ void FinishingFilterTests::bloomGrowsItsGridAndIsTrimmed()
     QVERIFY(after.size.width() > before.size.width() && after.size.width() < before.size.width() + 2 * 74);
 }
 
-void FinishingFilterTests::aPreviewForAnOlderGridLandsNothing()
+void FinishingFilterTests::aPreviewForAnOlderGridShowsOnThatGrid()
 {
     EditorSession session;
     session.createDocument(1200, 1200);
     session.insert(ImportedImage(filled(1200, 1200, QColor(90, 90, 90)), QImage(), QStringLiteral("Big")));
     session.beginFilter(FilterKind::bloomGlow);
     QTRY_VERIFY(!session.filterEdit().value().preparing);
-    // Every landed preview matches the grid it shows on.
+    // Every landed preview sits on the grid it came from.
     bool mismatched = false;
+    int older = 0;
     QObject::connect(&session, &EditorSession::changed, &session, [&] {
         const std::optional<FilterEdit> &edit = session.filterEdit();
-        if (edit && edit->preparedPreview && edit->preparedPreview->size() != edit->previewSource.size())
+        if (!edit || !edit->preparedPreview)
+            return;
+        if (QSizeF(edit->preparedPreview->size()) != edit->preparedTransform.value().size)
             mismatched = true;
+        older += edit->preparedPreview->size() != edit->previewSource.size();
     });
     session.updateFilter(FilterSettings{.bloomRadius = 5}, true);
-    const quint64 version = session.filterEdit().value().previewSourceVersion;
+    const LayerTransform grid = session.filterEdit().value().grownTransform.value();
     // Wider than the grid: it grows mid-render.
     session.updateFilter(FilterSettings{.bloomRadius = 40}, true);
-    QCOMPARE(session.filterEdit().value().previewSourceVersion, version + 1);
+    QVERIFY(session.filterEdit().value().grownTransform.value().size.width() > grid.size.width());
     QTRY_VERIFY(session.filterEdit().value().preparedPreview && !session.filterEdit().value().preparing);
-    QVERIFY(!mismatched);
+    QVERIFY(!mismatched && older > 0);
     QCOMPARE(session.filterEdit().value().preparedPreview->size(), session.filterEdit().value().previewSource.size());
+    QCOMPARE(session.filterEdit().value().preparedTransform, session.filterEdit().value().grownTransform);
     // Preview off: nothing waits; the stale render ends it.
     session.updateFilter(FilterSettings{.bloomRadius = 5}, true);
     session.updateFilter(FilterSettings{.bloomRadius = 60}, false);
@@ -293,7 +298,7 @@ void FinishingFilterTests::aPreviewForAnOlderGridLandsNothing()
     QVERIFY(!session.filterEdit().value().preparedPreview);
 }
 
-void FinishingFilterTests::aJobWaitingBehindAnotherEditTakesTheNewGrid()
+void FinishingFilterTests::aJobWaitingBehindAnotherEditShowsOnItsGrid()
 {
     // The reviewer's sequence: a cancelled edit's worker still runs.
     EditorSession session;
@@ -302,13 +307,13 @@ void FinishingFilterTests::aJobWaitingBehindAnotherEditTakesTheNewGrid()
     session.beginFilter(FilterKind::gaussianBlur);
     QVERIFY(session.filterEdit().value().preparing);
     session.cancelFilter();
-    // Bloom's first job waits; Preview off grows its grid meanwhile.
+    // Bloom's first job waits; Preview off grows the grid meanwhile.
     session.beginFilter(FilterKind::bloomGlow);
     session.updateFilter(FilterSettings{.bloomRadius = 50}, false);
     bool mismatched = false, armed = true;
     QObject::connect(&session, &EditorSession::changed, &session, [&] {
         const std::optional<FilterEdit> &edit = session.filterEdit();
-        if (edit && edit->preparedPreview && edit->preparedPreview->size() != edit->previewSource.size())
+        if (edit && edit->preparedPreview && QSizeF(edit->preparedPreview->size()) != edit->preparedTransform.value().size)
             mismatched = true;
         // The waiting job starts: Preview comes back next turn.
         if (std::exchange(armed, false))
@@ -317,6 +322,7 @@ void FinishingFilterTests::aJobWaitingBehindAnotherEditTakesTheNewGrid()
     QTRY_VERIFY(!armed);
     QTRY_VERIFY(session.filterEdit().value().preparedPreview && !session.filterEdit().value().preparing);
     QVERIFY(!mismatched);
+    QCOMPARE(session.filterEdit().value().preparedPreview->size(), session.filterEdit().value().previewSource.size());
 }
 
 void FinishingFilterTests::theVignettePickerPreviewsAndPutsBack()

@@ -10,6 +10,7 @@ private slots:
     void aStackBlendsOnceWithItsBasesMode();
     void laterChildrenCoverEarlierOnes();
     void aStackInheritsThePaintersOpacity();
+    void stacksAndCoverageTakeTheDevicesPixels();
 };
 
 void ClippingStackTests::init()
@@ -136,6 +137,43 @@ void ClippingStackTests::aStackInheritsThePaintersOpacity()
     painter.end();
     QCOMPARE(alphas(surface), (std::array<int, 4>{127, 64, 16, 0}));
     QCOMPARE(reds(surface), (std::array<int, 4>{127, 64, 16, 0}));
+}
+
+// Compositor 1.4: surfaces in device pixels keep half units sharp.
+void ClippingStackTests::stacksAndCoverageTakeTheDevicesPixels()
+{
+    Scene scene;
+    Layer white = placed(solid(4, 2, qRgba(255, 255, 255, 255)));
+    white.transform = placedAt({0, 0}, {4, 2});
+    Layer stripe = placed(solid(1, 2, qRgba(255, 0, 0, 255)));
+    stripe.transform = placedAt({0.5, 0}, {1, 2});
+    stripe.transform.sampling = LayerSampling::nearest;
+    const QUuid base = scene.add(white);
+    const QUuid child = scene.add(stripe);
+    scene.layers[child].source = base;
+    const auto row = [&](const std::vector<QUuid> &ids) {
+        LiveMaskRenderer live = scene.renderer();
+        live.prepareStacks(ids, [](QUuid) { return std::nullopt; }, [](QUuid) { return LayerBlendMode::normal; });
+        QImage surface = BrushRaster::context(8, 4, false);
+        QPainter painter(&surface);
+        painter.scale(2, 2);
+        for (const QUuid &id : ids)
+            live.drawComposite(id, painter);
+        painter.end();
+        QList<QRgb> pixels;
+        for (int x = 0; x < 4; ++x)
+            pixels << surface.pixel(x, 1);
+        return pixels;
+    };
+    const QRgb red = qRgba(255, 0, 0, 255), clear = qRgba(0, 0, 0, 0), whiteness = qRgba(255, 255, 255, 255);
+    QCOMPARE(row({base, child}), (QList<QRgb>{whiteness, red, red, whiteness}));
+    // Coverage from a source further down: a layer between.
+    const QUuid between = scene.add(placed(solid(2, 2, qRgba(0, 0, 0, 0))));
+    const QUuid target = scene.add(white);
+    scene.layers[child].source = std::nullopt;
+    scene.layers[child].blendMode = LayerBlendMode::normal;
+    scene.layers[target].source = child;
+    QCOMPARE(row({child, between, target}), (QList<QRgb>{clear, whiteness, whiteness, clear}));
 }
 
 QTEST_MAIN(ClippingStackTests)

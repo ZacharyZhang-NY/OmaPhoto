@@ -1,6 +1,7 @@
 #include "Rendering/AdjustmentSurface.h"
 #include "Document/BrushStroke.h"
 #include "Logging.h"
+#include "Rendering/LayerRenderer.h"
 #include <QPaintEngine>
 
 void AdjustmentSurface::draw(QPainter &context, const std::function<void(QPainter &)> &body, double padding, qint64 pixelBudget)
@@ -15,11 +16,18 @@ void AdjustmentSurface::draw(QPainter &context, const std::function<void(QPainte
     // Spatial adjustments read a halo; the clip keeps what shows.
     const QRectF shown = toDevice.inverted().mapRect(QRectF(output));
     const QRect area = padding > 0 ? toDevice.mapRect(shown.adjusted(-padding, -padding, padding, padding)).toAlignedRect() : output;
-    if (qint64(area.width()) * area.height() > pixelBudget) {
+    // Device pixels; past the budget, painter units.
+    double scale = 1;
+    QSize size = area.size();
+    if (qint64(size.width()) * size.height() > pixelBudget) {
+        scale = 1 / LayerRenderer::deviceScale(context);
+        size = QSize(std::max(1, qRound(area.width() * scale)), std::max(1, qRound(area.height() * scale)));
+    }
+    if (qint64(size.width()) * size.height() > pixelBudget) {
         qCWarning(lcRendering) << "an adjustment surface passes its pixel budget:" << area.size();
         return;
     }
-    QImage surface(area.size(), QImage::Format_RGBA8888_Premultiplied);
+    QImage surface(size, QImage::Format_RGBA8888_Premultiplied);
     if (surface.isNull()) {
         qCWarning(lcRendering) << "an adjustment surface could not be allocated:" << area.size();
         return;
@@ -28,12 +36,13 @@ void AdjustmentSurface::draw(QPainter &context, const std::function<void(QPainte
     {
         // The body draws in the painter's own coordinates.
         QPainter painter(&surface);
-        painter.setTransform(context.deviceTransform() * QTransform::fromTranslate(-area.left(), -area.top()));
+        painter.setTransform(context.deviceTransform() * QTransform::fromTranslate(-area.left(), -area.top()) * QTransform::fromScale(scale, scale));
         body(painter);
     }
     // Drawn back under the painter's own opacity, mode and clip.
     context.save();
     context.setWorldTransform(context.deviceTransform().inverted() * context.worldTransform());
+    context.setRenderHint(QPainter::SmoothPixmapTransform, scale != 1);
     context.drawImage(QRectF(area), surface);
     context.restore();
 }

@@ -57,7 +57,8 @@ void drawBrushPreview(const QImage &image, const LayerTransform &transform, QPoi
 void composite(QPainter &context, const QTransform &placement, const QRectF &extent, LayerSampling sampling,
                InterpolationQuality quality, const Options &options, const QRectF &maskBounds,
                const std::function<void(QPainter &)> &body, const std::function<void(QPainter &)> &veil = {});
-InterpolationQuality interpolation(LayerSampling sampling, double finalFactor);
+// An upright layer drawn pixel for pixel copies straight across.
+InterpolationQuality interpolation(LayerSampling sampling, double finalFactor, bool upright = false);
 Reduced reduced(const QImage &image, double width, double device, LayerSampling sampling);
 QRectF coverage(const Reduced &reduced, const QRectF &bounds);
 double deviceScale(const QPainter &context);

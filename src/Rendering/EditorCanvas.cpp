@@ -430,6 +430,10 @@ void CanvasView::drawLayers(const CanvasDocument &document, double scale, const 
     live.adjustment = [&](QUuid id) { return byID.contains(id) ? byID.at(id).adjustment : std::nullopt; };
     live.adjustmentOpacity = [&](QUuid id) { return byID.at(id).effectiveOpacity(byID); };
     live.adjustmentScale = scale;
+    const QPointF corner = center(QPointF(0, 0));
+    live.adjustmentRegion = [corner, scale](const QRectF &rect) {
+        return QRectF((rect.left() - corner.x()) / scale, (rect.top() - corner.y()) / scale, rect.width() / scale, rect.height() / scale);
+    };
     live.adjustmentClip = [&](QUuid id, const QPainter &painter, QImage &coverage) {
         const ImageLayer &layer = byID.at(id);
         if (!layer.mask || !layer.mask->isEnabled)

@@ -31,6 +31,8 @@ public:
     std::function<void(QUuid, const QPainter &, QImage &coverage)> adjustmentClip = [](QUuid, const QPainter &, QImage &) {};
     // Painter units a document pixel: the canvas's zoom.
     double adjustmentScale = 1;
+    // The document a painter region shows: the canvas maps it.
+    std::function<QRectF(const QRectF &)> adjustmentRegion;
 
 private:
     // The pixels beneath, adjusted and mixed back through coverage.
