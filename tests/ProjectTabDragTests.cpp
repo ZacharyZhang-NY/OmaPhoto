@@ -48,7 +48,7 @@ struct Strip {
         ProjectTabButton &tab = button(strip, title);
         const QPoint point = tab.mapTo(&strip, QPoint(20, 14));
         pressed = &select(tab);
-        QTest::mousePress(pressed, Qt::LeftButton, {}, QPoint(20 - pressed->x(), 14));
+        QTest::mousePress(pressed, Qt::LeftButton, {}, pressed->mapFrom(&strip, point));
         return point;
     }
     void move(QPoint point) { QTest::mouseMove(pressed, pressed->mapFrom(&strip, point)); }
@@ -158,11 +158,10 @@ void ProjectTabDragTests::aSmallOrUpwardMoveIsAClick()
     fixture.move(start + QPoint(2, -3));
     QCOMPARE(fixture.workspace.selectedID(), fixture.workspace.tabs()[2]->id);
     QCOMPARE(button(fixture.strip, "Untitled").x(), 0);
-    // A move with the button let go unseen drags nothing.
-    QMouseEvent unheld(QEvent::MouseMove, QPointF(fixture.pressed->mapFrom(&fixture.strip, start + QPoint(200, 0))),
-                       QPointF(fixture.pressed->mapToGlobal(fixture.pressed->mapFrom(&fixture.strip, start + QPoint(200, 0)))), Qt::NoButton,
-                       Qt::NoButton, Qt::NoModifier);
-    QApplication::sendEvent(fixture.pressed, &unheld);
+    // Its release lost, a move under another button drags nothing.
+    const QPoint far = fixture.pressed->mapFrom(&fixture.strip, start + QPoint(200, 0));
+    QMouseEvent other(QEvent::MouseMove, QPointF(far), QPointF(fixture.pressed->mapToGlobal(far)), Qt::NoButton, Qt::RightButton, Qt::NoModifier);
+    QApplication::sendEvent(fixture.pressed, &other);
     QCOMPARE(button(fixture.strip, "Untitled").x(), 0);
     fixture.release("Untitled", start + QPoint(2, -3));
     // The click selects; the order stays.
