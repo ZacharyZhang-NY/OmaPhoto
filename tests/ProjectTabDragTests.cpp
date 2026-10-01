@@ -74,6 +74,7 @@ private slots:
     void aSmallOrUpwardMoveIsAClick();
     void aBusyProjectHoldsTheOrder();
     void aTabClosedMidDragEndsIt();
+    void aLostReleaseGivesWayToTheNextDrag();
     void tabsThatDoNotFitGatherInAMenu();
     void theMenuSwitchesAndPinsTheChosenTab();
     void aBusyProjectOpensNoMenu();
@@ -132,11 +133,16 @@ void ProjectTabDragTests::aDraggedTabFollowsThePointerAndLandsInTheGap()
     fixture.move(back - QPoint(third.width() / 2 + 10, 0));
     fixture.release("Untitled", back - QPoint(third.width() / 2 + 10, 0));
     QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled 2", "Untitled", "Untitled 3"}));
+    // The first, dragged one place right.
+    const QPoint right = fixture.press("Untitled 2");
+    fixture.move(right + QPoint(first.width() / 2 + 10, 0));
+    fixture.release("Untitled 2", right + QPoint(first.width() / 2 + 10, 0));
+    QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled", "Untitled 2", "Untitled 3"}));
     // Let go where it began: the order stays.
     const QPoint still = fixture.press("Untitled 3");
     fixture.move(still + QPoint(5, 0));
     fixture.release("Untitled 3", still + QPoint(5, 0));
-    QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled 2", "Untitled", "Untitled 3"}));
+    QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled", "Untitled 2", "Untitled 3"}));
     QTRY_VERIFY(settled(fixture.strip));
     QCOMPARE(third.x(), second.width() + first.width() + 12);
 }
@@ -181,17 +187,33 @@ void ProjectTabDragTests::aTabClosedMidDragEndsIt()
 {
     Strip fixture;
     const QPoint start = fixture.press("Untitled 2");
-    fixture.move(start + QPoint(5000, 0));
-    QVERIFY(button(fixture.strip, "Untitled 2").x() > 100);
+    fixture.move(start - QPoint(5000, 0));
+    QTRY_VERIFY(settled(fixture.strip));
+    QVERIFY(button(fixture.strip, "Untitled").x() > 0);
     fixture.workspace.removeTab(fixture.workspace.tabs()[1]->id);
     QCOMPARE(fixture.strip.buttons().size(), 2);
     QTRY_VERIFY(settled(fixture.strip));
+    QCOMPARE(button(fixture.strip, "Untitled").x(), 0);
     QCOMPARE(button(fixture.strip, "Untitled 3").x(), button(fixture.strip, "Untitled").width() + 6);
     // Another drag works at once.
     const QPoint next = fixture.press("Untitled 3");
     fixture.move(next - QPoint(5000, 0));
     fixture.release("Untitled 3", next - QPoint(5000, 0));
     QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled 3", "Untitled"}));
+}
+
+void ProjectTabDragTests::aLostReleaseGivesWayToTheNextDrag()
+{
+    Strip fixture;
+    const QPoint first = fixture.press("Untitled");
+    fixture.move(first + QPoint(5000, 0));
+    // Its release never comes; another tab is dragged.
+    const QPoint next = fixture.press("Untitled 3");
+    fixture.move(next - QPoint(5000, 0));
+    fixture.release("Untitled 3", next - QPoint(5000, 0));
+    QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled 3", "Untitled", "Untitled 2"}));
+    QTRY_VERIFY(settled(fixture.strip));
+    QCOMPARE(button(fixture.strip, "Untitled 3").x(), 0);
 }
 
 void ProjectTabDragTests::tabsThatDoNotFitGatherInAMenu()
