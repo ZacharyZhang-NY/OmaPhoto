@@ -206,7 +206,7 @@ add_library(compositor_core STATIC
     src/Rendering/EditorCanvas+Gradient.cpp
     src/Rendering/EditorCanvas+Cursors.cpp
     src/Rendering/BrushCursorOverlay.cpp
-    src/Rendering/EditorCanvas+MaskAlone.cpp
+    src/Rendering/EditorCanvas+Masks.cpp
     src/Rendering/EditorCanvas+Navigation.cpp
     src/Rendering/EditorCanvas+Picking.cpp
     src/Rendering/EditorCanvas+Selection.cpp

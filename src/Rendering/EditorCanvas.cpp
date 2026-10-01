@@ -261,43 +261,6 @@ void CanvasView::draw(QPainter &context, const QRectF &dirty)
     context.restore();
 }
 
-// The folder's live mask, multiplied into the coverage.
-FolderMaskClip::Applier CanvasView::liveFolderMaskClip(const BrushStroke &edit, double scale, const Center &center) const
-{
-    return [&edit, scale, center](const QPainter &painter, QImage &coverage) {
-        QImage live(coverage.size(), QImage::Format_Grayscale8);
-        if (live.isNull())
-            throw ExportError(ExportError::Kind::render);
-        // Outside the mask's bounds stays hidden, as when committed.
-        live.fill(0);
-        LayerTransform transform = edit.paintTransform;
-        transform.sampling = LayerSampling::nearest;
-        const std::optional<ImportedImage> &base = edit.layer.mask ? std::optional(edit.layer.mask->asset) : std::nullopt;
-        {
-            QPainter drawing(&live);
-            drawing.setTransform(painter.deviceTransform());
-            // Swift's displayImage: halved near the size drawn.
-            const double device = LayerRenderer::deviceScale(drawing);
-            const auto shown = [device](const QImage &image, double width) {
-                return DownsampleCache::shared().imageDrawnAt(image, width * device / std::max(1, image.width()));
-            };
-            const std::shared_ptr<const RasterSnapshot> raster = base ? base->raster : nullptr;
-            const QImage image = base && !raster ? shown(base->image(), transform.size.width() * scale) : QImage();
-            const QImage rasterBase = raster && !raster->base.isNull()
-                ? shown(raster->base, transform.size.width() * scale * raster->baseRect.width() / std::max(1, raster->width))
-                : QImage();
-            LayerRenderer::drawBrushPreview(image, transform, center(transform.center()), drawing, {.scale = scale},
-                                            {.patches = edit.patches(), .pixelWidth = edit.width, .pixelHeight = edit.height, .paintingMask = false,
-                                             .sourceRect = edit.sourceRect, .raster = raster, .rasterBase = rasterBase});
-        }
-        QPainter multiplying(&coverage);
-        if (!multiplying.isActive())
-            throw ExportError(ExportError::Kind::render);
-        multiplying.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-        multiplying.drawImage(QRectF(coverage.rect()), BrushRaster::alphaView(live));
-    };
-}
-
 void CanvasView::drawLayers(const CanvasDocument &document, double scale, const Center &center, QPainter &context)
 {
     if (const std::optional<ImageLayer> alone = m_session.maskAloneLayer()) {
