@@ -46,94 +46,7 @@ bool LayerTextStyle::isValid() const
     // Ranges refuse NaN and infinities: Swift's isFinite adds nothing.
     const auto within = [](double value, double low, double high) { return value >= low && value <= high; };
     return content.size() <= 100'000 && boxIsValid() && within(fontSize, 1, 2000) && within(red, 0, 1) && within(green, 0, 1)
-        && within(blue, 0, 1) && within(tracking, -100, 1000) && within(leading, 0, 5000) && colorRunsAreValid();
-}
-
-bool LayerTextStyle::colorRunsAreValid() const
-{
-    if (!colorRuns)
-        return true;
-    qint64 end = 0;
-    for (const LayerTextColorRun &run : *colorRuns) {
-        // Each after the last, not empty, its end within Int.
-        if (run.location < end || run.length <= 0 || run.location > std::numeric_limits<qint64>::max() - run.length)
-            return false;
-        for (const double channel : {run.red, run.green, run.blue}) {
-            if (!(channel >= 0 && channel <= 1))
-                return false;
-        }
-        end = run.location + run.length;
-    }
-    return !colorRuns->empty() && end <= content.size();
-}
-
-PaletteColor LayerTextStyle::color(qint64 index) const
-{
-    for (const LayerTextColorRun &run : colorRuns.value_or(std::vector<LayerTextColorRun>())) {
-        if (run.location <= index && index < run.location + run.length)
-            return {run.red, run.green, run.blue};
-    }
-    return {red, green, blue};
-}
-
-void LayerTextStyle::setColor(const PaletteColor &color, TextSpan span)
-{
-    const qint64 count = content.size();
-    const qint64 start = std::clamp<qint64>(span.location, 0, count);
-    const qint64 end = std::max(start, std::min(span.location + span.length, count));
-    if (start == end || (start == 0 && end == count)) {
-        red = color.red;
-        green = color.green;
-        blue = color.blue;
-        colorRuns = std::nullopt;
-        return;
-    }
-    std::vector<PaletteColor> colors = unitColors();
-    std::fill(colors.begin() + start, colors.begin() + end, color);
-    setUnitColors(colors);
-}
-
-void LayerTextStyle::replaceCharacters(TextSpan span, qint64 length)
-{
-    if (!colorRuns)
-        return;
-    std::vector<PaletteColor> colors = unitColors();
-    const qint64 count = qint64(colors.size());
-    const qint64 start = std::clamp<qint64>(span.location, 0, count);
-    const qint64 end = std::max(start, std::min(span.location + span.length, count));
-    // New letters take the colour before them, as typing does.
-    const PaletteColor inherited = start > 0 ? colors[size_t(start - 1)] : end > start ? colors[size_t(start)] : !colors.empty() ? colors.front() : PaletteColor{red, green, blue};
-    colors.erase(colors.begin() + start, colors.begin() + end);
-    colors.insert(colors.begin() + start, size_t(std::max<qint64>(0, length)), inherited);
-    setUnitColors(colors);
-}
-
-std::vector<PaletteColor> LayerTextStyle::unitColors() const
-{
-    std::vector<PaletteColor> colors(size_t(content.size()), PaletteColor{red, green, blue});
-    for (const LayerTextColorRun &run : colorRuns.value_or(std::vector<LayerTextColorRun>())) {
-        const qint64 from = std::max<qint64>(0, run.location), to = std::min<qint64>(qint64(colors.size()), run.location + run.length);
-        for (qint64 index = from; index < to; ++index)
-            colors[size_t(index)] = {run.red, run.green, run.blue};
-    }
-    return colors;
-}
-
-void LayerTextStyle::setUnitColors(const std::vector<PaletteColor> &colors)
-{
-    const PaletteColor base{red, green, blue};
-    std::vector<LayerTextColorRun> runs;
-    for (size_t index = 0; index < colors.size(); ++index) {
-        const PaletteColor &color = colors[index];
-        if (color == base)
-            continue;
-        if (!runs.empty() && size_t(runs.back().location + runs.back().length) == index
-            && PaletteColor{runs.back().red, runs.back().green, runs.back().blue} == color)
-            runs.back().length += 1;
-        else
-            runs.push_back({qint64(index), 1, color.red, color.green, color.blue});
-    }
-    colorRuns = runs.empty() ? std::nullopt : std::optional(runs);
+        && within(blue, 0, 1) && within(tracking, -100, 1000) && within(leading, 0, 5000) && colorRunsAreValid() && fontRunsAreValid();
 }
 
 std::optional<LayerText> LayerText::loaded(const std::optional<LayerTextStyle> &style, const std::optional<ImportedImage> &image)
@@ -255,8 +168,9 @@ bool EditorSession::applyText(TextDraft draft)
             addPixelLayer(image, draft.origin, layerName(draft.style.content), QStringLiteral("New Text Layer"), false, std::nullopt, draft.style);
         }
         m_textDefaults = draft.style;
-        // The next text starts in one colour.
+        // The next text starts in one colour and face.
         m_textDefaults.colorRuns = std::nullopt;
+        m_textDefaults.fontRuns = std::nullopt;
         requestCanvasFocus();
         return succeed();
     } catch (const ProjectError &error) {

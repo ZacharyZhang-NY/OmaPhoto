@@ -1,10 +1,10 @@
-# OmaPhoto project format, versions 1–10
+# OmaPhoto project format, versions 1–11
 
 OmaPhoto reads and writes [Compositor](https://github.com/robbietilton/Compositor)'s project format; this page follows Compositor's own description.
 
 A `.comp` project is a folder (a document package on macOS) containing `manifest.json` and an `images/` directory of `<layer UUID>.png` assets.
 
-The manifest identifies `com.compositor.project`, version `10` for new saves (versions `1`–`9` remain readable), and the sRGB working space. It stores document UUID, pixel dimensions, active layer UUID, and layers in bottom-to-top order. Each layer stores its UUID, name, visibility, transform (origin, size, clockwise rotation, flips, sampling), and optional image filename. Blank layers have no image asset.
+The manifest identifies `com.compositor.project`, version `11` for new saves (versions `1`–`10` remain readable), and the sRGB working space. It stores document UUID, pixel dimensions, active layer UUID, and layers in bottom-to-top order. Each layer stores its UUID, name, visibility, transform (origin, size, clockwise rotation, flips, sampling), and optional image filename. Blank layers have no image asset.
 
 Embedded PNGs preserve source pixels and transparency; transforms remain separate. Projects survive moving or deleting imported source photos. Saving writes a hidden sibling folder and syncs it. A first save renames it into place; a later save swaps it with the old project atomically (`renameat2` with `RENAME_EXCHANGE`). Where the file system knows no exchange, the old project is moved aside and the new one moved in, two steps with a moment between them and a warning in the log, and the old copy is kept until the new one is synced. Unsupported versions, invalid metadata, missing assets, unsafe paths, and oversized data are rejected before replacing the live document.
 
@@ -36,6 +36,8 @@ Version 9 adds three adjustment kinds that sample neighboring pixels: `Gaussian 
 
 Version 10 lets a text layer color some of its letters differently: optional `colorRuns` in its `text` metadata (see Editable text). Files declaring 1–9 cannot contain it.
 
+Version 11 lets those letters use different faces too: optional `fontRuns` in the same metadata. Files declaring 1–10 cannot contain it. `colorRuns` stays valid from version 10.
+
 ### Additive layer fields
 
 Later fields are optional and not gated on the version, so older readers ignore them and keep the pixels or the linked mask as they were:
@@ -45,7 +47,7 @@ Later fields are optional and not gated on the version, so older readers ignore 
 
 ### Editable text
 
-Pixel layer records may include optional `text` metadata: content, PostScript font name, font size in pixels, RGB color, alignment, tracking, line spacing and optional `boxSize` paragraph bounds. Text wraps inside these bounds; changing them reflows the text without scaling the font. The PNG remains the display and export fallback. Older readers ignore this metadata. Transforms, duplication and masks preserve it. Canvas Size, Image Size and Crop rebuild the open document without it, so there the text becomes pixels; destructive pixel operations also rasterize text and omit the metadata on the next save. A missing face is replaced through Qt and fontconfig when edited, which can pick another family, while the saved PNG preserves the original appearance until then. From version 10, optional `colorRuns` lists letters painted in another color than the text's own `red`/`green`/`blue`: each run has `location` and `length` in UTF-16 units of the content, plus `red`, `green` and `blue` (0–1). Runs are sorted, do not overlap, have a positive length and end within the content; letters outside every run use the text's color.
+Pixel layer records may include optional `text` metadata: content, PostScript font name, font size in pixels, RGB color, alignment, tracking, line spacing and optional `boxSize` paragraph bounds. Text wraps inside these bounds; changing them reflows the text without scaling the font. The PNG remains the display and export fallback. Older readers ignore this metadata. Transforms, duplication and masks preserve it. Canvas Size, Image Size and Crop rebuild the open document without it, so there the text becomes pixels; destructive pixel operations also rasterize text and omit the metadata on the next save. A missing face is replaced through Qt and fontconfig when edited, which can pick another family, while the saved PNG preserves the original appearance until then. From version 10, optional `colorRuns` lists letters painted in another color than the text's own `red`/`green`/`blue`: each run has `location` and `length` in UTF-16 units of the content, plus `red`, `green` and `blue` (0–1). From version 11, optional `fontRuns` lists letters set in another face than `fontName`: the same `location` and `length`, plus `fontName`. Runs of either kind are sorted, do not overlap, have a positive length and end within the content; letters outside every run use the text's color or face.
 
 ### Layer effects
 

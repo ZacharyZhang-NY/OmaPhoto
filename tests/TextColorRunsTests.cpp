@@ -135,7 +135,7 @@ void TextColorRunsTests::selectedColorPaintsOnlyThoseLettersAndSurvivesReopening
     const auto pixels = redAndDark(session->activeLayer().value().asset.value().image());
     QVERIFY2(pixels.first > 50 && pixels.second > 50, qPrintable(QStringLiteral("%1 %2").arg(pixels.first).arg(pixels.second)));
     const ProjectSnapshot snapshot = session->projectSnapshot().value();
-    QCOMPARE(snapshot.manifest.version, qint64(10));
+    QCOMPARE(snapshot.manifest.version, qint64(11));
     QTemporaryDir root;
     const QString path = root.filePath(QStringLiteral("TextColors.comp"));
     ProjectStore::save(snapshot, path);

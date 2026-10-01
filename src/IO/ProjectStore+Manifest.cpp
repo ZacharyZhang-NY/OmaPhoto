@@ -120,6 +120,22 @@ std::vector<LayerTextColorRun> colorRuns(const QJsonValue &value)
     return runs;
 }
 
+LayerTextFontRun fontRun(const QJsonValue &value)
+{
+    const QJsonObject object = value.toObject();
+    return {integer(object.value("location")), integer(object.value("length")), string(object.value("fontName"))};
+}
+
+std::vector<LayerTextFontRun> fontRuns(const QJsonValue &value)
+{
+    if (!value.isArray())
+        refuse();
+    std::vector<LayerTextFontRun> runs;
+    for (const QJsonValue &each : value.toArray())
+        runs.push_back(fontRun(each));
+    return runs;
+}
+
 // Synthesized Codable: all required but the box and runs.
 LayerTextStyle textStyle(const QJsonValue &value)
 {
@@ -130,7 +146,8 @@ LayerTextStyle textStyle(const QJsonValue &value)
     return {.content = string(object.value("content")), .fontName = string(object.value("fontName")), .fontSize = number(object.value("fontSize")),
             .red = number(object.value("red")), .green = number(object.value("green")), .blue = number(object.value("blue")),
             .alignment = *alignment, .tracking = number(object.value("tracking")), .leading = number(object.value("leading")),
-            .boxSize = optional(object, "boxSize", size), .colorRuns = optional(object, "colorRuns", colorRuns)};
+            .boxSize = optional(object, "boxSize", size), .colorRuns = optional(object, "colorRuns", colorRuns),
+            .fontRuns = optional(object, "fontRuns", fontRuns)};
 }
 
 CanvasGuide guide(const QJsonValue &value)
@@ -199,6 +216,12 @@ QJsonObject encoded(const LayerTextStyle &text)
         for (const LayerTextColorRun &run : *text.colorRuns)
             runs.append(QJsonObject{{"location", run.location}, {"length", run.length}, {"red", run.red}, {"green", run.green}, {"blue", run.blue}});
         object.insert("colorRuns", runs);
+    }
+    if (text.fontRuns) {
+        QJsonArray runs;
+        for (const LayerTextFontRun &run : *text.fontRuns)
+            runs.append(QJsonObject{{"location", run.location}, {"length", run.length}, {"fontName", run.fontName}});
+        object.insert("fontRuns", runs);
     }
     return object;
 }

@@ -122,7 +122,7 @@ void ProjectSessionTests::aSnapshotGivesBackWhatWasInstalled()
     const ProjectSnapshot again = session.projectSnapshot().value();
     // The same manifest to the byte; pixels by identity.
     QCOMPARE(again.manifest.encoded(), snapshot.manifest.encoded());
-    QCOMPARE(again.manifest.version, qint64(10));
+    QCOMPARE(again.manifest.version, qint64(11));
     QCOMPARE(int(again.images.size()), 2);
     QCOMPARE(int(again.masks.size()), 2);
     for (const auto &[id, image] : snapshot.images)

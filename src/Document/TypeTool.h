@@ -32,6 +32,14 @@ struct LayerTextColorRun {
     friend bool operator==(const LayerTextColorRun &, const LayerTextColorRun &) = default;
 };
 
+// Letters in a face of their own, as Swift's LayerTextFontRun.
+struct LayerTextFontRun {
+    qint64 location = 0;
+    qint64 length = 0;
+    QString fontName;
+    friend bool operator==(const LayerTextFontRun &, const LayerTextFontRun &) = default;
+};
+
 // What a text layer says and how, in layer pixels.
 struct LayerTextStyle {
     QString content = QStringLiteral("Text");
@@ -49,6 +57,8 @@ struct LayerTextStyle {
     std::optional<QSizeF> boxSize = std::nullopt;
     // Sorted, apart, within the content; none is one colour.
     std::optional<std::vector<LayerTextColorRun>> colorRuns = std::nullopt;
+    // The same rules; none is one face.
+    std::optional<std::vector<LayerTextFontRun>> fontRuns = std::nullopt;
     // The gap between the text and its box, either kind.
     static constexpr double padding = 12;
     double autoLeading() const { return fontSize * 1.2; }
@@ -59,14 +69,23 @@ struct LayerTextStyle {
     PaletteColor color(qint64 index) const;
     // Paints `span`; empty or whole, it recolours all the text.
     void setColor(const PaletteColor &color, TextSpan span);
-    // Moves the colours as `span` becomes `length` units.
+    // The face of the UTF-16 unit at `index`.
+    QString fontNameAt(qint64 index) const;
+    // The one face over `span`; none when empty or mixed.
+    std::optional<QString> uniformFontName(TextSpan span) const;
+    // Sets `span`'s face; empty or whole, all the text's.
+    void setFont(const QString &name, TextSpan span);
+    // Moves colours and faces as `span` becomes `length` units.
     void replaceCharacters(TextSpan span, qint64 length);
     friend bool operator==(const LayerTextStyle &, const LayerTextStyle &) = default;
 
 private:
     bool colorRunsAreValid() const;
+    bool fontRunsAreValid() const;
     std::vector<PaletteColor> unitColors() const;
     void setUnitColors(const std::vector<PaletteColor> &colors);
+    std::vector<QString> unitFonts() const;
+    void setUnitFonts(const std::vector<QString> &fonts);
 };
 
 // A text layer: its style and the image it drew.
@@ -85,7 +104,7 @@ struct TextDraft {
     QPointF origin;
     std::optional<LayerTransform> transform = std::nullopt;
     LayerTextStyle style;
-    // What the editor selects; colour applies to it alone.
+    // What the editor selects; colour and face apply to it.
     TextSpan selection;
     friend bool operator==(const TextDraft &, const TextDraft &) = default;
 };

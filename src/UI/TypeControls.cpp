@@ -96,10 +96,37 @@ TypeFontPicker::TypeFontPicker(QWidget *parent) : QComboBox(parent)
     setAccessibleName(QStringLiteral("Font"));
 }
 
+namespace {
+const QString multiple = QStringLiteral("(Multiple)");
+}
+
+bool TypeFontPicker::isMultiple(int index) const
+{
+    return itemData(index).toString() == multiple;
+}
+
+void TypeFontPicker::showMultiple()
+{
+    if (!isMultiple(0))
+        insertItem(0, multiple, multiple);
+    setCurrentIndex(0);
+}
+
+void TypeFontPicker::hideMultiple()
+{
+    if (isMultiple(0))
+        removeItem(0);
+}
+
 void TypeFontPicker::sync(const QString &name)
 {
     if (view()->isVisible())
         return;
+    if (name.isEmpty()) {
+        showMultiple();
+        return;
+    }
+    hideMultiple();
     if (findText(name) < 0)
         addItem(name);
     setCurrentIndex(findText(name));
@@ -109,15 +136,18 @@ void TypeFontPicker::showPopup()
 {
     if (!m_loaded) {
         // Every installed face, and the style's own though missing.
-        const QString selected = currentText();
+        const QString selected = isMultiple(currentIndex()) ? QString() : currentText();
         QStringList names = TextLayout::availableFonts();
-        if (!names.contains(selected))
+        if (!selected.isEmpty() && !names.contains(selected))
             names << selected;
         names.sort();
         const QSignalBlocker quiet(this);
         clear();
         addItems(names);
-        setCurrentIndex(findText(selected));
+        if (selected.isEmpty())
+            showMultiple();
+        else
+            setCurrentIndex(findText(selected));
         m_loaded = true;
     }
     QComboBox::showPopup();
@@ -193,10 +223,11 @@ TypeControls::TypeControls(EditorSession &session, QWidget *parent)
     m_font->setToolTip(QStringLiteral("Font face, including bold and italic variants"));
     connect(m_font, &QComboBox::activated, this, [this](int index) {
         const QString name = m_font->itemText(index);
-        // The face already shown changes nothing, as Swift's choose.
-        if (name == m_session.currentTextStyle().fontName)
+        // (Multiple), or the face already shown, changes nothing.
+        if (m_font->isMultiple(index) || name == shownFont())
             return;
-        m_session.changeTextStyle([&name](LayerTextStyle &style) { style.fontName = name; });
+        const TextSpan selection = m_session.textDraft() ? m_session.textDraft().value().selection : TextSpan();
+        m_session.changeTextStyle([&name, selection](LayerTextStyle &style) { style.setFont(name, selection); });
     });
     m_size->setObjectName(QStringLiteral("typeSize"));
     m_size->setFixedWidth(52);
@@ -287,6 +318,18 @@ QToolButton *TypeControls::alignment(TextAlignment value)
     return button;
 }
 
+QString TypeControls::shownFont() const
+{
+    const std::optional<TextDraft> &draft = m_session.textDraft();
+    if (!draft)
+        return m_session.currentTextStyle().fontName;
+    const TextSpan selection = draft->selection;
+    if (selection.length == 0)
+        return draft->style.fontNameAt(std::max<qint64>(0, selection.location - 1));
+    // Several faces: (Multiple), so any face chosen applies.
+    return draft->style.uniformFontName(selection).value_or(QString());
+}
+
 void TypeControls::synchronize()
 {
     // Swift's onChange: open text previews the picker's colour.
@@ -296,7 +339,7 @@ void TypeControls::synchronize()
         m_session.previewTextColor();
     }
     const LayerTextStyle style = m_session.currentTextStyle();
-    m_font->sync(style.fontName);
+    m_font->sync(shownFont());
     for (size_t index = 0; index < m_alignments.size(); ++index)
         m_alignments[index]->setChecked(style.alignment == allTextAlignments[index]);
     for (TextStyleField *field : {m_size, m_tracking, m_leading})

@@ -313,7 +313,7 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions_data()
     for (int version = 1; version <= 9; ++version)
         QTest::addRow("plain at version %d", version) << "" << version << fine;
     QTest::newRow("version 0") << "" << 0 << std::optional(ProjectError::Kind::version);
-    QTest::newRow("version 11") << "" << 11 << std::optional(ProjectError::Kind::version);
+    QTest::newRow("version 12") << "" << 12 << std::optional(ProjectError::Kind::version);
     QTest::newRow("another format") << "format" << 7 << invalid;
     QTest::newRow("another colour space") << "colorSpace" << 7 << invalid;
     QTest::newRow("resolution 0.5") << "resolution=0.5" << 7 << invalid;
@@ -369,6 +369,8 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions_data()
     QTest::newRow("letters in colours before version 10") << "textRuns" << 9 << invalid;
     QTest::newRow("letters in colours at version 10") << "textRuns" << 10 << fine;
     QTest::newRow("one-colour text before version 10") << "text" << 9 << fine;
+    QTest::newRow("letters in faces before version 11") << "textFonts" << 10 << invalid;
+    QTest::newRow("letters in faces at version 11") << "textFonts" << 11 << fine;
 }
 
 void ProjectManifestTests::validationFollowsTheFormatsVersions()
@@ -458,11 +460,13 @@ void ProjectManifestTests::validationFollowsTheFormatsVersions()
         image.imageFile = "image.png";
     else if (change == "imageLower")
         image.imageFile = image.id.toString(QUuid::WithoutBraces) + ".png";
-    else if (change == "text" || change == "textRuns") {
+    else if (change == "text" || change == "textRuns" || change == "textFonts") {
         LayerTextStyle style;
         style.content = QStringLiteral("Ab");
         if (change == "textRuns")
             style.colorRuns = std::vector{LayerTextColorRun{1, 1, 1, 0, 0}};
+        if (change == "textFonts")
+            style.fontRuns = std::vector{LayerTextFontRun{1, 1, QStringLiteral("DejaVuSansMono")}};
         image.text = style;
     } else if (change == "active")
         manifest.activeLayerID = QUuid::createUuid();

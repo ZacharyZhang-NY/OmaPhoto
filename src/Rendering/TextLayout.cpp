@@ -43,13 +43,18 @@ const std::map<QString, std::pair<QString, QString>> &faces()
 
 QFont TextLayout::font(const LayerTextStyle &style)
 {
+    return font(style, style.fontName);
+}
+
+QFont TextLayout::font(const LayerTextStyle &style, const QString &face)
+{
     QFont font;
-    if (faces().contains(style.fontName)) {
-        font.setFamily(faces().at(style.fontName).first);
-        font.setStyleName(faces().at(style.fontName).second);
+    if (faces().contains(face)) {
+        font.setFamily(faces().at(face).first);
+        font.setStyleName(faces().at(face).second);
     } else {
         // Not installed: Qt's match, where macOS takes its own.
-        font.setFamily(style.fontName);
+        font.setFamily(face);
     }
     // A point is a pixel here; Qt's faces come whole.
     font.setPixelSize(qRound(style.fontSize));
@@ -93,8 +98,16 @@ TextLines::TextLines(const LayerTextStyle &style, QSizeF container)
         const QString paragraph = style.content.mid(range.start, range.end - range.start);
         auto layout = std::make_unique<QTextLayout>(paragraph, font);
         layout->setTextOption(option);
-        // Run letters draw once in their colour, as CoreText's.
+        // Run letters draw once in their face and colour.
         QList<QTextLayout::FormatRange> runs;
+        for (const LayerTextFontRun &run : style.fontRuns.value_or(std::vector<LayerTextFontRun>())) {
+            const qint64 start = std::max<qint64>(run.location, range.start), end = std::min<qint64>(run.location + run.length, range.end);
+            if (start >= end)
+                continue;
+            QTextCharFormat format;
+            format.setFont(TextLayout::font(style, run.fontName));
+            runs << QTextLayout::FormatRange{int(start - range.start), int(end - start), format};
+        }
         for (const LayerTextColorRun &run : style.colorRuns.value_or(std::vector<LayerTextColorRun>())) {
             const qint64 start = std::max<qint64>(run.location, range.start), end = std::min<qint64>(run.location + run.length, range.end);
             if (start >= end)

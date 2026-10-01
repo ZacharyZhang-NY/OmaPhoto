@@ -13,6 +13,8 @@ class QPainter;
 namespace TextLayout {
 // The face a PostScript name names, or Qt's match.
 QFont font(const LayerTextStyle &style);
+// The style's size and spacing in another face.
+QFont font(const LayerTextStyle &style, const QString &face);
 // Every installed face's PostScript name, sorted.
 QStringList availableFonts();
 }

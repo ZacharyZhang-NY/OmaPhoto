@@ -160,7 +160,7 @@ void LayerMaskSessionTests::projectAndPNGPreserveCoverageAndDisabledState()
         rewrite(*session, [&](ProjectSnapshot &snapshot) { record(snapshot, id).maskEnabled = enabled; });
         ProjectStore::save(session->projectSnapshot().value(), path);
         const ProjectSnapshot loaded = ProjectStore::load(path);
-        QCOMPARE(loaded.manifest.version, qint64(10));
+        QCOMPARE(loaded.manifest.version, qint64(11));
         session->installProject(loaded, path);
         QCOMPARE(session->activeLayer().value().mask.value().isEnabled, enabled);
         const QImage image = QImage::fromData(ImageExporter::pngData(loaded), "PNG");
@@ -240,7 +240,7 @@ void LayerMaskSessionTests::folderMasksSaveResizeAndNeedTheNewFormat()
     const ProjectSnapshot snapshot = session->projectSnapshot().value();
     ProjectStore::save(snapshot, path);
     const ProjectSnapshot loaded = ProjectStore::load(path);
-    QVERIFY(loaded.manifest.version == 10 && loaded.masks.count(folder) == 1);
+    QVERIFY(loaded.manifest.version == 11 && loaded.masks.count(folder) == 1);
     QCOMPARE(alphas(ImageExporter::render(loaded).image), (QList<int>{255, 0, 128, 255}));
     const ProjectSnapshot resized = ImageResizer::resize(loaded, {.width = 4, .height = 4, .resolution = 72, .sampling = LayerSampling::nearest});
     QCOMPARE(alphas(ImageExporter::render(resized).image),

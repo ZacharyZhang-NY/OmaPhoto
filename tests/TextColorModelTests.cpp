@@ -44,6 +44,10 @@ void TextColorModelTests::colorAppliesToSelectionAndFollowsEdits()
 {
     LayerTextStyle style;
     style.content = QStringLiteral("Hello world");
+    // The whole text takes every channel of its colour.
+    style.setColor(PaletteColor{0.25, 0.5, 0.75}, {0, 0});
+    QVERIFY(style.red == 0.25 && style.green == 0.5 && style.blue == 0.75 && !style.colorRuns);
+    style.setColor(PaletteColor::black(), {0, 11});
     style.setColor(red, {6, 5});
     QCOMPARE(style.colorRuns.value(), (std::vector{run(6, 5, red)}));
     QVERIFY(style.color(5) == PaletteColor::black() && style.color(6) == red);

@@ -40,15 +40,19 @@ class TypeFontPicker : public QComboBox {
     Q_OBJECT
 public:
     explicit TypeFontPicker(QWidget *parent = nullptr);
-    // Shows `name`; an open menu is left alone.
+    // Shows `name`, or (Multiple) when empty; an open menu stays.
     void sync(const QString &name);
     void showPopup() override;
+    // Swift's isMultiple: the top item that is no font.
+    bool isMultiple(int index) const;
 
 protected:
     // A long name is cut short, never widening the control.
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    void showMultiple();
+    void hideMultiple();
     bool m_loaded = false;
 };
 
@@ -65,6 +69,8 @@ private:
     QToolButton *alignment(TextAlignment value);
     void applyGlyphs();
     void synchronize();
+    // Swift's binding: the caret's face, the selection's, or none.
+    QString shownFont() const;
 
     EditorSession &m_session;
     TypeFontPicker *const m_font;

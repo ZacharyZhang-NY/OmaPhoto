@@ -73,8 +73,9 @@ void validate(const ProjectManifest &manifest)
     if (manifest.width < 1 || manifest.width > DocumentLimits::maxSide || manifest.height < 1 || manifest.height > DocumentLimits::maxSide || manifest.layers.size() > 10'000)
         throw ProjectError(ProjectError::Kind::tooLarge);
     for (const ProjectLayerRecord &layer : manifest.layers) {
-        // Text needs a valid style, pixels; runs from 10.
-        if (layer.text && (!layer.text->isValid() || !layer.imageFile || (layer.text->colorRuns && manifest.version < 10)))
+        // Valid text with pixels; colours from 10, faces from 11.
+        if (layer.text && (!layer.text->isValid() || !layer.imageFile || (layer.text->colorRuns && manifest.version < 10)
+                           || (layer.text->fontRuns && manifest.version < 11)))
             throw ProjectError(ProjectError::Kind::invalid);
         // Version 7's adjustments hold settings, never pixels or children.
         if (layer.adjustment && (manifest.version < 7 || layer.isGroup == true || layer.imageFile || !layer.adjustment->isValid()))

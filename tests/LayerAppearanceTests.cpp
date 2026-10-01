@@ -119,7 +119,7 @@ void LayerAppearanceTests::appearancePersistsThroughSaveResizeAndTransparentExpo
     const QString path = folder.filePath("Appearance.comp");
     ProjectStore::save(snapshot, path);
     const ProjectSnapshot loaded = ProjectStore::load(path);
-    QCOMPARE(loaded.manifest.version, qint64(10));
+    QCOMPARE(loaded.manifest.version, qint64(11));
     const ProjectSnapshot resized = ImageResizer::resize(loaded, {.width = 8, .height = 8, .resolution = 72});
     const ProjectSnapshot canvas = CanvasResizer::resize(resized, {.width = 12, .height = 12});
     const auto record = std::find_if(canvas.manifest.layers.begin(), canvas.manifest.layers.end(),

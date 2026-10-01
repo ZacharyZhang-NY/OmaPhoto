@@ -90,6 +90,7 @@ add_library(compositor_core STATIC
     src/Document/SelectionEdits.cpp
     src/Document/ShapeTool.cpp
     src/Document/TypeTool.cpp
+    src/Document/TypeTool+Runs.cpp
     src/Document/SmudgeLiquify.cpp
     src/UI/BlendModePicker.cpp
     src/UI/BrushControls.cpp

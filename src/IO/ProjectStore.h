@@ -51,7 +51,7 @@ QString uuidString(const QUuid &id);
 
 struct ProjectManifest {
     // Swift's current and supported: what saves write, what loads accept.
-    static constexpr qint64 current = 10;
+    static constexpr qint64 current = 11;
     static constexpr std::pair<qint64, qint64> supported{1, current};
     static bool supports(qint64 version) { return version >= supported.first && version <= supported.second; }
     QString format = QStringLiteral("com.compositor.project");
