@@ -43,8 +43,8 @@ public:
     LayerThumbnailButton(NativeLayerList &list, bool maskTarget, QWidget *parent);
     QUuid layerID;
     const bool isMaskTarget;
-    // An accent ring while the target is selected.
-    void setTargeted(bool targeted);
+    // An accent ring while targeted; white while shown alone.
+    void setTargeted(bool targeted, bool alone = false);
     bool isTargeted() const { return m_targeted; }
 
     ~LayerThumbnailButton() override;
@@ -63,6 +63,7 @@ private:
 
     NativeLayerList &m_list;
     bool m_targeted = false;
+    bool m_alone = false;
     // Alt on a mask: chosen on release, or dragged.
     std::optional<QPoint> m_altMaskPress;
 };
@@ -215,8 +216,6 @@ public:
     QString dragToken() const { return m_dragToken; }
 
     EditorSession &session() const { return m_session; }
-    // The table's Select All: every row, the top one primary.
-    void selectAllRows();
     void update();
     std::vector<LayerCell *> cells() const { return m_cells; }
     // The row under a point of this list, or -1.
@@ -283,3 +282,6 @@ private:
     const QMimeData *m_dragData = nullptr;
     Qt::DropActions m_dragActions;
 };
+
+// The size on the canvas and, once scaled, how much.
+QString sizeLabel(const ImageLayer &layer);

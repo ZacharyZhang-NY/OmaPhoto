@@ -347,7 +347,7 @@ void EditorSession::finishFilterCommit()
         mask.isEnabled = true;
         mask.placement = std::nullopt;
         m_document->layers[index].mask = mask;
-        m_isMaskSelected = true;
+        setIsMaskSelected(true);
         endEdit();
         finish();
         return;

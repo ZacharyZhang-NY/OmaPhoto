@@ -101,7 +101,8 @@ TransformInspector::TransformInspector(EditorSession &session, QWidget *parent)
       m_rotation(new TransformValueField(QStringLiteral("°"), QString(), -360, 360, session, [this](double number) {
           change([number](LayerTransform &value) { value.rotation = std::fmod(number, 360.0); });
       })),
-      m_sampling(new QComboBox(this)), m_cancel(new QPushButton(QStringLiteral("Cancel"), this)), m_apply(new QPushButton(QStringLiteral("Apply"), this))
+      m_sampling(new QComboBox(this)), m_cancel(new QPushButton(QStringLiteral("Cancel"), this)), m_apply(new QPushButton(QStringLiteral("Apply"), this)),
+      m_pendingButtons(new QWidget(this)), m_fade(new QGraphicsOpacityEffect(m_pendingButtons)), m_fadeIn(new QPropertyAnimation(m_fade, "opacity", this))
 {
     m_autoSelect->setObjectName(QStringLiteral("transformAutoSelect"));
     m_autoSelect->setToolTip(QStringLiteral("Select layers by clicking the canvas. When off, hold Ctrl to select a layer."));
@@ -162,8 +163,25 @@ TransformInspector::TransformInspector(EditorSession &session, QWidget *parent)
     // Swift's configuredNativeShortcut: Return and Escape, as remapped.
     NativeShortcut::bind(*this, m_apply, m_cancel);
     connect(m_apply, &QPushButton::clicked, this, [this] { m_session.commitTransform(); });
+    m_pendingButtons->setObjectName(QStringLiteral("pendingTransform"));
+    auto *pending = new QHBoxLayout(m_pendingButtons);
+    pending->setContentsMargins(0, 0, 0, 0);
+    pending->setSpacing(12);
+    pending->addWidget(m_cancel);
+    pending->addWidget(m_apply);
+    // Unseen, not hidden: Return and Escape still reach a drag.
+    m_pendingButtons->setGraphicsEffect(m_fade);
+    m_fade->setOpacity(0);
+    m_pendingButtons->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_cancel->setFocusPolicy(Qt::NoFocus);
+    m_apply->setFocusPolicy(Qt::NoFocus);
+    // SwiftUI's easeOut over 0.12 seconds.
+    QEasingCurve easeOut(QEasingCurve::BezierSpline);
+    easeOut.addCubicBezierSegment(QPointF(0, 0), QPointF(0.58, 1), QPointF(1, 1));
+    m_fadeIn->setEasingCurve(easeOut);
+    m_fadeIn->setDuration(120);
     // Before the stretch ending the row, in Swift's order.
-    for (QWidget *widget : std::initializer_list<QWidget *>{m_autoSelect, m_showControls, m_fields, m_cancel, m_apply})
+    for (QWidget *widget : std::initializer_list<QWidget *>{m_autoSelect, m_showControls, m_fields, m_pendingButtons})
         row->insertWidget(row->count() - 1, widget, widget == m_fields ? 1 : 0);
     // The scroll view takes the spare room, as SwiftUI's does.
     row->setStretch(row->count() - 1, 0);
@@ -278,4 +296,16 @@ void TransformInspector::synchronize()
     m_fields->widget()->setEnabled((m_session.canTransform() || editing) && !distorted);
     m_cancel->setEnabled(editing);
     m_apply->setEnabled(editing);
+    // Typed values, Ctrl+T, a distortion wait; a handle drag applies.
+    const bool pending = editing && m_session.transformEdit()->persistent;
+    if (pending == m_pending)
+        return;
+    m_pending = pending;
+    m_pendingButtons->setAttribute(Qt::WA_TransparentForMouseEvents, !pending);
+    m_cancel->setFocusPolicy(pending ? Qt::StrongFocus : Qt::NoFocus);
+    m_apply->setFocusPolicy(pending ? Qt::StrongFocus : Qt::NoFocus);
+    m_fadeIn->stop();
+    m_fadeIn->setStartValue(m_fade->opacity());
+    m_fadeIn->setEndValue(pending ? 1.0 : 0.0);
+    m_fadeIn->start();
 }

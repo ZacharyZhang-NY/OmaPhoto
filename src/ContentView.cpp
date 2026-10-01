@@ -11,6 +11,7 @@
 #include "UI/ShapeControls.h"
 #include "UI/TypeControls.h"
 #include "UI/LassoControls.h"
+#include "UI/LayerMaskMenu.h"
 #include "UI/NavigationToolHeader.h"
 #include "UI/TransformInspector.h"
 #include "UI/NewCanvasSheet.h"
@@ -196,7 +197,8 @@ protected:
 
 ContentView::ContentView(EditorSession &session, ProjectController *projects, QWidget *parent)
     : QWidget(parent), m_session(session), m_projects(projects), m_column(new QVBoxLayout(this)), m_canvasSlot(new QGridLayout),
-      m_canvas(new CanvasView(session, this)), m_layersPanel(new LayersPanel(session, this)), m_dock(new QWidget(this)), m_dropRing(new DropRing(this)), m_zoom(statusText(new QLabel(this))), m_dimensions(statusText(new QLabel(this))), m_colour(statusText(new QLabel(this))),
+      m_canvas(new CanvasView(session, this)), m_layersPanel(new LayersPanel(session, this)), m_dock(new QWidget(this)), m_dropRing(new DropRing(this)),
+      m_maskAloneBadge(new MaskAloneBadge(session, this)), m_zoom(statusText(new QLabel(this))), m_dimensions(statusText(new QLabel(this))), m_colour(statusText(new QLabel(this))),
       m_activity(statusText(new ElidedLabel(this))),
       m_spinner(new QProgressBar(this))
 {
@@ -240,6 +242,12 @@ ContentView::ContentView(EditorSession &session, ProjectController *projects, QW
     // The welcome sits over the canvas, as Swift's ZStack.
     m_canvasSlot->addWidget(m_canvas, 0, 0);
     m_canvasSlot->addWidget(m_dropRing, 0, 0);
+    // A layout takes no clicks; the canvas keeps the rest.
+    auto *foot = new QVBoxLayout;
+    foot->addStretch(1);
+    foot->addWidget(m_maskAloneBadge, 0, Qt::AlignHCenter);
+    foot->addSpacing(14);
+    m_canvasSlot->addLayout(foot, 0, 0);
     setAcceptDrops(true);
 
     auto *middle = new QHBoxLayout;
@@ -390,6 +398,10 @@ void ContentView::synchronize()
     }
     const std::optional<CanvasDocument> &document = m_session.document();
     showWelcome(!document);
+    const std::optional<ImageLayer> alone = m_session.maskAloneLayer();
+    if (alone)
+        m_maskAloneBadge->setLayerName(alone->name);
+    m_maskAloneBadge->setVisible(alone.has_value());
     for (QWidget *ruler : m_rulers)
         ruler->setVisible(m_session.showsRulers() && document);
     m_zoom->setVisible(document.has_value());

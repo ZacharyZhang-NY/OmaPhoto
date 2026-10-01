@@ -1,4 +1,4 @@
 // Swift's BlurTool extension: what a Blur stroke paints.
 public:
-    // The active layer, or its mask, softened at document size.
-    std::optional<QImage> blurSample(const CanvasDocument &document, bool mask = false) const;
+    // The stroke's pixels or mask softened, in its own grid.
+    std::optional<BrushStroke::Clone> blurSample(const BrushStroke &stroke) const;

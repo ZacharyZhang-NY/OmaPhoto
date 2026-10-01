@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QContextMenuEvent>
 #include <QKeyEvent>
+#include <QLocale>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -30,7 +31,7 @@ LayerCell::LayerCell(NativeLayerList &list)
     connect(m_disclosure, &QToolButton::clicked, this, [this] { m_list.session().toggleGroupExpansion(m_layerID); });
     m_thumbnail->setObjectName(QStringLiteral("layerThumbnail"));
     m_maskThumbnail->setObjectName(QStringLiteral("maskThumbnail"));
-    m_maskThumbnail->setToolTip(QStringLiteral("Select layer mask; Shift-click to enable/disable; Ctrl-click to select its black areas (Ctrl-Shift adds, Ctrl-Alt subtracts)"));
+    m_maskThumbnail->setToolTip(QStringLiteral("Select layer mask; Alt-click to view it alone; Shift-click to enable/disable; Ctrl-click to select its black areas (Ctrl-Shift adds, Ctrl-Alt subtracts)"));
     m_link->setObjectName(QStringLiteral("maskLink"));
     m_link->setAutoRaise(true);
     m_link->setFixedSize(9, 20);
@@ -115,7 +116,7 @@ void LayerCell::configure(const ImageLayer &layer, bool enabled, int depth, bool
     m_dimensions->setText(m_editableText   ? QStringLiteral("Text · Double-click to edit")
                           : m_isAdjustment ? QStringLiteral("Adjustment · Double-click to edit")
                           : layer.isGroup  ? QStringLiteral("Folder")
-                                          : QStringLiteral("%1 × %2 px").arg(std::lround(layer.size().width())).arg(std::lround(layer.size().height())));
+                                          : sizeLabel(layer));
     m_dimensions->setToolTip(QString());
     if (layer.maskSourceID && session.document()) {
         const int source = indexOf(session.document()->layers, layer.maskSourceID);
@@ -158,7 +159,7 @@ void LayerCell::updateTarget()
     const bool active = session.activeLayerID() == m_layerID && session.selectedLayerIDs().size() == 1;
     const bool mask = session.isMaskSelected();
     m_thumbnail->setTargeted(active && !mask);
-    m_maskThumbnail->setTargeted(active && mask);
+    m_maskThumbnail->setTargeted(active && mask, active && session.maskAloneLayer());
     QWidget::update();
 }
 
@@ -334,4 +335,19 @@ bool LayerCell::eventFilter(QObject *watched, QEvent *event)
     else
         return false;
     return true;
+}
+
+QString sizeLabel(const ImageLayer &layer)
+{
+    const QString text = QStringLiteral("%1 × %2 px").arg(std::lround(layer.size().width())).arg(std::lround(layer.size().height()));
+    const int pixels = layer.asset ? layer.asset->size().width() : 0;
+    if (pixels <= 0)
+        return text;
+    // Across the width, as the Move bar's Scale field.
+    const double percent = layer.size().width() / pixels * 100;
+    if (std::abs(percent - 100) < 0.05)
+        return text;
+    // Swift's .number to one place at most, ties to even.
+    const double rounded = std::nearbyint(percent * 10) / 10;
+    return text + QStringLiteral(" · ") + QLocale().toString(rounded, 'f', rounded == std::trunc(rounded) ? 0 : 1) + QStringLiteral("%");
 }

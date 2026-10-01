@@ -273,11 +273,12 @@ QImage BrushStroke::clonePixels(const Tile &tile) const
     if (!clone)
         return QImage();
     const int width = int(tile.rect.width()), height = int(tile.rect.height());
-    // Tile pixels to clone pixels: grid, document, then offset.
-    const QTransform toClone = QTransform::fromTranslate(tile.rect.left(), tile.rect.top()) * pixelToDocument
-        * QTransform::fromTranslate(clone->offset.width(), clone->offset.height());
     // Colour even for gray clones: edges carry their coverage.
     const QImage &image = clone->image;
+    // Tile pixels to clone pixels: grid, maybe document, then placed.
+    const QRectF &placed = clone->placed;
+    const QTransform toClone = QTransform::fromTranslate(tile.rect.left(), tile.rect.top()) * (clone->inGrid ? QTransform() : pixelToDocument)
+        * QTransform::fromTranslate(-placed.left(), -placed.top()) * QTransform::fromScale(image.width() / placed.width(), image.height() / placed.height());
     if (toClone.type() > QTransform::TxTranslate) {
         // Swift's medium quality: bilinear under a scale or turn.
         QImage sample = BrushRaster::context(width, height, false);

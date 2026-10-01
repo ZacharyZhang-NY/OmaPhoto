@@ -70,9 +70,10 @@ LayerThumbnailButton::LayerThumbnailButton(NativeLayerList &list, bool maskTarge
     setAutoRaise(true);
 }
 
-void LayerThumbnailButton::setTargeted(bool targeted)
+void LayerThumbnailButton::setTargeted(bool targeted, bool alone)
 {
     m_targeted = targeted;
+    m_alone = alone;
     QWidget::update();
 }
 
@@ -155,12 +156,9 @@ void LayerThumbnailButton::mouseReleaseEvent(QMouseEvent *event)
     if (!m_altMaskPress || event->button() != Qt::LeftButton)
         return;
     endAltMaskPress();
-    // Released where pressed: a click, not a drag; Shift toggles.
-    if (!rect().contains(event->position().toPoint()))
-        return;
-    m_list.session().selectLayerTarget(layerID, true);
-    if (event->modifiers().testFlag(Qt::ShiftModifier))
-        m_list.session().toggleLayerMask();
+    // Released where pressed: the mask alone, or the image again.
+    if (rect().contains(event->position().toPoint()))
+        m_list.session().toggleMaskAlone(layerID);
 }
 
 // With a modifier the second press is the button's again.
@@ -179,7 +177,7 @@ void LayerThumbnailButton::paintEvent(QPaintEvent *)
     if (!m_targeted)
         return;
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(palette().color(QPalette::Highlight), 2));
+    painter.setPen(QPen(m_alone ? QColor(Qt::white) : palette().color(QPalette::Highlight), 2));
     painter.setBrush(Qt::NoBrush);
     painter.drawRoundedRect(QRectF(rect()).adjusted(1, 1, -1, -1), 3, 3);
 }

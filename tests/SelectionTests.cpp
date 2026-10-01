@@ -11,6 +11,7 @@ private slots:
     void polygonalCornersCanBeRemovedAndClosed();
     void antialiasingControlsEdgeCoverage();
     void selectAllInverseAndToolSwitchCancelsDraft();
+    void inverseOfEverythingDeselects();
     void cursorBadgeFollowsModifiersButKeepsAnOutlinesStartingMode();
     void draggingMovesTheOutlineInWholePixelsAsOneUndo();
     void movingOffCanvasAndBackKeepsTheWholeShape();
@@ -178,6 +179,23 @@ void SelectionTests::selectAllInverseAndToolSwitchCancelsDraft()
     session->selectAll();
     session->selectAll();
     QCOMPARE(session->history.undoCount(), count + 1);
+}
+
+// Swift's: Select All then Inverse leaves nothing selected.
+void SelectionTests::inverseOfEverythingDeselects()
+{
+    const auto session = selectionSession();
+    session->selectAll();
+    session->invertSelection();
+    QVERIFY(!session->selection().has_value());
+    QCOMPARE(session->history.undoName(), QString("Inverse"));
+    session->undo();
+    QVERIFY(!session->selection().value().isEmpty());
+    // Everything but a corner inverts to that corner.
+    lasso(*session, square(0, 0, 10));
+    session->invertSelection();
+    session->invertSelection();
+    QCOMPARE(bounds(*session), QRectF(0, 0, 10, 10));
 }
 
 void SelectionTests::cursorBadgeFollowsModifiersButKeepsAnOutlinesStartingMode()

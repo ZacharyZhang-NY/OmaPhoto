@@ -10,6 +10,12 @@ inline BrushSettings brush(double diameter, double hardness, double red, double 
     return BrushSettings{.diameter = diameter, .hardness = hardness, .red = red, .green = green, .blue = blue, .opacity = opacity};
 }
 
+// A document-pixel clone, copied from `offset` away.
+inline BrushStroke::Clone documentClone(const QImage &image, QSizeF offset = QSizeF(0, 0))
+{
+    return {image, QRectF(-offset.width(), -offset.height(), image.width(), image.height()), false};
+}
+
 inline ImageLayer blankLayer(int width, int height)
 {
     return ImageLayer(QStringLiteral("Layer 1"), QSizeF(width, height));

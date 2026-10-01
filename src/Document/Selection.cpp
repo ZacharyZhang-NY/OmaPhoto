@@ -420,5 +420,7 @@ void EditorSession::invertSelection()
     const std::optional<DocumentSelection> current = selection();
     if (!m_document || !current)
         return;
-    setSelection(DocumentSelection{canvasPath(*m_document).subtracted(current->path), current->antialiased, current->feather}, QStringLiteral("Inverse"));
+    const DocumentSelection inverse{canvasPath(*m_document).subtracted(current->path), current->antialiased, current->feather};
+    // The inverse of everything is no selection, as Photoshop's.
+    setSelection(inverse.isEmpty() ? std::nullopt : std::optional(inverse), QStringLiteral("Inverse"));
 }

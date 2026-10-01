@@ -313,6 +313,12 @@ void LayerIcons::paint(QPainter &painter, LayerIcon icon, QPointF origin, double
     case LayerIcon::dottedCircle: dottedCircle(painter); break;
     case LayerIcon::plusMagnifyingGlass: magnifyingGlass(painter, true); break;
     case LayerIcon::minusMagnifyingGlass: magnifyingGlass(painter, false); break;
+    // Swift's xmark at bold weight.
+    case LayerIcon::xmark:
+        painter.setPen(QPen(colour, 2.6, Qt::SolidLine, Qt::RoundCap));
+        painter.drawLine(QPointF(4, 4), QPointF(14, 14));
+        painter.drawLine(QPointF(14, 4), QPointF(4, 14));
+        break;
     }
     painter.restore();
 }

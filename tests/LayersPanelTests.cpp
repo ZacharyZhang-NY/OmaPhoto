@@ -188,22 +188,36 @@ void LayersPanelTests::theMaskButtonUsesTheSelection()
     panel.show();
     QVERIFY(QTest::qWaitForWindowExposed(&panel));
     auto &mask = find<QToolButton>(panel, "addLayerMask");
-    QCOMPARE(mask.toolTip(), QString("Add layer mask"));
+    QCOMPARE(mask.toolTip(), QString("Add layer mask (Alt-click for a black mask)"));
+    // Alt-click: all black without a selection.
+    QTest::mouseClick(&mask, Qt::LeftButton, Qt::AltModifier);
+    QCOMPARE(session.history.undoName(), QString("Add Hide-All Mask"));
+    session.undo();
+    QTest::mouseClick(&mask, Qt::LeftButton);
+    QCOMPARE(session.history.undoName(), QString("Add Reveal-All Mask"));
+    session.undo();
     QPainterPath box;
     box.addRect(QRectF(20, 10, 30, 20));
     session.applySelection(box, SelectionMode::replace, "Select");
-    QCOMPARE(mask.toolTip(), QString("Add layer mask (the selection becomes black)"));
+    QCOMPARE(mask.toolTip(), QString("Add layer mask revealing the selection (Alt-click to hide it)"));
+    // The button reveals the selection, as Photoshop's.
     QTest::mouseClick(&mask, Qt::LeftButton);
-    QCOMPARE(session.history.undoName(), QString("Add Mask from Selection"));
+    QCOMPARE(session.history.undoName(), QString("Reveal Selection"));
     QVERIFY(!session.selection().has_value() && session.isMaskSelected() && !mask.isEnabled());
-    QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(20)[30]), 0);
-    QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(5)[5]), 255);
-    // The row's menu: black shows only the selection.
-    session.undo();
-    QVERIFY(session.selection().has_value());
-    LayerCell &cell = *panel.list().cells().at(0);
-    panel.list().menuFor(cell, QPoint(cell.width() - 20, 20))->findChild<QAction *>("addBlackMask")->trigger();
-    QCOMPARE(session.history.undoName(), QString("Add Mask from Selection"));
     QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(20)[30]), 255);
     QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(5)[5]), 0);
+    // Alt-click hides it instead.
+    session.undo();
+    QVERIFY(session.selection().has_value());
+    QTest::mouseClick(&mask, Qt::LeftButton, Qt::AltModifier);
+    QCOMPARE(session.history.undoName(), QString("Hide Selection"));
+    QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(20)[30]), 0);
+    QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(5)[5]), 255);
+    // The row's Hide All hides the selection too.
+    session.undo();
+    LayerCell &cell = *panel.list().cells().at(0);
+    panel.list().menuFor(cell, QPoint(cell.width() - 20, 20))->findChild<QAction *>("addBlackMask")->trigger();
+    QCOMPARE(session.history.undoName(), QString("Hide Selection"));
+    QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(20)[30]), 0);
+    QCOMPARE(int(session.activeLayer().value().mask.value().asset.image().constScanLine(5)[5]), 255);
 }

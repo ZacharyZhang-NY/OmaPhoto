@@ -1,6 +1,8 @@
 // Swift's EditorSession+Brush extension: a stroke from press to commit.
 public:
     bool canPaint() const;
+    // Why the target refuses a stroke; none while busy.
+    std::optional<QString> paintRefusal() const;
     std::unique_ptr<BrushStroke> makeRasterEdit(const ImageLayer &layer, const BrushSettings &settings = BrushSettings(), bool growsMask = false) const;
     void beginBrush(QPointF point);
     void continueBrush(QPointF point);

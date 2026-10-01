@@ -46,6 +46,7 @@ add_library(compositor_core STATIC
     src/Document/LayerGroups.cpp
     src/Document/LayerGroups+Order.cpp
     src/Document/LayerMask.cpp
+    src/Document/LayerMask+Alone.cpp
     src/Document/LayerTransform.cpp
     src/Document/LiveLayerMask.cpp
     src/Document/PixelAdjust.cpp
@@ -205,6 +206,7 @@ add_library(compositor_core STATIC
     src/Rendering/EditorCanvas+Gradient.cpp
     src/Rendering/EditorCanvas+Cursors.cpp
     src/Rendering/BrushCursorOverlay.cpp
+    src/Rendering/EditorCanvas+MaskAlone.cpp
     src/Rendering/EditorCanvas+Navigation.cpp
     src/Rendering/EditorCanvas+Picking.cpp
     src/Rendering/EditorCanvas+Selection.cpp

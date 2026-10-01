@@ -97,7 +97,7 @@ void EditorSession::selectEffect(LayerEffectKind kind, QUuid id, bool editing)
         finishEffectsEditing(false);
     // Swift's `selectedLayerIDs = [id]`: selectLayer sets it, unrefused here.
     selectLayer(id);
-    m_isMaskSelected = false;
+    setIsMaskSelected(false);
     m_effectSelection = selection;
     if (editing && m_effectsEditing != selection) {
         m_effectsEditingOriginal = m_document->layers[size_t(indexOf(m_document->layers, id))].effects.value_or(LayerEffects());

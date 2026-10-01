@@ -8,7 +8,7 @@
 enum class LayerIcon {
     eye, eyeSlash, chevronRight, chevronDown, folder, link, newLayer, newFolder, addMask, trash, layers, text,
     halfFilledCircle, sliders, curvePath, plusMinusCircle, paintPalette, circleGrid, sparkles, rightHalfCircle, hatchedCircle, axes,
-    scope, lineDiagonal, drop, wind, dottedCircle, plusMagnifyingGlass, minusMagnifyingGlass
+    scope, lineDiagonal, drop, wind, dottedCircle, plusMagnifyingGlass, minusMagnifyingGlass, xmark
 };
 
 namespace LayerIcons {

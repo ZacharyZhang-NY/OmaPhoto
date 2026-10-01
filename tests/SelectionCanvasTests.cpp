@@ -11,6 +11,7 @@ private slots:
     void focusLossEndsAMarqueeDraftAndAnOutlineMove();
     void shiftDeleteBeginsAContentAwareFill();
     void aCtrlDragMovesSelectedPixelsAndCtrlArrowsNudgeThem();
+    void shiftKeepsMovedPixelsOnALine();
 };
 
 void SelectionCanvasTests::marqueeDragsSelectShiftAddsAltSubtractsAndAFreshShiftSquares()
@@ -320,6 +321,38 @@ void SelectionCanvasTests::aCtrlDragMovesSelectedPixelsAndCtrlArrowsNudgeThem()
     QTest::qWait(50);
     QCOMPARE(session.history.undoCount(), drafting);
     QVERIFY(session.lassoDraft().has_value() && !session.pixelMove());
+}
+
+void SelectionCanvasTests::shiftKeepsMovedPixelsOnALine()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    QImage red = BrushRaster::context(400, 300, false);
+    red.fill(Qt::red);
+    session.insert(ImportedImage(red, red, "Red"));
+    session.applySelection(rectPath(QRectF(20, 20, 40, 40)), SelectionMode::replace, "Select");
+    shown.canvas->synchronizeDisplay();
+    const auto box = [&] { return session.displayedSelection().value().path.boundingRect(); };
+    shown.press(QPointF(40, 40), Qt::ControlModifier);
+    QVERIFY(session.pixelMove());
+    // Across: the drag went further that way.
+    shown.move(QPointF(100, 55), Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(box(), QRectF(80, 20, 40, 40));
+    // Down, then a tie keeps across.
+    shown.move(QPointF(50, 100), Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(box(), QRectF(20, 80, 40, 40));
+    shown.move(QPointF(10, 10), Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(box(), QRectF(-10, 20, 40, 40));
+    // Lengths, not signs: left beats a shorter down.
+    shown.move(QPointF(0, 50), Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(box(), QRectF(-20, 20, 40, 40));
+    // Without Shift both ways.
+    shown.move(QPointF(60, 55), Qt::ControlModifier);
+    QCOMPARE(box(), QRectF(40, 35, 40, 40));
+    shown.move(QPointF(70, 45), Qt::ControlModifier | Qt::ShiftModifier);
+    shown.release(QPointF(70, 45), Qt::ControlModifier | Qt::ShiftModifier);
+    QTRY_VERIFY(!session.pixelMove());
+    QCOMPARE(session.selection().value().path.boundingRect(), QRectF(50, 20, 40, 40));
 }
 
 QTEST_MAIN(SelectionCanvasTests)
