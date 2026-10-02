@@ -1,0 +1,16 @@
+# OmaStore (https://github.com/KitsuneSemCalda/OmaStore): lists OmaPhoto in the
+# Omarchy app store and installs the release package into the user's $HOME.
+kind = "app"
+name = "OmaPhoto"
+summary = "Layered image editor for Linux and Omarchy, a port of Compositor"
+icon = "packaging/icons/app-icon-256.png"
+categories = ["Graphics"]
+screenshots = [
+  "docs/acceptance/01-layers.png",
+  "docs/acceptance/05-adjustments.png",
+  "docs/acceptance/16-omarchy-light.png",
+]
+
+[linux.x86_64]
+asset = "omaphoto-x86_64.pkg.tar.zst"
+exec = "usr/bin/omaphoto"
