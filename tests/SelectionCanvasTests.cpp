@@ -346,6 +346,9 @@ void SelectionCanvasTests::shiftKeepsMovedPixelsOnALine()
     // Lengths, not signs: left beats a shorter down.
     shown.move(QPointF(0, 50), Qt::ControlModifier | Qt::ShiftModifier);
     QCOMPARE(box(), QRectF(-20, 20, 40, 40));
+    // And up beats a shorter right.
+    shown.move(QPointF(45, 0), Qt::ControlModifier | Qt::ShiftModifier);
+    QCOMPARE(box(), QRectF(20, -20, 40, 40));
     // Without Shift both ways.
     shown.move(QPointF(60, 55), Qt::ControlModifier);
     QCOMPARE(box(), QRectF(40, 35, 40, 40));
