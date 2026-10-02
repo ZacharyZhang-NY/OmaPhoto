@@ -13,7 +13,7 @@
     in {
       packages.x86_64-linux.default = pkgs.stdenv.mkDerivation {
         pname = "omaphoto";
-        version = "1.3.3";
+        version = "1.4.5";
         # dev.sh builds in ./build; the package starts clean.
         src = pkgs.lib.cleanSourceWith {
           src = self;
