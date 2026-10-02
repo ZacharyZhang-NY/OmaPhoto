@@ -74,6 +74,7 @@ void ProjectTabLayoutTests::overflowHidesTheLeftmostTabsAndPillsThem()
     QCOMPARE(result.contentWidth(), 292.0);
     // 292 exactly still holds two; a third at 398.
     QCOMPARE(projectTabOverflow(order, widths(order), e, 292, pill).visible.size(), size_t(2));
+    QCOMPARE(projectTabOverflow(order, widths(order), e, 397, pill).visible.size(), size_t(2));
     QCOMPARE(projectTabOverflow(order, widths(order), e, 398, pill).visible.size(), size_t(3));
     // Too narrow for even one: one tab stays.
     QVERIFY((ids(projectTabOverflow(order, widths(order), e, 50, pill)) == std::vector<QUuid>{e}));
