@@ -18,6 +18,8 @@ private slots:
     void aPlacedOrDisabledMaskShowsAlone();
     void theBadgeNamesTheMaskAndTakesItsOwnClicks();
     void altClickOnTheThumbnailTogglesItAndOutlinesItWhite();
+    void theViewOutlastsUndoRedoAndTargetingTheMaskAgain();
+    void aPendingGradientElsewhereStaysOutOfTheView();
 };
 
 namespace {
@@ -292,6 +294,56 @@ void MaskAloneTests::altClickOnTheThumbnailTogglesItAndOutlinesItWhite()
     QVERIFY(!session.maskAloneLayer() && session.activeLayer().value().mask.value().isEnabled);
     const QColor accent = thumbnail->grab().toImage().pixelColor(1, middle.y());
     QCOMPARE(accent, thumbnail->palette().color(QPalette::Highlight));
+}
+
+void MaskAloneTests::theViewOutlastsUndoRedoAndTargetingTheMaskAgain()
+{
+    QUuid id;
+    const auto session = maskedSession(id);
+    session->toggleMaskAlone(id);
+    // A plain click on the shown mask targets it again.
+    session->selectLayerTarget(id, true);
+    QCOMPARE(session->maskAloneLayer().value().id, id);
+    // A stroke on it, undone and redone, keeps the view.
+    session->selectTool(NavigationTool::brush);
+    session->setBrushSettings(brush(20, 1, 0, 0, 0));
+    session->beginBrush(QPointF(50, 50));
+    QVERIFY(session->finishBrushImmediately());
+    QCOMPARE(session->history.undoName(), QString("Paint Mask"));
+    session->undo();
+    QCOMPARE(session->maskAloneLayer().value().id, id);
+    session->redo();
+    QCOMPARE(session->maskAloneLayer().value().id, id);
+}
+
+void MaskAloneTests::aPendingGradientElsewhereStaysOutOfTheView()
+{
+    Canvas shown;
+    EditorSession &session = shown.session;
+    session.setForegroundColor(PaletteColor{0, 0, 1});
+    session.selectTool(NavigationTool::gradient);
+    // The layer's own pixels take a blue gradient, still pending.
+    session.selectLayerTarget(shown.id, false);
+    session.beginGradient(QPointF(0, 80));
+    session.moveGradient(std::nullopt, QPointF(200, 80));
+    QVERIFY(session.gradientEdit().has_value() && !session.gradientEdit()->raster->isMask);
+    session.toggleMaskAlone(shown.id);
+    // The commit is posted: the pixels' raster lingers, unshown.
+    QVERIFY(session.maskAloneLayer().has_value() && session.gradientEdit().has_value());
+    QVERIFY(gray(shown.at(QPointF(50, 50)), 255) && gray(shown.at(QPointF(150, 50)), 0));
+    QTRY_VERIFY(!session.gradientEdit().has_value());
+    // Another layer's mask gradient stays out of this view.
+    session.addBlankLayer();
+    const QUuid other = session.activeLayerID().value();
+    session.addLayerMask();
+    session.beginGradient(QPointF(0, 80));
+    session.moveGradient(std::nullopt, QPointF(200, 80));
+    QVERIFY(session.gradientEdit().has_value() && session.gradientEdit()->raster->isMask && session.gradientEdit()->raster->layer.id == other);
+    session.toggleMaskAlone(shown.id);
+    QCOMPARE(session.maskAloneLayer().value().id, shown.id);
+    QVERIFY(session.gradientEdit().has_value());
+    QVERIFY(gray(shown.at(QPointF(50, 50)), 255) && gray(shown.at(QPointF(150, 50)), 0));
+    QTRY_VERIFY(!session.gradientEdit().has_value());
 }
 
 QTEST_MAIN(MaskAloneTests)

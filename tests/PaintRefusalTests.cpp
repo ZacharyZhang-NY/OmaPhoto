@@ -8,6 +8,7 @@ private slots:
     void eachRefusalSaysWhy();
     void theGradientAndTheSmearSayWhyToo();
     void aBusyEditorOrAnotherToolSaysNothing();
+    void theEarlierReasonWinsAtEverySeam();
 };
 
 namespace {
@@ -142,6 +143,33 @@ void PaintRefusalTests::aBusyEditorOrAnotherToolSaysNothing()
     session->selectTool(NavigationTool::move);
     session->beginBrush(QPointF(10, 10));
     QCOMPARE(session->brushError(), std::optional<QString>("Earlier"));
+}
+
+void PaintRefusalTests::theEarlierReasonWinsAtEverySeam()
+{
+    const auto session = makeSession();
+    const QUuid layer = session->activeLayerID().value();
+    // A hidden folder's pixels: the folder, not the hiding.
+    session->addGroup();
+    const QUuid folder = session->activeLayerID().value();
+    session->toggleLayerVisibility(folder);
+    QCOMPARE(pressed(*session), std::optional<QString>("“Folder 1” is a folder, which has no pixels of its own. Paint on a layer inside it, or on the "
+                                                       "folder’s mask."));
+    session->toggleLayerVisibility(folder);
+    // A hidden layer's mask turned off: the hiding.
+    session->selectLayer(layer);
+    session->addLayerMask();
+    session->toggleLayerMask();
+    session->toggleLayerVisibility(layer);
+    QCOMPARE(pressed(*session), std::optional<QString>("“Layer 1” is hidden, or inside a hidden folder. Show it to paint on it."));
+    session->toggleLayerVisibility(layer);
+    session->toggleLayerMask();
+    // An adjustment's pixels in an empty selection: the adjustment.
+    session->addAdjustment(AdjustmentKind::levels);
+    session->setAdjustmentEditingID(std::nullopt);
+    session->selectLayerTarget(session->activeLayerID().value(), false);
+    emptySelection(*session);
+    QCOMPARE(pressed(*session), std::optional<QString>("“Levels” is an adjustment layer, with no pixels to paint. Paint on its mask instead."));
 }
 
 QTEST_GUILESS_MAIN(PaintRefusalTests)
