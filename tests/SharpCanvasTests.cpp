@@ -32,6 +32,23 @@ int blurred(double width, const Draw &draw)
     }
     return count;
 }
+
+// Opaque mid tones of 20 rows of columns, turned 2°.
+int turned(const Draw &draw)
+{
+    QImage surface = BrushRaster::context(120, 30, false);
+    QPainter painter(&surface);
+    draw(LayerTransform{.origin = {0, 5}, .size = {100, 20}, .rotation = 2}, painter);
+    painter.end();
+    int count = 0;
+    for (int y = 0; y < 30; ++y) {
+        for (int x = 0; x < 100; ++x) {
+            const QRgb pixel = surface.pixel(x, y);
+            count += qAlpha(pixel) == 255 && qRed(pixel) > 30 && qRed(pixel) < 225;
+        }
+    }
+    return count;
+}
 }
 
 class SharpCanvasTests : public QObject {
@@ -74,6 +91,8 @@ void SharpCanvasTests::plainMaskedAndTiledLayersCopyAcross()
         QCOMPARE(blurred(100.05, draw), 0);
         // A fifth: filtered as before.
         QVERIFY(blurred(100.2, draw) > 0);
+        // Turned, even pixel for pixel: filtered between columns.
+        QVERIFY(turned(draw) > 100);
     }
 }
 
