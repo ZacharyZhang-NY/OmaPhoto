@@ -17,6 +17,7 @@ private slots:
     void liquifyStaysSharp();
     void liquifyDrawsFromTheUntouchedLayer();
     void smudgeLeavesOneFadingTrail();
+    void aCommitKeepsATwentiethAndTheLastPoint();
 };
 
 // Pushed across and back, the layer ends nearly unchanged.
@@ -92,6 +93,24 @@ void WarpStrokeTests::smudgeLeavesOneFadingTrail()
         peaks += row[i] > row[i - 2] + 2 && row[i] > row[i + 2] + 2;
     QCOMPARE(peaks, 0);
     QVERIFY2(row.front() > row.back() + 20, qPrintable(QString("%1 to %2").arg(row.front()).arg(row.back())));
+}
+
+// Swift's thinning: a twentieth of the brush apart, the last kept.
+void WarpStrokeTests::aCommitKeepsATwentiethAndTheLastPoint()
+{
+    QImage image = BrushRaster::context(80, 20, false);
+    image.fill(Qt::red);
+    WarpStroke stroke = warp(image, BlurToolMode::liquify, brush(100, 0.5, 0, 0, 0, 1));
+    stroke.append(QPointF(0, 10));
+    stroke.append(QPointF(51, 10));
+    QCOMPARE(int(stroke.points().size()), 21);
+    const std::vector<QPointF> kept = stroke.committedPoints();
+    QCOMPARE(int(kept.size()), 8);
+    QCOMPARE(kept.front(), stroke.points().front());
+    QCOMPARE(kept[1], stroke.points()[3]);
+    QCOMPARE(kept[6], stroke.points()[18]);
+    // Two and a half from the one before, kept as the last.
+    QCOMPARE(kept.back(), QPointF(51, 10));
 }
 
 QTEST_GUILESS_MAIN(WarpStrokeTests)

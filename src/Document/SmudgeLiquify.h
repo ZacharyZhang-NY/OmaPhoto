@@ -30,6 +30,8 @@ public:
     const int height;
     // Every dab's centre, for painting the result into the layer.
     const std::vector<QPointF> &points() const { return m_points; }
+    // Swift's commit thinning: a twentieth of the brush apart, the last kept.
+    std::vector<QPointF> committedPoints() const;
     // The layer as the stroke has reshaped it so far.
     const QImage &image() const { return m_context; }
     // Dabs along the way to `point`.
