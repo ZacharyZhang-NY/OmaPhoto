@@ -2,9 +2,11 @@
 #include "Document/EditorSession.h"
 #include "IO/ImageExporter.h"
 #include "IO/ProjectStore.h"
+#include "Logging.h"
 #include "Rendering/LayerRenderer.h"
 #include <algorithm>
 #include <cmath>
+#include <new>
 #include <stdexcept>
 
 QString rawValue(BrushToolMode mode)
@@ -51,6 +53,20 @@ WarpStroke::WarpStroke(const ImageLayer &layer, const QImage &image, const Layer
     } catch (const std::bad_alloc &) {
         throw ExportError(ExportError::Kind::render);
     }
+}
+
+// A point every twentieth of the tip covers every dab.
+std::vector<QPointF> WarpStroke::committedPoints() const
+{
+    const double spacing = std::max(1.0, diameter * 0.05);
+    std::vector<QPointF> kept;
+    for (size_t index = 0; index < m_points.size(); ++index) {
+        const QPointF step = m_points[index];
+        if (!kept.empty() && index + 1 < m_points.size() && std::hypot(step.x() - kept.back().x(), step.y() - kept.back().y()) < spacing)
+            continue;
+        kept.push_back(step);
+    }
+    return kept;
 }
 
 int WarpStroke::radius() const
@@ -102,7 +118,12 @@ void WarpStroke::append(QPointF point)
 void WarpStroke::pickUp(QPointF center)
 {
     const int r = radius(), side = 2 * r + 1;
-    m_carried.assign(size_t(side) * size_t(side) * 4, 0);
+    // The first dab's, inside `beginWarp`'s catch.
+    try {
+        m_carried.assign(size_t(side) * size_t(side) * 4, 0);
+    } catch (const std::bad_alloc &) {
+        throw ExportError(ExportError::Kind::render);
+    }
     const int cx = int(std::round(center.x())), cy = int(std::round(center.y()));
     const uchar *pixels = m_context.constBits();
     const qsizetype stride = m_context.bytesPerLine();
@@ -166,8 +187,14 @@ void WarpStroke::push(QPointF a, QPointF b)
     if (x0 > x1 || y0 > y1)
         return;
     const int cw = x1 - x0 + 1, ch = y1 - y0 + 1;
-    if (m_scratch.size() < size_t(cw) * size_t(ch) * 2)
-        m_scratch.assign(size_t(cw) * size_t(ch) * 2, 0);
+    // Swift's guard on the scratch texture: no room, no dab.
+    try {
+        if (m_scratch.size() < size_t(cw) * size_t(ch) * 2)
+            m_scratch.assign(size_t(cw) * size_t(ch) * 2, 0);
+    } catch (const std::bad_alloc &) {
+        qCWarning(lcRendering) << "a Liquify dab finds no memory:" << cw << "by" << ch;
+        return;
+    }
     for (int y = 0; y < ch; ++y) {
         const auto row = m_offsets.begin() + std::ptrdiff_t((size_t(y + y0) * size_t(width) + size_t(x0)) * 2);
         std::copy(row, row + std::ptrdiff_t(size_t(cw) * 2), m_scratch.begin() + std::ptrdiff_t(size_t(y) * size_t(cw) * 2));
@@ -209,11 +236,10 @@ void WarpStroke::push(QPointF a, QPointF b)
             // The untouched layer there, held to its edges, sampled once.
             const float sourceX = std::clamp(float(x) + moved[0], 0.0f, float(width - 1));
             const float sourceY = std::clamp(float(y) + moved[1], 0.0f, float(height - 1));
-            const int jx = std::max(0, std::min(int(sourceX), width - 2)), jy = std::max(0, std::min(int(sourceY), height - 2));
+            // `ix` above needs two columns and rows, so these exist.
+            const int jx = std::min(int(sourceX), width - 2), jy = std::min(int(sourceY), height - 2);
             const float gx = sourceX - float(jx), gy = sourceY - float(jy);
-            const int kx = std::min(jx + 1, width - 1), ky = std::min(jy + 1, height - 1);
-            const uchar *top0 = original + jy * originalStride, *bottom0 = original + ky * originalStride;
-            const uchar *c00 = top0 + jx * 4, *c10 = top0 + kx * 4, *c01 = bottom0 + jx * 4, *c11 = bottom0 + kx * 4;
+            const uchar *c00 = original + jy * originalStride + jx * 4, *c10 = c00 + 4, *c01 = c00 + originalStride, *c11 = c01 + 4;
             uchar *p = pixels + y * stride + x * 4;
             for (int k = 0; k < 4; ++k) {
                 const float a = float(c00[k]) / 255, b = float(c10[k]) / 255, c = float(c01[k]) / 255, d = float(c11[k]) / 255;
@@ -270,17 +296,8 @@ void EditorSession::finishWarp()
                 stroke->setClone(BrushStroke::Clone{warp->image(), QRectF(QPointF(0, 0), warp->image().size()), false, {}});
                 stroke->replacesWithClone = true;
                 stroke->editName = rawValue(warp->mode);
-                // A point every twentieth of the tip covers every dab.
-                const double spacing = std::max(1.0, warp->diameter * 0.05);
-                const std::vector<QPointF> &points = warp->points();
-                std::optional<QPointF> kept;
-                for (size_t index = 0; index < points.size(); ++index) {
-                    const QPointF step = points[index];
-                    if (kept && index + 1 < points.size() && std::hypot(step.x() - kept->x(), step.y() - kept->y()) < spacing)
-                        continue;
+                for (const QPointF step : warp->committedPoints())
                     stroke->append(step);
-                    kept = step;
-                }
                 stroke->flush();
                 if (!stroke->patches().empty())
                     commitPaintSnapshot(*stroke);

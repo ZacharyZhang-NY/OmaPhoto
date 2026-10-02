@@ -29,8 +29,9 @@ QImage padded(const QImage &image, const QRect &part, int margin, bool repeat)
 std::function<QImage(const QRect &)> softened(const QImage &sharp, double sigma, bool mask)
 {
     return [sharp, sigma, mask](const QRect &part) {
+        // The pad holds the edges; the blur's rule never reaches.
         const int margin = int(std::ceil(3 * sigma));
-        const QImage piece = PixelAdjust::gaussianBlur(padded(sharp, part, margin, mask), sigma, mask).copy(margin, margin, part.width(), part.height());
+        const QImage piece = PixelAdjust::gaussianBlur(padded(sharp, part, margin, mask), sigma, false).copy(margin, margin, part.width(), part.height());
         if (piece.isNull())
             throw ExportError(ExportError::Kind::render);
         return piece;

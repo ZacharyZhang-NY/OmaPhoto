@@ -345,6 +345,12 @@ void BrushControlsTests::blurHasItsOwnRadius()
     QTest::keyClick(&field, Qt::Key_Return);
     QCOMPARE(session.brushSettings().blurRadius, 0.5);
     QCOMPARE(field.text(), QString("0.5"));
+    // A number not finite takes 5, as Swift's binding.
+    type(field, "inf");
+    QTest::keyClick(&field, Qt::Key_Return);
+    QCOMPARE(session.brushSettings().blurRadius, 5.0);
+    type(field, "0");
+    QTest::keyClick(&field, Qt::Key_Return);
     type(field, "abc");
     QTest::keyClick(&field, Qt::Key_Return);
     QCOMPARE(session.brushSettings().blurRadius, 0.5);

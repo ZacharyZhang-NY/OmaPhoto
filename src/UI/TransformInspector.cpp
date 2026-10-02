@@ -6,6 +6,7 @@
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QTimer>
 #include <cmath>
 
 TransformValueField::TransformValueField(const QString &label, const QString &suffix, double low, double high, EditorSession &session,
@@ -68,7 +69,11 @@ bool TransformValueField::eventFilter(QObject *watched, QEvent *event)
         // Another window in front keeps the field, as AppKit does.
         m_borrowed = reason == Qt::MenuBarFocusReason || reason == Qt::PopupFocusReason || reason == Qt::ActiveWindowFocusReason;
         if (!m_borrowed) {
-            m_finish();
+            // Swift's focus changes after the canvas's mouseDown: it picks first.
+            if (reason == Qt::MouseFocusReason)
+                QTimer::singleShot(0, this, [this] { m_finish(); });
+            else
+                m_finish();
             field->setText(formatted(m_value));
         }
     }

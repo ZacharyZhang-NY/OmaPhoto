@@ -41,6 +41,8 @@ private slots:
     void aTurnedLayerDoesntSnap();
     void eachEdgeSnapsOnItsOwn();
     void theDraggedSideAloneSnaps();
+    void aLongDragSnapsTheEdgeItCarries();
+    void aTieTakesTheLowEdge();
     void snappingOffOrAnotherDragLeavesThePoint();
 };
 
@@ -139,6 +141,31 @@ void ResizeSnapTests::theDraggedSideAloneSnaps()
     const LayerTransform down = resized.resize(5, QPointF(52, 110), QPointF(52, 148), false);
     QCOMPARE(down, (LayerTransform{.origin = {2, 10}, .size = {100, 140}}));
     QCOMPARE(resized.session.snapGuides, (SnapGuides{{}, {150}}));
+}
+
+// Dragged past the anchor, the moved edge is the left.
+void ResizeSnapTests::aLongDragSnapsTheEdgeItCarries()
+{
+    Resized resized;
+    const LayerTransform flipped = resized.resize(3, QPointF(110, 60), QPointF(-3, 60), false);
+    QCOMPARE(flipped.origin.x(), 0.0);
+    QCOMPARE(flipped.size.width(), 10.0);
+    QVERIFY(flipped.flipX);
+    QCOMPARE(resized.session.snapGuides, (SnapGuides{{0}, {}}));
+}
+
+// Half a pixel from the anchor: one pixel, pointer mid-way.
+void ResizeSnapTests::aTieTakesTheLowEdge()
+{
+    Resized resized;
+    resized.place(QPointF(13, 150), QSizeF(20, 20));
+    resized.session.selectLayer(resized.layer);
+    const TransformDrag drag{layerWith(resized.session, resized.layer).transform, QPointF(110, 60), {TransformDrag::Kind::resize, 3}, std::nullopt};
+    QCOMPARE(drag.updated(QPointF(10.5, 60), false, false).size.width(), 1.0);
+    // The anchor's edge, which no step moves: the pointer stays.
+    QCOMPARE(resized.session.snappedResizePoint(QPointF(10.5, 60), drag, false, {resized.layer}, 5, [&](QPointF to) { return drag.updated(to, false, false); }),
+             QPointF(10.5, 60));
+    QCOMPARE(resized.session.snapGuides, (SnapGuides{{13}, {}}));
 }
 
 void ResizeSnapTests::snappingOffOrAnotherDragLeavesThePoint()
