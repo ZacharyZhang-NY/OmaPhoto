@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdatomic.h>
 
-// Linux: GCD's dispatch_apply, run on QtConcurrent by Document/Dither.cpp. Blocks become functions with a context.
+// Linux: GCD's dispatch_apply, run on QtConcurrent by Dither.cpp.
 void dither_bands(size_t bands, void (*band)(void *context, size_t index), void *context);
 
 static inline float clamp01(float v) { return v < 0 ? 0 : v > 1 ? 1 : v; }

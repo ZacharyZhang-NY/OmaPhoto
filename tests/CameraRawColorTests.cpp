@@ -50,6 +50,9 @@ void CameraRawColorTests::curvesAreRepairedIntoOrder()
     QCOMPARE(repaired({{0, 0}, {0.995, 0.5}, {1, 1}}), (Points{{0, 0}, {0.99, 0.5}, {1, 1}}));
     QCOMPARE(repaired({{0, 0}, {0.5, 0.3}, {0.505, 0.6}, {1, 1}}), (Points{{0, 0}, {0.5, 0.3}, {1, 1}}));
     QCOMPARE(repaired({{0, 0}, {0.004, 0.3}, {1, 1}}), CameraRawCurveSettings::linear());
+    // Exactly a hundredth past the last kept is too near.
+    QCOMPARE(repaired({{0, 0}, {0.5, 0.3}, {0.5 + 0.01, 0.6}, {1, 1}}), (Points{{0, 0}, {0.5, 0.3}, {1, 1}}));
+    QCOMPARE(repaired({{0, 0}, {0.5, 0.3}, {0.5 + 0.0100001, 0.6}, {1, 1}}).size(), size_t(4));
     // A curve of one point passes its input through.
     CameraRawCurveSettings curve;
     const std::vector<float> table = curve.channelTable({{0.5, 0.7}});

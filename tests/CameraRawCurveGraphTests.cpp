@@ -59,6 +59,8 @@ private slots:
     void theChosenPointIsLitAndReadOut();
     void aNewChannelOrPresetDropsTheChoice();
     void aDoubleClickRemovesAnInnerPointAndTheChoice();
+    void aDoubleClickReachesFourHundredthsByX();
+    void aDoubleClickInTheStripMovesADivider();
     void onlyTheLeftButtonDragsAndAPressStartsAfresh();
     void theGraphSaysWhatADragDoes();
 };
@@ -356,6 +358,31 @@ void CameraRawCurveGraphTests::aDoubleClickRemovesAnInnerPointAndTheChoice()
     QTest::mouseDClick(graph.graph, Qt::LeftButton, {}, graph.at(1, 1));
     QCOMPARE(graph.curve().rgb.size(), size_t(3));
     QCOMPARE(graph.readout().text(), QString("In 255   Out 255"));
+}
+
+void CameraRawCurveGraphTests::aDoubleClickReachesFourHundredthsByX()
+{
+    Graph graph(true);
+    // Beside the start nothing is added; 0.037 removes, 0.042 not.
+    QVERIFY(3.0 / graph.graph->width() < 0.01);
+    for (const auto &[inner, removed] : {std::pair(0.045, true), std::pair(0.05, false)}) {
+        graph.set([inner](CameraRawCurveSettings &curve) { curve.rgb = {{0, 0}, {inner, 0.9}, {1, 1}}; });
+        QTest::mouseDClick(graph.graph->window()->windowHandle(), Qt::LeftButton, {}, graph.graph->mapTo(graph.graph->window(), QPoint(3, 140)));
+        QCOMPARE(graph.curve().rgb.size(), removed ? size_t(2) : size_t(3));
+    }
+}
+
+void CameraRawCurveGraphTests::aDoubleClickInTheStripMovesADivider()
+{
+    Graph graph;
+    const int w = graph.graph->width(), h = graph.graph->height();
+    graph.set([](CameraRawCurveSettings &curve) { curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
+    // Both presses take the nearest divider there; no point goes.
+    QTest::mouseDClick(graph.graph->window()->windowHandle(), Qt::LeftButton, {}, graph.graph->mapTo(graph.graph->window(), QPoint(int(0.3 * w), h - 5)));
+    QVERIFY(std::abs(graph.curve().shadowSplit - 30) < 0.5);
+    QVERIFY(graph.curve().darkSplit == 50 && graph.curve().lightSplit == 75);
+    QCOMPARE(graph.curve().rgb.size(), size_t(3));
+    QVERIFY(graph.curve().shadows == 0 && graph.curve().darks == 0);
 }
 
 void CameraRawCurveGraphTests::onlyTheLeftButtonDragsAndAPressStartsAfresh()
