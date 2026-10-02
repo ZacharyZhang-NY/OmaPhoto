@@ -53,6 +53,23 @@ std::vector<int> gray(int level, double spacing, double glow = 0)
     return column(scanlines(spacing, glow).apply(filled(16, 32, QColor(level, level, level))), 5);
 }
 
+// Worst difference from Swift's first glow, blurred whole.
+int glowError(const QImage &image, double glow)
+{
+    const QImage lines = scanlines(8).apply(image), result = scanlines(8, glow).apply(image);
+    const QImage blurred = PixelAdjust::gaussianBlur(lines, 8 * 3 + 3, true);
+    const float amount = float(glow / 100 * 2.5);
+    int worst = 0;
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            const int plain = lines.constScanLine(y)[x * 4], light = blurred.constScanLine(y)[x * 4];
+            const int expected = int(std::lround(std::min(255.0f, float(plain) + float(light) * amount)));
+            worst = std::max(worst, std::abs(result.constScanLine(y)[x * 4] - expected));
+        }
+    }
+    return worst;
+}
+
 std::vector<int> repeated(const std::vector<int> &band, int times)
 {
     std::vector<int> all;
@@ -113,6 +130,7 @@ private slots:
     void everyBandOfATallImageIsDrawn();
     void bandsDrawAsOneBandDoes();
     void theGlowIsTheBlurredLightAtItsAmount();
+    void theGlowScalesBackExactlyOffTheStep();
     void theGlowNeverPassesAlpha();
     void theSheetShowsScanlinesRows();
     void theRowsWriteTheirSettings();
@@ -302,26 +320,23 @@ void ScanlinesTests::theGlowIsTheBlurredLightAtItsAmount()
 {
     QImage image = filled(64, 160, Qt::black);
     QPainter(&image).fillRect(QRect(0, 0, 32, 40), Qt::white);
-    const QImage lines = scanlines(8).apply(image);
-    // Swift's first glow: the lines blurred whole, sigma 27.
-    const QImage blurred = PixelAdjust::gaussianBlur(lines, 8 * 3 + 3, true);
     for (const double glow : {20.0, 100.0}) {
-        const QImage result = scanlines(8, glow).apply(image);
-        const float amount = float(glow / 100 * 2.5);
-        int worst = 0;
-        for (int y = 0; y < 160; ++y) {
-            for (int x = 0; x < 64; ++x) {
-                const int plain = lines.constScanLine(y)[x * 4], light = blurred.constScanLine(y)[x * 4];
-                const int expected = int(std::lround(std::min(255.0f, float(plain) + float(light) * amount)));
-                worst = std::max(worst, std::abs(result.constScanLine(y)[x * 4] - expected));
-            }
-        }
         // Three levels of the shrink's blur, times 2.5.
+        const int worst = glowError(image, glow);
         QVERIFY2(worst <= 8, qPrintable(QString::number(worst)));
     }
     // Below the light, at amount 0.5, it fades.
     const std::vector<int> fading = column(scanlines(8, 20).apply(image), 16);
     QVERIFY(fading[48] > 20 && fading[48] < fading[40] && fading[120] < 3);
+}
+
+void ScanlinesTests::theGlowScalesBackExactlyOffTheStep()
+{
+    // 73 plus two 84-point pads is off the 6 step.
+    QImage image = filled(73, 73, Qt::black);
+    QPainter(&image).fillRect(QRect(0, 0, 40, 40), Qt::white);
+    const int worst = glowError(image, 100);
+    QVERIFY2(worst <= 8, qPrintable(QString::number(worst)));
 }
 
 void ScanlinesTests::theGlowNeverPassesAlpha()
@@ -346,6 +361,22 @@ void ScanlinesTests::theSheetShowsScanlinesRows()
                                         "Glow|Light blooming around the lines, like a CRT's phosphors", "Dots|Break the lines into glowing beads",
                                         "Wobble|Make the lines waver sideways down the screen, like a CRT losing sync",
                                         "Density|More ink (darker) or less before dithering", "Contrast|", "Colors|"}));
+    // A value mid-range sits mid-travel; each unit is Swift's.
+    const std::tuple<const char *, double DitherSettings::*, double, QString> middles[] = {
+        {"lineSpacing", &DitherSettings::lineSpacing, 17, "px"}, {"glow", &DitherSettings::glow, 50, "%"},
+        {"dots", &DitherSettings::dots, 50, "%"},                {"wobble", &DitherSettings::wobble, 32, "px"}};
+    for (const auto &[name, setting, middle, unit] : middles) {
+        FilterSettings settings = shown.session.filterEdit().value().settings;
+        settings.dither.*setting = middle;
+        shown.session.updateFilter(settings, true);
+        QSlider *slider = shown.sheet->findChild<QSlider *>(QString::fromLatin1(name) + "Slider");
+        QLineEdit *field = shown.sheet->findChild<QLineEdit *>(QString::fromLatin1(name) + "Field");
+        QVERIFY2(slider && field, name);
+        QCOMPARE(slider->value(), slider->maximum() / 2);
+        QCOMPARE(slider->minimum(), 0);
+        const QList<QLabel *> labels = field->parentWidget()->findChildren<QLabel *>(QString(), Qt::FindDirectChildrenOnly);
+        QCOMPARE(labels.last()->text(), unit);
+    }
     // Each slider's travel reaches its range's ends.
     const std::tuple<const char *, double DitherSettings::*, double, double> sliders[] = {
         {"lineSpacingSlider", &DitherSettings::lineSpacing, 2, 32}, {"glowSlider", &DitherSettings::glow, 0, 100},

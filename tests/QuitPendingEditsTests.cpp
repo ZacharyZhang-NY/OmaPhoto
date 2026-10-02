@@ -53,6 +53,8 @@ private slots:
     void quittingCancelsAnOpenDialog();
     void quittingCancelsTheOtherDialogs();
     void quittingCancelsAnAdjustmentsEditor();
+    void onlyTheTabOnScreenIsSettled();
+    void aQuitWaitsForAnAdjustmentsEditorToRender();
     void aWorkspaceGoneMidSettleCallsNothing();
     void closingTheWindowAppliesTheGradientThenAsks();
     void aBusyProjectHoldsTheQuit();
@@ -163,6 +165,52 @@ void QuitPendingEditsTests::quittingCancelsAnAdjustmentsEditor()
     QVERIFY(!session.adjustmentEditingID() && !session.adjustmentOriginal() && !session.filterEdit());
     QVERIFY(session.activeLayer().value().adjustment.value() == made);
     QVERIFY(workspace.canSwitch());
+}
+
+void QuitPendingEditsTests::onlyTheTabOnScreenIsSettled()
+{
+    ProjectWorkspace workspace;
+    const std::shared_ptr<ProjectTab> first = workspace.tabs().front();
+    first->session.createDocument(100, 20);
+    first->session.insert(filled(QColor(200, 100, 50)));
+    workspace.newCanvas();
+    const std::shared_ptr<ProjectTab> second = workspace.tabs().back();
+    QVERIFY(second != first);
+    first->session.beginFilter(FilterKind::gaussianBlur);
+    second->session.createDocument(100, 20);
+    second->session.insert(filled(QColor(200, 100, 50)));
+    second->session.beginFilter(FilterKind::gaussianBlur);
+    QCOMPARE(workspace.current().id, second->id);
+    QVERIFY(awaited([&](std::function<void()> done) { workspace.settlePendingEdits(std::move(done)); }));
+    QVERIFY(!second->session.filterEdit());
+    QVERIFY(first->session.filterEdit());
+    // The other way round, the first alone.
+    workspace.select(first->id);
+    second->session.beginFilter(FilterKind::gaussianBlur);
+    QVERIFY(awaited([&](std::function<void()> done) { workspace.settlePendingEdits(std::move(done)); }));
+    QVERIFY(!first->session.filterEdit());
+    QVERIFY(second->session.filterEdit());
+}
+
+void QuitPendingEditsTests::aQuitWaitsForAnAdjustmentsEditorToRender()
+{
+    ProjectWorkspace workspace;
+    EditorSession &session = workspace.current().session;
+    session.createDocument(100, 20);
+    session.insert(filled(Qt::white));
+    session.addAdjustment(AdjustmentKind::exposure);
+    const QUuid id = session.adjustmentEditingID().value();
+    // Asked for, not yet rendered: nothing to cancel, so refused.
+    QTest::ignoreMessage(QtWarningMsg, "Quit refused: the project is still busy");
+    DialogDesk desk;
+    QCOMPARE(answer(workspace), std::optional(false));
+    QVERIFY(desk.seen.isEmpty());
+    QVERIFY(session.adjustmentEditingID() == id && !session.adjustmentOriginal());
+    QVERIFY(awaited([&](std::function<void()> done) { session.beginAdjustmentEditing(id, std::move(done)); }));
+    // Once open, the editor is cancelled; the quit goes on.
+    QVERIFY(session.filterEdit() && session.adjustmentOriginal());
+    QVERIFY(awaited([&](std::function<void()> done) { workspace.settlePendingEdits(std::move(done)); }));
+    QVERIFY(!session.adjustmentEditingID() && !session.filterEdit() && workspace.canSwitch());
 }
 
 void QuitPendingEditsTests::aWorkspaceGoneMidSettleCallsNothing()

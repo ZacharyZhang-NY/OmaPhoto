@@ -202,14 +202,16 @@ QImage DitherSettings::glowing(const QImage &image) const
     const int width = image.width(), height = image.height();
     // Swift clamps first: edges repeat outward before shrinking.
     const int step = int(shrink), pad = int(std::ceil(sigma * 3 / shrink)) * step;
-    QImage padded = BrushRaster::context(width + 2 * pad, height + 2 * pad, false);
+    // Far sides fill whole steps: both scales are exact.
+    const auto whole = [step](int side) { return (side + step - 1) / step * step; };
+    QImage padded = BrushRaster::context(whole(width + 2 * pad), whole(height + 2 * pad), false);
     for (int y = 0; y < padded.height(); ++y) {
         const uchar *source = image.constScanLine(std::clamp(y - pad, 0, height - 1));
         uchar *out = padded.scanLine(y);
         for (int x = 0; x < padded.width(); ++x)
             std::copy_n(source + std::clamp(x - pad, 0, width - 1) * 4, 4, out + x * 4);
     }
-    const int smallWidth = (padded.width() + step - 1) / step, smallHeight = (padded.height() + step - 1) / step;
+    const int smallWidth = padded.width() / step, smallHeight = padded.height() / step;
     const QImage small = padded.scaled(smallWidth, smallHeight, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
     if (small.isNull())
         throw ExportError(ExportError::Kind::render);
