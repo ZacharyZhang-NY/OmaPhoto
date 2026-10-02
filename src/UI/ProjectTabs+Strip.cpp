@@ -1,11 +1,23 @@
 #include "UI/ProjectTabs.h"
+#include <QGuiApplication>
 #include <QPropertyAnimation>
+#include <QTimer>
 #include <algorithm>
 #include <cmath>
 
 ProjectTabStrip::ProjectTabStrip(ProjectWorkspace &workspace, QWidget *parent)
-    : QWidget(parent), m_workspace(workspace), m_pill(new OverflowTabsPill(workspace, this))
+    : QWidget(parent), m_workspace(workspace), m_pill(new OverflowTabsPill(workspace, this)), m_releaseWatch(new QTimer(this))
 {
+    // Swift's dragTimer: with no button held, the drag ends.
+    m_releaseWatch->setObjectName(QStringLiteral("tabReleaseWatch"));
+    m_releaseWatch->setInterval(100);
+    connect(m_releaseWatch, &QTimer::timeout, this, [this] {
+        if (QGuiApplication::mouseButtons() != Qt::NoButton)
+            return;
+        m_releaseWatch->stop();
+        if (std::exchange(m_reorder, std::nullopt))
+            layOut(true);
+    });
     setObjectName(QStringLiteral("projectTabs"));
     setAccessibleName(QStringLiteral("Project tabs"));
     setFixedHeight(34);
@@ -133,21 +145,21 @@ int ProjectTabStrip::Reorder::nearestSlot() const
 void ProjectTabStrip::handleReorder(QUuid id, TabDragPhase phase, double translation)
 {
     if (phase == TabDragPhase::changed) {
-        // Another tab's drag lost its release, as Swift's timer finds.
-        if (m_reorder && m_reorder->id != id)
-            m_reorder.reset();
         if (!m_reorder) {
             if (!m_workspace.canSwitch() || std::abs(translation) < 3)
                 return;
             // Dragging a tab selects it, as in Safari.
             m_workspace.select(id);
             m_reorder = makeReorder(id);
+            m_releaseWatch->start();
             // Above the tabs it crosses.
             for (ProjectTabButton *button : m_buttons) {
                 if (button->tab->id == id)
                     button->raise();
             }
         }
+        if (m_reorder->id != id)
+            return;
         m_reorder->translation = translation;
         m_reorder->targetIndex = m_reorder->nearestSlot();
         layOut(true);

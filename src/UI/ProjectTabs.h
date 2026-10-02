@@ -1,6 +1,7 @@
 #pragma once
 #include "Document/ProjectWorkspace.h"
 #include "UI/ProjectTabLayout.h"
+#include <QTimer>
 #include <QToolButton>
 #include <QWidget>
 
@@ -124,4 +125,5 @@ private:
     OverflowTabsPill *const m_pill;
     std::vector<ProjectTabButton *> m_buttons;
     std::optional<Reorder> m_reorder;
+    QTimer *const m_releaseWatch;
 };

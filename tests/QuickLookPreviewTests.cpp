@@ -1,6 +1,7 @@
 #include "DialogDesk.h"
 #include "IO/ImageExporter.h"
 #include "IO/ProjectController.h"
+#include "IO/ProjectDigest.h"
 #include "ProjectFixtures.h"
 #include <QBuffer>
 #include <QColorSpace>
@@ -61,6 +62,12 @@ void QuickLookPreviewTests::theStoreWritesThePreviewAndLoadingIgnoresIt()
     QCOMPARE(contents(path + "/QuickLook/Preview.jpg"), QByteArray("not even a JPEG"));
     // Its bytes are never read.
     QCOMPARE(ProjectStore::load(path).manifest.encoded(), snapshot.manifest.encoded());
+    // Rewritten or deleted, it is no external change.
+    const QByteArray digest = ProjectDigest::compute(path);
+    overwrite(path + "/QuickLook/Preview.jpg", QByteArray(5000, 'x'));
+    QCOMPARE(ProjectDigest::compute(path), digest);
+    QVERIFY(QDir(path + "/QuickLook").removeRecursively());
+    QCOMPARE(ProjectDigest::compute(path), digest);
     // Saved without one, the project has none.
     ProjectStore::save(snapshot, path);
     QCOMPARE(QDir(path).entryList(everything), (QStringList{"images", "manifest.json"}));

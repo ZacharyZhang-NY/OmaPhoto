@@ -173,11 +173,13 @@ void KeyboardShortcutsTests::menusAndSheetsTakeTheirRemappedKeys()
                                                              {"Show Guides", QKeySequence(Qt::CTRL | Qt::Key_Semicolon)},
                                                              {"Show Rulers", QKeySequence(Qt::CTRL | Qt::Key_R)},
                                                              {"Snap", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Semicolon)},
-                                                             {"Lock Guides", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Semicolon)}};
+                                                             {"Lock Guides", QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Semicolon)},
+                                                             {"Ungroup Layers", QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G)}};
     for (const auto &[title, original] : view) {
         QVERIFY(settings.save({{named(title).id(), ShortcutChord("k", 7)}}));
         QVERIFY2(settings.menu(original) == QKeySequence(Qt::CTRL | Qt::ALT | Qt::META | Qt::Key_K), qPrintable(title));
     }
+    QCOMPARE(named("Ungroup Layers").original, ShortcutChord("g", 9));
 }
 
 void KeyboardShortcutsTests::theCanvasTranslatesRemappedKeys()

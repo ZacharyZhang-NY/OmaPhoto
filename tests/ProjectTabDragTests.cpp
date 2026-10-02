@@ -1,4 +1,5 @@
 #include "UI/ProjectTabs.h"
+#include <QDialog>
 #include <QMenu>
 #include <QPropertyAnimation>
 #include <QtTest>
@@ -40,7 +41,7 @@ struct Strip {
         if (!QTest::qWaitForWindowExposed(&strip))
             throw std::runtime_error("the strip never showed");
     }
-    // QTest sends to a widget, not to the press's grab.
+    // Through the window, so the application tracks the buttons.
     QToolButton *pressed = nullptr;
     // Presses a tab; returns the point, in the strip.
     QPoint press(const QString &title)
@@ -48,16 +49,11 @@ struct Strip {
         ProjectTabButton &tab = button(strip, title);
         const QPoint point = tab.mapTo(&strip, QPoint(20, 14));
         pressed = &select(tab);
-        QTest::mousePress(pressed, Qt::LeftButton, {}, pressed->mapFrom(&strip, point));
+        QTest::mousePress(strip.windowHandle(), Qt::LeftButton, {}, point);
         return point;
     }
-    void move(QPoint point) { QTest::mouseMove(pressed, pressed->mapFrom(&strip, point)); }
-    // The release goes to the pressed title wherever it is.
-    void release(const QString &title, QPoint point)
-    {
-        QToolButton &title_ = select(button(strip, title));
-        QTest::mouseRelease(&title_, Qt::LeftButton, {}, title_.mapFrom(&strip, point));
-    }
+    void move(QPoint point) { QTest::mouseMove(strip.windowHandle(), point); }
+    void release(const QString &, QPoint point) { QTest::mouseRelease(strip.windowHandle(), Qt::LeftButton, {}, point); }
 };
 
 // Every slide finished: tabs rest at their slots.
@@ -215,13 +211,31 @@ void ProjectTabDragTests::aLostReleaseGivesWayToTheNextDrag()
     Strip fixture;
     const QPoint first = fixture.press("Untitled");
     fixture.move(first + QPoint(5000, 0));
-    // Its release never comes; another tab is dragged.
+    QVERIFY(button(fixture.strip, "Untitled").x() > 100);
+    // A modal alert mid-drag: the strip misses the release.
+    QDialog alert;
+    alert.setModal(true);
+    alert.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&alert));
+    fixture.release("Untitled", first + QPoint(5000, 0));
+    QCOMPARE(QGuiApplication::mouseButtons(), Qt::NoButton);
+    QVERIFY(button(fixture.strip, "Untitled").x() > 100);
+    alert.close();
+    // Swift's timer: the drag ends, nothing moves.
+    auto *watch = fixture.strip.findChild<QTimer *>("tabReleaseWatch");
+    QVERIFY(watch && watch->interval() == 100);
+    QTRY_VERIFY(!watch->isActive());
+    QTRY_VERIFY(settled(fixture.strip));
+    QCOMPARE(button(fixture.strip, "Untitled").x(), 0);
+    QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled", "Untitled 2", "Untitled 3"}));
+    // Another drag works at once.
     const QPoint next = fixture.press("Untitled 3");
     fixture.move(next - QPoint(5000, 0));
+    // Held, the drag lasts past the timer.
+    QTest::qWait(250);
+    QVERIFY(button(fixture.strip, "Untitled 3").x() == 0 && watch->isActive());
     fixture.release("Untitled 3", next - QPoint(5000, 0));
     QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled 3", "Untitled", "Untitled 2"}));
-    QTRY_VERIFY(settled(fixture.strip));
-    QCOMPARE(button(fixture.strip, "Untitled 3").x(), 0);
 }
 
 void ProjectTabDragTests::tabsThatDoNotFitGatherInAMenu()

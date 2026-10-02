@@ -91,6 +91,11 @@ void LayerDragGestureTests::altShowsTheClippingAndDuplicateCursors()
     QCOMPARE(drawn.pixelColor(25, 23).alpha(), 255);
     QCOMPARE(drawn.copy(0, 0, 18, 18), image(CanvasView::duplicateCursor(1)).copy(0, 0, 18, 18));
     QCOMPARE(image(CanvasView::duplicateCursor(1)).pixelColor(23, 23).alpha(), 0);
+    // The arrows lie over the eye: opaque arrow pixels stay.
+    const QImage arrows = image(CanvasView::duplicateCursor(1));
+    for (int y = 0; y < arrows.height(); ++y)
+        for (int x = 0; x < arrows.width(); ++x)
+            QVERIFY(arrows.pixelColor(x, y).alpha() < 255 || drawn.pixelColor(x, y) == arrows.pixelColor(x, y));
     session->setIsImporting(true);
     QCOMPARE(image(shown.list.cursorFor(mask, Qt::AltModifier)), image(NativeLayerList::showMaskCursor(ratio)));
     QCOMPARE(shown.list.cursorFor(mask, Qt::ControlModifier).shape(), Qt::ArrowCursor);
