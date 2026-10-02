@@ -6,19 +6,20 @@ It is a Linux port of [Compositor](https://github.com/robbietilton/Compositor) b
 
 ## What it does
 
-- Layers, folders, masks, clipping masks, blend modes and opacity; whole layers copy between projects
-- Selections: marquee, lasso, magic wand and its object mode, Select › Subject, load from a layer, feather, expand and contract
-- Brush, eraser, spot healing, clone stamp, smudge, blur and liquify, gradient, shapes, type with colour on selected letters
-- Move, transform and distort layers and selections; rulers, guides, a grid with adjustable spacing and subdivisions, and snapping
+- Layers, folders, masks, clipping masks, blend modes and opacity; whole layers copy between projects; Ungroup Layers
+- Selections: marquee, lasso, magic wand and its object mode, Select › Subject, Select › Color Range, load from a layer, feather, expand and contract
+- Brush, eraser, spot healing, clone stamp, smudge, blur and liquify, gradient, shapes, type with colour and fonts on selected letters
+- Move, transform and distort layers and selections; rulers, guides, a grid with its own settings, and snapping for layers, selections and shapes
 - Levels, Curves, Hue/Saturation, Exposure, Black & White, Color Balance, Gradient Map, Grain, Invert, blur and noise, as edits or as adjustment layers
-- Camera Raw Filter, docked beside the canvas
+- Camera Raw Filter, docked beside the canvas, with Photoshop's curves
 - Layer effects: stroke, drop shadow, outer and inner glow, color overlay, inner shadow
 - Filters: Gaussian and motion blur, noise, lens correction, Vignette, Bloom / Glow, Tonal Contrast, Dither, Content-Aware Fill and Remove Background (U²-Net on ONNX Runtime, offline)
-- Crop, trim, canvas size, image size; PNG and JPEG export
+- Crop, trim, canvas size, image size; PNG and JPEG export with a zoomable preview; New Canvas presets for screens and social formats
 - Imports JPEG, PNG, TIFF, HEIC, SVG, Photoshop files (PSD and PSB) and camera RAW
 - Open Recent, and a Keyboard Shortcuts window
 - Drag a number's label to scrub its value
 - Keep working while a project saves
+- Project tabs that drag to reorder; those that do not fit gather in a menu
 - A project another app changes on disk reloads in place; unsaved work is never replaced without asking
 
 The [acceptance run](docs/acceptance.md) checks each of these in the app's own window, with screenshots.
