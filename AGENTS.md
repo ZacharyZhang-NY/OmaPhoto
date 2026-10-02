@@ -2,6 +2,10 @@
 
 OmaPhoto is the Linux port of Compositor, the macOS app at https://github.com/robbietilton/Compositor. That repository's Swift tree (`Compositor/`, `CompositorTests/`) is the specification; this repository mirrors it. Its checkout at `../Compositor-spec`, pinned to the tag being ported (v1.4.5 since item 13), is where the Swift sources are read; never edit it for OmaPhoto work.
 
+## Status
+
+Paused on 2026-10-02 for a system reinstall, in the middle of item 13 (Compositor v1.4.5, released as OmaPhoto 1.4.5). Items 13.2 to 13.18 are ported. The release, 13.19, is open, and some review fixes are committed but untested. Read the status lines under 13.19 in `TASKS.md` before any work. They list what is unfinished, the failing tests, the setup after a reinstall and the next steps. Work in this one checkout: no worktrees or copies beside it.
+
 ## Designing or editing a project
 
 To make or change an image in a `.comp` project, the source is not needed: read [docs/writing-comp-files.md](docs/writing-comp-files.md). It covers the format, the rules that make a project load, and writing it safely while it is open. [docs/project-format.md](docs/project-format.md) describes the whole format.
