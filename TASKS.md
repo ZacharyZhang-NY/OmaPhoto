@@ -470,8 +470,11 @@ Reviews for this section ran on codex `gpt-6.1-sol` at `max` (agent `codex-sol`)
 - Resumed 2026-10-03 after the reinstall. The user's rule of that day replaces the ten-review allowance: every step below is reviewed by codex (GPT-6.1-Sol, max) in a herdr pane before the next, at most three rounds a step. Steps, in order:
   - [x] 13.19a The spec checkout is `Compositor-Ref` inside the repository (ignored by git, left out of the flake's source), at `v1.4.5`; AGENTS.md and TASKS.md say so.
   - 13.19a review: round 1 FAIL (the flake copied the spec; no step for review 3's scope; the budget unstated; the status said done), fixed; the Docker context finding answered (no Dockerfile copies from it). Round 2 PASS.
-  - [ ] 13.19b Build main in a fresh `omaphoto-dev` image.
-  - [ ] 13.19c `63e42ac` (13.8's `upright` pin) built, run, its mutant caught.
+  - [x] 13.19b Build main in a fresh `omaphoto-dev` image.
+  - 13.19b review: round 1 PASS.
+  - [x] 13.19c `63e42ac` (13.8's `upright` pin) built, run, its mutant caught.
+  - 13.19c work: `SharpCanvasTests` passes; `transform.radians() == 0` set to `true` in `LayerRenderer::draw` and in `TiledLayerRenderer`, each caught by the turned rows (dropping `upright` inside `interpolation` leaves the parameter unused, which `-Werror` refuses).
+  - 13.19c review: round 1 PASS.
   - [ ] 13.19d `2190a1b` (13.10–13.12 tests) built and run; its open items closed: the 12.5b, 13.11 and 8.6 bullets, `sizeLabel`'s tie claim, 13.12's pending pixel gradient.
   - [ ] 13.19e `70318de` (13.13 and 13.16 fixes and tests) built and run.
   - [ ] 13.19f The fixes since `81894f7` already tested (`382c9c2` for 13.9a and 13.9b, `6735aad` for 13.7, 13.14 and 13.15, `5c8e18c` for 13.17 and 13.18) reviewed: review 3's scope.
