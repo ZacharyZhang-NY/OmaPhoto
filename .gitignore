@@ -5,3 +5,5 @@
 /packaging/arch/pkg/
 /packaging/arch/*.pkg.tar.zst
 /packaging/arch/u2net.onnx
+
+/Compositor-Ref/
