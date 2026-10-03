@@ -14,10 +14,10 @@
       packages.x86_64-linux.default = pkgs.stdenv.mkDerivation {
         pname = "omaphoto";
         version = "1.4.5";
-        # dev.sh builds in ./build; the package starts clean.
+        # dev.sh's build and the Swift spec stay out.
         src = pkgs.lib.cleanSourceWith {
           src = self;
-          filter = path: type: path != "${toString self}/build";
+          filter = path: type: !(builtins.elem path [ "${toString self}/build" "${toString self}/Compositor-Ref" ]);
         };
         nativeBuildInputs = with pkgs; [ cmake ninja pkg-config qt6.wrapQtAppsHook ];
         buildInputs = with pkgs; [ qt6.qtbase qt6.qtsvg qt6.qtimageformats libheif libde265 libraw fontconfig onnxruntime ];

@@ -459,7 +459,7 @@ Reviews for this section ran on codex `gpt-6.1-sol` at `max` (agent `codex-sol`)
 - 13.18 port (agent): the fitted parametric curve, the tone curve per channel, Refine Saturation's new meaning and words; the graph's one drag (`CameraRawColorControls+Curve.cpp`); fixes beyond Swift: a preset drops the chosen point, a point dragged onto its neighbour stays and stays dragged; tests in `CameraRawCurveTests` and `CameraRawCurveGraphTests`. Survivor recorded: the all-zero shortcut. No review yet.
 - [ ] 13.19 Release OmaPhoto 1.4.5: version, change log, README, AGENTS.md, the acceptance run, distro checks, packages, live installs, the acceptance checklist.
 - Status 2026-10-02, stopped for a system reinstall. Main is 19d8737 plus this note, pushed; there are no other branches or worktrees. Items 13.2–13.18 are ported and merged; 13.19 is open. Nothing outside the repository survives the reinstall (`~/.cache/omaphoto-review`, `~/.cache/omaphoto-port`, the `omaphoto-dev` image, `../Compositor-spec`), so this note carries everything.
-- Setup after the reinstall: clone https://github.com/robbietilton/Compositor into `../Compositor-spec` and check out tag `v1.4.5`; `scripts/dev.sh build` rebuilds the `omaphoto-dev` image from `Dockerfile.dev`.
+- Setup after the reinstall: clone https://github.com/robbietilton/Compositor into `Compositor-Ref` (ignored) and check out tag `v1.4.5`; `scripts/dev.sh build` rebuilds the `omaphoto-dev` image from `Dockerfile.dev`.
 - Reviews: two of the ten the user allowed are used. Review 1 (13.7, 13.8, 13.9a, 13.9b, 13.14, 13.15) passed 13.8 and failed the rest on test gaps and stale AGENTS lines; review 2 (13.10–13.13, 13.16–13.18) failed on the same kinds. No crash or wrong output was found. Fixed and tested: all of review 1's, and review 2's for 13.17 and 13.18.
 - Committed but neither built nor tested (stopped mid-work; two leftover mutants were reverted from it):
   - 13.8: `SharpCanvasTests` pins `LayerRenderer::draw`'s `upright` term (a turned layer near 1:1 must filter) (`63e42ac`).
@@ -467,6 +467,20 @@ Reviews for this section ran on codex `gpt-6.1-sol` at `max` (agent `codex-sol`)
   - 13.13 and 13.16 (`70318de`): a typed Move-bar value then a real canvas press (the field finishes from the event loop on `MouseFocusReason`; `MoveBarPressTests`), the folder case, Alt-centre and long-drag resize snapping and the edge tie (`ResizeSnapTests`, `ResizeSnapCanvasTests`, fixture `MovePressFixtures.h`), the dead one-pixel Liquify "fix" removed, a Liquify dab's scratch allocation caught (skips the dab with a warning), the Radius field's `inf`, `WarpStroke::committedPoints` with its test, `softened`'s mask flag removed, and AGENTS and TASKS lines.
 - Known failures: at 81894f7 the full suite under `ctest -j16` failed `ColorRangeTests`, `GuideGridTests`, `GridSettingsSheetTests`, `TypeFontPreviewTests` and `GuideCanvasTests`, each of which passes alone: some state is shared between test processes (suspect `QSettings` or `ToolDefaults` keys). Find and isolate it; never loosen a check.
 - Next, in order: build; run the commits above and fix them; run the full suite and fix the parallel failures; review 3 over every fix since 81894f7 (13.8 included); then this item: acceptance run, distro checks (arch, fedora, fedora44, nixos, resolute), the `v1.4.5` tag and release, live installs, and the acceptance checklist. The 1.4.5 version, change log, README and acceptance table (results pending) are already in.
+- Resumed 2026-10-03 after the reinstall. The user's rule of that day replaces the ten-review allowance: every step below is reviewed by codex (GPT-6.1-Sol, max) in a herdr pane before the next, at most three rounds a step. Steps, in order:
+  - [x] 13.19a The spec checkout is `Compositor-Ref` inside the repository (ignored by git, left out of the flake's source), at `v1.4.5`; AGENTS.md and TASKS.md say so.
+  - 13.19a review: round 1 FAIL (the flake copied the spec; no step for review 3's scope; the budget unstated; the status said done), fixed; the Docker context finding answered (no Dockerfile copies from it). Round 2 PASS.
+  - [ ] 13.19b Build main in a fresh `omaphoto-dev` image.
+  - [ ] 13.19c `63e42ac` (13.8's `upright` pin) built, run, its mutant caught.
+  - [ ] 13.19d `2190a1b` (13.10–13.12 tests) built and run; its open items closed: the 12.5b, 13.11 and 8.6 bullets, `sizeLabel`'s tie claim, 13.12's pending pixel gradient.
+  - [ ] 13.19e `70318de` (13.13 and 13.16 fixes and tests) built and run.
+  - [ ] 13.19f The fixes since `81894f7` already tested (`382c9c2` for 13.9a and 13.9b, `6735aad` for 13.7, 13.14 and 13.15, `5c8e18c` for 13.17 and 13.18) reviewed: review 3's scope.
+  - [ ] 13.19g The full suite under `ctest -j16`; the shared state behind the five parallel failures found and isolated.
+  - [ ] 13.19h The acceptance run and its shots.
+  - [ ] 13.19i Distro checks: arch, fedora, fedora44, nixos, resolute.
+  - [ ] 13.19j Tag `v1.4.5`; the release workflow publishes every package.
+  - [ ] 13.19k Live installs from GitHub in fresh containers.
+  - [ ] 13.19l The acceptance checklist.
 
 ## Skills by phase
 
