@@ -80,7 +80,7 @@ void OuterGlowTests::outerGlowCodableRoundTrip()
     QCOMPARE(ManifestJson::effects(encoded), original);
     // Absent `enabled` stays absent, read as shown.
     LayerEffects shown = original;
-    shown.outerGlow->enabled = std::nullopt;
+    shown.outerGlow.value().enabled = std::nullopt;
     QVERIFY(!ManifestJson::encoded(shown).value("outerGlow").toObject().contains("enabled"));
     QCOMPARE(ManifestJson::effects(ManifestJson::encoded(shown)), shown);
     // A key of the wrong type, or missing, refuses it.
@@ -104,7 +104,7 @@ void OuterGlowTests::layerEffectsIntegration()
     QVERIFY(effects.color(LayerEffectKind::outerGlow) == (PaletteColor{1, 0, 0}));
     QVERIFY((effects.kinds() == std::vector{LayerEffectKind::outerGlow}));
     effects.setColor(PaletteColor{0, 1, 0}, LayerEffectKind::outerGlow);
-    QVERIFY(effects.outerGlow->green == 1 && effects.outerGlow->red == 0);
+    QVERIFY(effects.outerGlow.value().green == 1 && effects.outerGlow.value().red == 0);
     effects.setEnabled(false, LayerEffectKind::outerGlow);
     QVERIFY(!effects.isEnabled(LayerEffectKind::outerGlow) && !effects.visible().outerGlow);
     effects.remove(LayerEffectKind::outerGlow);
@@ -202,7 +202,7 @@ void OuterGlowTests::theGlowWidensTheMargin()
 {
     LayerEffects effects = glowing(7.2, 1, 1, 1, 1);
     QCOMPARE(LayerEffectsRenderer::margin(effects), 24.0);
-    effects.outerGlow->enabled = false;
+    effects.outerGlow.value().enabled = false;
     QCOMPARE(LayerEffectsRenderer::margin(effects), 2.0);
 }
 
@@ -215,11 +215,11 @@ void OuterGlowTests::theSessionAddsCopiesAndCancelsIt()
     session.addEffect(LayerEffectKind::outerGlow);
     QCOMPARE(session.history.undoName(), QString("Add Outer Glow"));
     QVERIFY(session.activeEffects().outerGlow == OuterGlowEffect());
-    session.changeEffects([](LayerEffects &effects) { effects.outerGlow->size = 44; });
+    session.changeEffects([](LayerEffects &effects) { effects.outerGlow.value().size = 44; });
     session.finishEffectsEditing(false);
     QVERIFY(!session.activeEffects().outerGlow);
     session.addEffect(LayerEffectKind::outerGlow);
-    session.changeEffects([](LayerEffects &effects) { effects.outerGlow->size = 44; });
+    session.changeEffects([](LayerEffects &effects) { effects.outerGlow.value().size = 44; });
     session.finishEffectsEditing(true);
     session.insert(ImportedImage(square(), QImage(), QStringLiteral("Two")));
     const QUuid second = session.activeLayerID().value();

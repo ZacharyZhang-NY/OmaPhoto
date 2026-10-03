@@ -276,11 +276,11 @@ void FinishingFilterTests::aPreviewForAnOlderGridShowsOnThatGrid()
     int older = 0;
     QObject::connect(&session, &EditorSession::changed, &session, [&] {
         const std::optional<FilterEdit> &edit = session.filterEdit();
-        if (!edit || !edit->preparedPreview)
+        if (!edit || !edit.value().preparedPreview)
             return;
-        if (QSizeF(edit->preparedPreview->size()) != edit->preparedTransform.value().size)
+        if (QSizeF(edit.value().preparedPreview.value().size()) != edit.value().preparedTransform.value().size)
             mismatched = true;
-        older += edit->preparedPreview->size() != edit->previewSource.size();
+        older += edit.value().preparedPreview.value().size() != edit.value().previewSource.size();
     });
     session.updateFilter(FilterSettings{.bloomRadius = 5}, true);
     const LayerTransform grid = session.filterEdit().value().grownTransform.value();
@@ -289,7 +289,7 @@ void FinishingFilterTests::aPreviewForAnOlderGridShowsOnThatGrid()
     QVERIFY(session.filterEdit().value().grownTransform.value().size.width() > grid.size.width());
     QTRY_VERIFY(session.filterEdit().value().preparedPreview && !session.filterEdit().value().preparing);
     QVERIFY(!mismatched && older > 0);
-    QCOMPARE(session.filterEdit().value().preparedPreview->size(), session.filterEdit().value().previewSource.size());
+    QCOMPARE(session.filterEdit().value().preparedPreview.value().size(), session.filterEdit().value().previewSource.size());
     QCOMPARE(session.filterEdit().value().preparedTransform, session.filterEdit().value().grownTransform);
     // Preview off: nothing waits; the stale render ends it.
     session.updateFilter(FilterSettings{.bloomRadius = 5}, true);
@@ -313,7 +313,7 @@ void FinishingFilterTests::aJobWaitingBehindAnotherEditShowsOnItsGrid()
     bool mismatched = false, armed = true;
     QObject::connect(&session, &EditorSession::changed, &session, [&] {
         const std::optional<FilterEdit> &edit = session.filterEdit();
-        if (edit && edit->preparedPreview && QSizeF(edit->preparedPreview->size()) != edit->preparedTransform.value().size)
+        if (edit && edit.value().preparedPreview && QSizeF(edit.value().preparedPreview.value().size()) != edit.value().preparedTransform.value().size)
             mismatched = true;
         // The waiting job starts: Preview comes back next turn.
         if (std::exchange(armed, false))
@@ -322,7 +322,7 @@ void FinishingFilterTests::aJobWaitingBehindAnotherEditShowsOnItsGrid()
     QTRY_VERIFY(!armed);
     QTRY_VERIFY(session.filterEdit().value().preparedPreview && !session.filterEdit().value().preparing);
     QVERIFY(!mismatched);
-    QCOMPARE(session.filterEdit().value().preparedPreview->size(), session.filterEdit().value().previewSource.size());
+    QCOMPARE(session.filterEdit().value().preparedPreview.value().size(), session.filterEdit().value().previewSource.size());
 }
 
 void FinishingFilterTests::theVignettePickerPreviewsAndPutsBack()

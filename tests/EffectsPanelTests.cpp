@@ -146,56 +146,56 @@ void EffectsPanelTests::theSheetEditsItsEffect()
     auto &slider = find<QSlider>(sheet, "sizeSlider");
     QCOMPARE(size.text(), QString("4"));
     type(size, "12");
-    QCOMPARE(editor.effects().stroke->size, 12.0);
+    QCOMPARE(editor.effects().stroke.value().size, 12.0);
     // The slider spans 0 to 20; typing reaches 500.
     QCOMPARE(slider.value(), 600);
     // No finite number changes nothing; the field goes back.
     type(size, "abc");
-    QVERIFY(editor.effects().stroke->size == 12 && size.text() == "12");
+    QVERIFY(editor.effects().stroke.value().size == 12 && size.text() == "12");
     type(size, "inf");
-    QVERIFY(editor.effects().stroke->size == 12 && size.text() == "12");
+    QVERIFY(editor.effects().stroke.value().size == 12 && size.text() == "12");
     // Up steps one, Shift ten; past the range, clamped.
     QTest::keyClick(&size, Qt::Key_Up);
-    QCOMPARE(editor.effects().stroke->size, 13.0);
+    QCOMPARE(editor.effects().stroke.value().size, 13.0);
     QTest::keyClick(&size, Qt::Key_Up, Qt::ShiftModifier);
-    QCOMPARE(editor.effects().stroke->size, 23.0);
+    QCOMPARE(editor.effects().stroke.value().size, 23.0);
     // Past its end the thumb rests there, writing nothing back.
     QCOMPARE(slider.value(), 1000);
     // A step replaces pending typing, even where it clamps.
     typing(size, "12");
     QTest::keyClick(&size, Qt::Key_Up);
-    QVERIFY(editor.effects().stroke->size == 24 && size.text() == "24" && !size.isModified());
+    QVERIFY(editor.effects().stroke.value().size == 24 && size.text() == "24" && !size.isModified());
     size.clearFocus();
-    QCOMPARE(editor.effects().stroke->size, 24.0);
+    QCOMPARE(editor.effects().stroke.value().size, 24.0);
     type(size, "900");
-    QVERIFY(editor.effects().stroke->size == 500 && size.text() == "500");
+    QVERIFY(editor.effects().stroke.value().size == 500 && size.text() == "500");
     typing(size, "12");
     QTest::keyClick(&size, Qt::Key_Up);
-    QVERIFY(editor.effects().stroke->size == 500 && size.text() == "500" && !size.isModified());
+    QVERIFY(editor.effects().stroke.value().size == 500 && size.text() == "500" && !size.isModified());
     size.clearFocus();
-    QCOMPARE(editor.effects().stroke->size, 500.0);
+    QCOMPARE(editor.effects().stroke.value().size, 500.0);
     // The slider sets any value; the field rounds, ties even.
     slider.setValue(525);
-    QVERIFY(editor.effects().stroke->size == 10.5 && size.text() == "10");
+    QVERIFY(editor.effects().stroke.value().size == 10.5 && size.text() == "10");
     // Leaving an untouched field keeps the exact value.
     size.setFocus();
     size.clearFocus();
-    QCOMPARE(editor.effects().stroke->size, 10.5);
+    QCOMPARE(editor.effects().stroke.value().size, 10.5);
     // Typing waits while other changes arrive.
     auto &opacity = find<QLineEdit>(sheet, "opacityField");
     QCOMPARE(opacity.text(), QString("100"));
     typing(size, "3");
     find<QSlider>(sheet, "opacitySlider").setValue(500);
-    QVERIFY(editor.effects().stroke->opacity == 0.5 && opacity.text() == "50" && size.text() == "3");
+    QVERIFY(editor.effects().stroke.value().opacity == 0.5 && opacity.text() == "50" && size.text() == "3");
     size.clearFocus();
-    QCOMPARE(editor.effects().stroke->size, 3.0);
+    QCOMPARE(editor.effects().stroke.value().size, 3.0);
     // Inside or Outside, as Swift's segments, following an undo.
     const QList<QToolButton *> position = find<QWidget>(sheet, "strokePosition").findChildren<QToolButton *>();
     QVERIFY(position.size() == 2 && position[0]->text() == "Outside" && position[1]->text() == "Inside" && position[0]->isChecked());
     position[1]->click();
-    QVERIFY(editor.effects().stroke->inside && position[1]->isChecked());
+    QVERIFY(editor.effects().stroke.value().inside && position[1]->isChecked());
     editor.session.undo();
-    QVERIFY(!editor.effects().stroke->inside && position[0]->isChecked());
+    QVERIFY(!editor.effects().stroke.value().inside && position[0]->isChecked());
     position[1]->click();
     // The swatch opens the picker, whose colour shows at once.
     auto &swatch = find<QAbstractButton>(sheet, "effectColor");
@@ -207,7 +207,7 @@ void EffectsPanelTests::theSheetEditsItsEffect()
     Painted counter(paints);
     swatch.installEventFilter(&counter);
     editor.session.setColorPickerHSB(PickerHSB(PaletteColor{1, 0, 0}));
-    QCOMPARE(editor.effects().stroke->color(), (PaletteColor{1, 0, 0}));
+    QCOMPARE(editor.effects().stroke.value().color(), (PaletteColor{1, 0, 0}));
     QTRY_VERIFY(paints > 0);
     // A black rim, a white ring inside, then the colour.
     const QImage shot = swatch.grab().toImage();
@@ -218,7 +218,7 @@ void EffectsPanelTests::theSheetEditsItsEffect()
     // Return commits, then goes on to OK, keeping everything.
     typing(size, "7");
     QTest::keyClick(&size, Qt::Key_Return);
-    QVERIFY(!editor.session.effectsEditing() && editor.effects().stroke->size == 7 && editor.effects().stroke->inside);
+    QVERIFY(!editor.session.effectsEditing() && editor.effects().stroke.value().size == 7 && editor.effects().stroke.value().inside);
     QTRY_VERIFY(!editor.sheet());
 }
 
@@ -236,11 +236,11 @@ void EffectsPanelTests::aWheelOnTheSliderReplacesTheTyping()
                       Qt::NoScrollPhase, false);
     QApplication::sendEvent(&slider, &wheel);
     const double wheeled = 20.0 * (200 - QApplication::wheelScrollLines()) / 1000;
-    QCOMPARE(editor.effects().stroke->size, wheeled);
+    QCOMPARE(editor.effects().stroke.value().size, wheeled);
     QVERIFY(size.hasFocus() && size.text() == QString::number(std::lround(wheeled)) && !size.isModified());
     // Return then keeps the slider's value, going on to OK.
     QTest::keyClick(&size, Qt::Key_Return);
-    QVERIFY(!editor.session.effectsEditing() && editor.effects().stroke->size == wheeled);
+    QVERIFY(!editor.session.effectsEditing() && editor.effects().stroke.value().size == wheeled);
 }
 
 void EffectsPanelTests::theSheetKeepsSwiftsMeasures()
@@ -355,14 +355,14 @@ void EffectsPanelTests::cancelAndEscapePutTheEffectBack()
     auto &cancel = find<QPushButton>(*editor.sheet(), "effectsCancel");
     cancel.setFocus();
     QTest::keyClick(&cancel, Qt::Key_Return);
-    QVERIFY(editor.effects().shadow->angle == -45 && !editor.session.effectsEditing());
+    QVERIFY(editor.effects().shadow.value().angle == -45 && !editor.session.effectsEditing());
     // An existing shadow: Cancel puts it back as it was.
     editor.session.selectEffect(LayerEffectKind::shadow, editor.layer, true);
     QCOMPARE(find<QLineEdit>(*editor.sheet(), "distanceField").text(), QString("20"));
     find<QSlider>(*editor.sheet(), "distanceSlider").setValue(400);
-    QCOMPARE(editor.effects().shadow->distance, 40.0);
+    QCOMPARE(editor.effects().shadow.value().distance, 40.0);
     find<QPushButton>(*editor.sheet(), "effectsCancel").click();
-    QVERIFY(editor.effects().shadow->distance == 20 && !editor.session.effectsEditing());
+    QVERIFY(editor.effects().shadow.value().distance == 20 && !editor.session.effectsEditing());
     // A new overlay's panel: Escape takes the overlay away again.
     editor.session.addEffect(LayerEffectKind::colorOverlay);
     QVERIFY(editor.effects().colorOverlay);

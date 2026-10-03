@@ -125,7 +125,7 @@ void TextColorModelTests::everyChannelOfARunIsChecked()
     session->setPaletteColor(red, false);
     QVERIFY(session->finishText());
     ProjectSnapshot snapshot = session->projectSnapshot().value();
-    snapshot.manifest.layers.back().text->colorRuns->front().blue = 2;
+    snapshot.manifest.layers.back().text.value().colorRuns.value().front().blue = 2;
     QTemporaryDir root;
     try {
         ProjectStore::save(snapshot, root.filePath(QStringLiteral("Bad.comp")));

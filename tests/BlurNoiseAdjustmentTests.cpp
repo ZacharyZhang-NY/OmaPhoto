@@ -191,14 +191,14 @@ void BlurNoiseAdjustmentTests::theStoreTakesTheKindsFromVersion9()
         QCOMPARE(stored(snapshot), std::optional(ProjectError::Kind::invalid));
         // Invalid settings refuse it at any version.
         snapshot.manifest.version = 9;
-        snapshot.manifest.layers[1].adjustment->setGaussianRadius(300);
+        snapshot.manifest.layers[1].adjustment.value().setGaussianRadius(300);
         QCOMPARE(stored(snapshot), std::optional(ProjectError::Kind::invalid));
     }
     // The rule reads the kind: older kinds may carry keys.
     ProjectSnapshot older = twoLayers();
     older.manifest.version = 7;
     older.manifest.layers[1].adjustment = LayerAdjustment{AdjustmentKind::levels};
-    older.manifest.layers[1].adjustment->setGaussianRadius(5);
+    older.manifest.layers[1].adjustment.value().setGaussianRadius(5);
     QCOMPARE(stored(older), std::nullopt);
 }
 
@@ -211,7 +211,7 @@ void BlurNoiseAdjustmentTests::eachNoiseLayerRollsItsOwnSeed()
     session.setAdjustmentEditingID(std::nullopt);
     session.addAdjustment(AdjustmentKind::addNoise);
     const LayerAdjustment second = session.activeLayer().value().adjustment.value();
-    QVERIFY(first.noiseSeed && second.noiseSeed && *first.noiseSeed != *second.noiseSeed);
+    QVERIFY(first.noiseSeed && second.noiseSeed && first.noiseSeed.value() != second.noiseSeed.value());
     // Only noise rolls one; the rest keep their defaults.
     session.setAdjustmentEditingID(std::nullopt);
     session.addAdjustment(AdjustmentKind::gaussianBlur);

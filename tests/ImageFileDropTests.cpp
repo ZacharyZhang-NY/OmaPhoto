@@ -135,7 +135,7 @@ void ImageFileDropTests::aPictureIsCopiedToAFileFirst()
     sky.image = PSDFixture::colorImage(4, 2, 0, 0, 1);
     sky.bounds = QRectF(0, 0, 4, 2);
     QMimeData photoshop;
-    photoshop.setData("image/vnd.adobe.photoshop", PSDFixture::data(PSDDocument{4, 2, 72, {sky}}, *sky.image));
+    photoshop.setData("image/vnd.adobe.photoshop", PSDFixture::data(PSDDocument{4, 2, 72, {sky}}, sky.image.value()));
     photoshop.setData("application/x-other", "ignored");
     QCOMPARE(ImageFileDrop::providers(photoshop).front()->formats(), QStringList{"image/vnd.adobe.photoshop"});
     photoshop.setData("image/tiff", "tiff first");
@@ -165,7 +165,7 @@ void ImageFileDropTests::aPictureIsCopiedToAFileFirst()
     done = false;
     ImageFileDrop::importProviders(raw, developed, std::nullopt, nullptr, std::nullopt, [&done] { done = true; });
     QTRY_VERIFY(developed.rawDevelop());
-    developed.finishRawDevelop(developed.rawDevelop()->settings);
+    developed.finishRawDevelop(developed.rawDevelop().value().settings);
     QTRY_VERIFY(done);
     QCOMPARE(names(developed), QStringList{"Dropped"});
     QCOMPARE(takeCopy(before), QString("Dropped.dng"));

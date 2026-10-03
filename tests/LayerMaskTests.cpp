@@ -351,8 +351,8 @@ void LayerMaskTests::maskTransformPrefersThePlacement()
     QCOMPARE(layer.maskTransform(), layer.transform);
     layer.mask = wideMask();
     QCOMPARE(layer.maskTransform(), layer.transform);
-    layer.mask->placement = LayerTransform{.origin = {5, 6}, .size = {7, 8}};
-    QCOMPARE(layer.maskTransform(), *layer.mask->placement);
+    layer.mask.value().placement = LayerTransform{.origin = {5, 6}, .size = {7, 8}};
+    QCOMPARE(layer.maskTransform(), layer.mask.value().placement.value());
 }
 
 void LayerMaskTests::layersCompareAndRecordTheirMasks()
@@ -370,7 +370,7 @@ void LayerMaskTests::layersCompareAndRecordTheirMasks()
     QVERIFY(!(masked == layer));
     QCOMPARE(masked, ImageLayer(masked));
     ImageLayer disabled = masked;
-    disabled.mask->isEnabled = false;
+    disabled.mask.value().isEnabled = false;
     QVERIFY(!(disabled == masked));
     const ProjectLayerRecord hidden = disabled.hierarchyRecord();
     QCOMPARE(hidden.maskEnabled, std::optional<bool>(false));
@@ -382,12 +382,12 @@ void LayerMaskTests::layersCompareAndRecordTheirMasks()
     QCOMPARE(record.maskPlacement, std::nullopt);
     QCOMPARE(record.maskLinked, std::optional<bool>(true));
     ImageLayer unlinked = masked;
-    unlinked.mask->isLinked = false;
-    unlinked.mask->placement = LayerTransform{.origin = {5, 6}, .size = {7, 8}};
+    unlinked.mask.value().isLinked = false;
+    unlinked.mask.value().placement = LayerTransform{.origin = {5, 6}, .size = {7, 8}};
     const ProjectLayerRecord moved = unlinked.hierarchyRecord();
     QCOMPARE(moved.maskEnabled, std::optional<bool>(true));
     QCOMPARE(moved.maskLinked, std::optional<bool>(false));
-    QCOMPARE(moved.maskPlacement, unlinked.mask->placement);
+    QCOMPARE(moved.maskPlacement, unlinked.mask.value().placement);
 }
 
 void LayerMaskTests::historyCountsMaskPixels()
@@ -395,18 +395,18 @@ void LayerMaskTests::historyCountsMaskPixels()
     DocumentHistory history;
     std::optional<CanvasDocument> document = CanvasDocument(40, 20);
     const ImportedImage pixels(BrushRaster::context(40, 20, false), QImage(), "Photo");
-    document->layers.push_back(ImageLayer(pixels, QPointF(0, 0)));
-    document->layers[0].mask = LayerMask(LayerMask::assetFrom(gray(200, 100, 255)));
-    const qint64 maskBytes = document->layers[0].mask->asset.byteCount()
-        + document->layers[0].mask->asset.thumbnail.sizeInBytes();
+    document.value().layers.push_back(ImageLayer(pixels, QPointF(0, 0)));
+    document.value().layers[0].mask = LayerMask(LayerMask::assetFrom(gray(200, 100, 255)));
+    const qint64 maskBytes = document.value().layers[0].mask.value().asset.byteCount()
+        + document.value().layers[0].mask.value().asset.thumbnail.sizeInBytes();
     QCOMPARE(maskBytes, qint64(200 * 100 + 96 * 48));
     history.begin("Disable Layer Mask", document, std::nullopt);
-    document->layers[0].mask->isEnabled = false;
+    document.value().layers[0].mask.value().isEnabled = false;
     history.end(document, std::nullopt);
     QCOMPARE(history.undoCount(), 1);
     QCOMPARE(history.retainedBytes(document), 0);
     history.begin("Delete Layer Mask", document, std::nullopt);
-    document->layers[0].mask.reset();
+    document.value().layers[0].mask.reset();
     history.end(document, std::nullopt);
     QCOMPARE(history.retainedBytes(document), maskBytes);
 }

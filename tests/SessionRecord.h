@@ -27,10 +27,10 @@ inline QStringList described(const EditorSession &session)
         "tool error " + session.brushError().value_or(QStringLiteral("none")),
         "renaming " + text(session.renamingLayerID()),
         "adjusting " + text(session.adjustmentEditingID()) + (session.adjustmentOriginal().has_value() ? " open" : ""),
-        "effects " + (session.effectsEditing() ? text(session.effectsEditing()->layerID) + " " + rawValue(session.effectsEditing()->kind) : QStringLiteral("closed"))
-            + (session.effectsEditingOriginal() ? " " + QJsonDocument(ManifestJson::encoded(*session.effectsEditingOriginal())).toJson(QJsonDocument::Compact) : QString())
-            + " chosen " + (session.effectSelection() ? text(session.effectSelection()->layerID) + " " + rawValue(session.effectSelection()->kind) : QStringLiteral("none")),
-        "picker " + (session.colorPicker() ? session.colorPicker()->target.title() + " " + session.colorPicker()->color().hex() : QStringLiteral("closed")),
+        "effects " + (session.effectsEditing() ? text(session.effectsEditing().value().layerID) + " " + rawValue(session.effectsEditing().value().kind) : QStringLiteral("closed"))
+            + (session.effectsEditingOriginal() ? " " + QJsonDocument(ManifestJson::encoded(session.effectsEditingOriginal().value())).toJson(QJsonDocument::Compact) : QString())
+            + " chosen " + (session.effectSelection() ? text(session.effectSelection().value().layerID) + " " + rawValue(session.effectSelection().value().kind) : QStringLiteral("none")),
+        "picker " + (session.colorPicker() ? session.colorPicker().value().target.title() + " " + session.colorPicker().value().color().hex() : QStringLiteral("closed")),
         QStringLiteral("mask target %1").arg(int(session.isMaskSelected())),
         QStringLiteral("history %1%2").arg(int(session.canUndo())).arg(int(session.canRedo())),
         QStringLiteral("names %1/%2").arg(session.history.undoName(), session.history.redoName()),

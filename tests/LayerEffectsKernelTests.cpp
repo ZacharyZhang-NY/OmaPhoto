@@ -86,32 +86,32 @@ QImage replayed(const QImage &pixels, const LayerEffects &effects)
         for (int x = 0; x < pixels.width(); ++x)
             shader.shape.push_back(float(pixels.constScanLine(y)[x * 4 + 3]) / 255.f);
     }
-    const auto on = [](const auto &effect) { return effect && effect->isEnabled() && effect->opacity > 0; };
-    const bool stroke = on(effects.stroke) && effects.stroke->size > 0;
+    const auto on = [](const auto &effect) { return effect && effect.value().isEnabled() && effect.value().opacity > 0; };
+    const bool stroke = on(effects.stroke) && effects.stroke.value().size > 0;
     std::vector<float> ring(shader.shape.size()), cast(shader.shape.size()), inner(shader.shape.size()), glow(shader.shape.size()),
         innerGlow(shader.shape.size());
     if (stroke) {
-        const int reach = std::max(1, int(std::lround(effects.stroke->size)));
-        const std::vector<float> moved = shader.spread(shader.spread(shader.shape, reach, effects.stroke->inside, true), reach, effects.stroke->inside, false);
+        const int reach = std::max(1, int(std::lround(effects.stroke.value().size)));
+        const std::vector<float> moved = shader.spread(shader.spread(shader.shape, reach, effects.stroke.value().inside, true), reach, effects.stroke.value().inside, false);
         for (size_t index = 0; index < ring.size(); ++index)
-            ring[index] = std::clamp(effects.stroke->inside ? shader.shape[index] - moved[index] : moved[index] - shader.shape[index], 0.f, 1.f);
+            ring[index] = std::clamp(effects.stroke.value().inside ? shader.shape[index] - moved[index] : moved[index] - shader.shape[index], 0.f, 1.f);
     }
     if (on(effects.shadow))
-        cast = shader.softened(shader.shift(shader.shape, float(effects.shadow->offset().width()), float(effects.shadow->offset().height())),
-                               float(effects.shadow->blur / 2));
-    const bool glowing = on(effects.outerGlow) && effects.outerGlow->size > 0;
+        cast = shader.softened(shader.shift(shader.shape, float(effects.shadow.value().offset().width()), float(effects.shadow.value().offset().height())),
+                               float(effects.shadow.value().blur / 2));
+    const bool glowing = on(effects.outerGlow) && effects.outerGlow.value().size > 0;
     if (glowing)
-        glow = shader.softened(shader.shape, float(effects.outerGlow->size / 2));
-    const bool glowingInside = on(effects.innerGlow) && effects.innerGlow->size > 0;
+        glow = shader.softened(shader.shape, float(effects.outerGlow.value().size / 2));
+    const bool glowingInside = on(effects.innerGlow) && effects.innerGlow.value().size > 0;
     if (glowingInside) {
-        const std::vector<float> softened = shader.softened(shader.shape, float(effects.innerGlow->size / 2));
+        const std::vector<float> softened = shader.softened(shader.shape, float(effects.innerGlow.value().size / 2));
         for (size_t index = 0; index < innerGlow.size(); ++index)
             innerGlow[index] = std::clamp(shader.shape[index] * (1.f - softened[index]), 0.f, 1.f);
     }
     if (on(effects.innerShadow)) {
-        const std::vector<float> moved = shader.softened(shader.shift(shader.shape, float(effects.innerShadow->offset().width()),
-                                                                      float(effects.innerShadow->offset().height())),
-                                                         float(effects.innerShadow->blur / 2));
+        const std::vector<float> moved = shader.softened(shader.shift(shader.shape, float(effects.innerShadow.value().offset().width()),
+                                                                      float(effects.innerShadow.value().offset().height())),
+                                                         float(effects.innerShadow.value().blur / 2));
         for (size_t index = 0; index < inner.size(); ++index)
             inner[index] = std::clamp(shader.shape[index] * (1.f - moved[index]), 0.f, 1.f);
     }
@@ -127,25 +127,25 @@ QImage replayed(const QImage &pixels, const LayerEffects &effects)
                 alpha = coverage + alpha * (1.f - coverage);
             };
             if (on(effects.shadow))
-                blend(effects.shadow->color(), std::clamp(cast[index] * float(effects.shadow->opacity), 0.f, 1.f));
+                blend(effects.shadow.value().color(), std::clamp(cast[index] * float(effects.shadow.value().opacity), 0.f, 1.f));
             if (glowing)
-                blend(effects.outerGlow->color(), std::clamp(glow[index] * (1.f - shader.shape[index]) * float(effects.outerGlow->opacity), 0.f, 1.f));
-            const float strokeCoverage = stroke ? std::clamp(ring[index] * float(effects.stroke->opacity), 0.f, 1.f) : 0.f;
-            if (stroke && !effects.stroke->inside)
-                blend(effects.stroke->color(), strokeCoverage);
+                blend(effects.outerGlow.value().color(), std::clamp(glow[index] * (1.f - shader.shape[index]) * float(effects.outerGlow.value().opacity), 0.f, 1.f));
+            const float strokeCoverage = stroke ? std::clamp(ring[index] * float(effects.stroke.value().opacity), 0.f, 1.f) : 0.f;
+            if (stroke && !effects.stroke.value().inside)
+                blend(effects.stroke.value().color(), strokeCoverage);
             const uchar *source = pixels.constScanLine(y) + x * 4;
             const float sourceAlpha = float(source[3]) / 255.f;
             for (int channel = 0; channel < 3; ++channel)
                 colour[channel] = float(source[channel]) / 255.f + colour[channel] * (1.f - sourceAlpha);
             alpha = sourceAlpha + alpha * (1.f - sourceAlpha);
             if (on(effects.colorOverlay))
-                blend(effects.colorOverlay->color(), std::clamp(shader.shape[index] * float(effects.colorOverlay->opacity), 0.f, 1.f));
+                blend(effects.colorOverlay.value().color(), std::clamp(shader.shape[index] * float(effects.colorOverlay.value().opacity), 0.f, 1.f));
             if (glowingInside)
-                blend(effects.innerGlow->color(), std::clamp(innerGlow[index] * float(effects.innerGlow->opacity), 0.f, 1.f));
+                blend(effects.innerGlow.value().color(), std::clamp(innerGlow[index] * float(effects.innerGlow.value().opacity), 0.f, 1.f));
             if (on(effects.innerShadow))
-                blend(effects.innerShadow->color(), std::clamp(inner[index] * float(effects.innerShadow->opacity), 0.f, 1.f));
-            if (stroke && effects.stroke->inside)
-                blend(effects.stroke->color(), strokeCoverage);
+                blend(effects.innerShadow.value().color(), std::clamp(inner[index] * float(effects.innerShadow.value().opacity), 0.f, 1.f));
+            if (stroke && effects.stroke.value().inside)
+                blend(effects.stroke.value().color(), strokeCoverage);
             uchar *out = result.scanLine(y) + x * 4;
             for (int channel = 0; channel < 3; ++channel)
                 out[channel] = uchar(std::clamp(colour[channel], 0.f, 1.f) * 255.f + 0.5f);
@@ -219,7 +219,7 @@ void LayerEffectsKernelTests::everyEffectMatchesTheShader_data()
     all.innerShadow = inner.innerShadow;
     all.outerGlow = glow.outerGlow;
     all.innerGlow = innerGlow.innerGlow;
-    all.shadow->blur = 0;
+    all.shadow.value().blur = 0;
     wide.stroke = StrokeEffect{.size = 9, .red = 1, .opacity = 1};
     wide.shadow = ShadowEffect{.angle = 200, .distance = 0.5, .blur = 0.01, .opacity = 1};
     QTest::newRow("outside stroke") << outside;

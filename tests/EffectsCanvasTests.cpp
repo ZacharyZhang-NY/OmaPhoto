@@ -253,8 +253,8 @@ void EffectsCanvasTests::aSurfaceIsMadeAnewForOtherSettings()
     QVERIFY(session.finishBrushImmediately());
     // A canvas alone follows nothing: the old surface stays.
     LayerEffects cyan = outline(2);
-    cyan.stroke->red = 0;
-    cyan.stroke->blue = 1;
+    cyan.stroke.value().red = 0;
+    cyan.stroke.value().blue = 1;
     session.setEffects(cyan);
     session.beginBrush(QPointF(45, 32));
     session.continueBrush(QPointF(55, 32));

@@ -92,7 +92,7 @@ void EffectsPreviewCacheTests::aPreviewLandsAfterItsDelayAsTheRendererDrawsIt()
     QCOMPARE(*landings.count, 1);
     // No effects, or none shown: nothing, and the entry goes.
     ImageLayer hidden = layer;
-    hidden.effects->stroke->enabled = false;
+    hidden.effects.value().stroke.value().enabled = false;
     QVERIFY(!ask(cache, hidden, landings) && !cache.rendered(layer.id));
     QTest::qWait(150);
     QVERIFY(!cache.rendered(layer.id));
@@ -110,7 +110,7 @@ void EffectsPreviewCacheTests::movingTheLayerKeepsThePreviewUnlessAMaskIsPlaced(
     EffectsPreviewCache cache;
     ImageLayer layer = layerOf(filled(20, 10, QColor(0, 0, 255)), outline(3));
     layer.mask = LayerMask(LayerMask::assetFrom(gray(20, 10, 255)));
-    const QImage mask = layer.mask->enabledImage().value();
+    const QImage mask = layer.mask.value().enabledImage().value();
     const Landings landings;
     ask(cache, layer, landings, mask);
     const qint64 first = landed(cache, layer, landings, 1).image.cacheKey();
@@ -149,7 +149,7 @@ void EffectsPreviewCacheTests::settingsKeepTheLastPreviewButNewPixelsDropIt()
     const EffectsPreviewCache::Result second = landed(cache, layer, landings, 2);
     QCOMPARE(second.inset, 7.0);
     // Another kind shown or hidden: the last preview stands.
-    layer.effects->colorOverlay = ColorOverlayEffect();
+    layer.effects.value().colorOverlay = ColorOverlayEffect();
     QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), second.image.cacheKey());
     landed(cache, layer, landings, 3);
     // New pixels drop it.
@@ -158,10 +158,10 @@ void EffectsPreviewCacheTests::settingsKeepTheLastPreviewButNewPixelsDropIt()
     const qint64 red = landed(cache, layer, landings, 4).image.cacheKey();
     // A mask added or removed on those pixels keeps it.
     layer.mask = LayerMask(LayerMask::assetFrom(gray(20, 10, 255)));
-    QCOMPARE(ask(cache, layer, landings, layer.mask->enabledImage()).value().image.cacheKey(), red);
+    QCOMPARE(ask(cache, layer, landings, layer.mask.value().enabledImage()).value().image.cacheKey(), red);
     QVERIFY(landed(cache, layer, landings, 5).image.cacheKey() != red);
     // Switched off again, the unmasked effects are known: no render.
-    layer.mask->isEnabled = false;
+    layer.mask.value().isEnabled = false;
     QCOMPARE(ask(cache, layer, landings).value().image.cacheKey(), red);
     QTest::qWait(200);
     QCOMPARE(*landings.count, 5);
@@ -325,7 +325,7 @@ void EffectsPreviewCacheTests::preparingDropsLayersWithoutEffectsAndSharesTheBud
     ask(cache, small, landings);
     landed(cache, small, landings, 5);
     ImageLayer off = small;
-    off.effects->stroke->enabled = false;
+    off.effects.value().stroke.value().enabled = false;
     cache.seed(wide.id, filled(4, 4, Qt::green), placedAt(QPointF(0, 0), QSizeF(4, 4)));
     cache.prepare({off});
     QVERIFY(!cache.rendered(small.id) && !cache.rendered(wide.id));
@@ -374,7 +374,7 @@ void EffectsPreviewCacheTests::aMaskHidesPixelsInTheReducedPreview()
     }
     QVERIFY(low == 125 && high == 129);
     layer.mask = LayerMask(LayerMask::assetFrom(stripes.scaled(6000, 100)));
-    ask(cache, layer, landings, layer.mask->enabledImage());
+    ask(cache, layer, landings, layer.mask.value().enabledImage());
     QVERIFY(landed(cache, layer, landings, 4).image == row);
 }
 
@@ -397,13 +397,13 @@ void EffectsPreviewCacheTests::aReducedPreviewScalesEveryLength()
     // The renderer on the reduced pixels, every length reduced alike.
     const double factor = 1528.0 / (6000 + 2 * LayerEffectsRenderer::margin(effects));
     const QImage reduced = image.scaled(1518, 25, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    effects.stroke->size *= factor;
-    effects.shadow->distance *= factor;
-    effects.shadow->blur *= factor;
-    effects.innerShadow->distance *= factor;
-    effects.innerShadow->blur *= factor;
-    effects.outerGlow->size *= factor;
-    effects.innerGlow->size *= factor;
+    effects.stroke.value().size *= factor;
+    effects.shadow.value().distance *= factor;
+    effects.shadow.value().blur *= factor;
+    effects.innerShadow.value().distance *= factor;
+    effects.innerShadow.value().blur *= factor;
+    effects.outerGlow.value().size *= factor;
+    effects.innerGlow.value().size *= factor;
     QVERIFY(result.image == LayerEffectsRenderer::render(reduced, std::nullopt, effects).image);
 }
 

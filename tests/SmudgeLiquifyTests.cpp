@@ -126,7 +126,7 @@ struct Oracle {
                 pickUp(point);
             return;
         }
-        const QPointF from = *last;
+        const QPointF from = last.value();
         const double distance = std::hypot(point.x() - from.x(), point.y() - from.y());
         const double spacing = std::max(1.0, diameter * (smudging ? 0.005 : 0.025));
         if (distance < spacing)

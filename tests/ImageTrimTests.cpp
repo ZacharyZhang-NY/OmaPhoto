@@ -222,7 +222,7 @@ void ImageTrimTests::theSheetSaysSwiftsWordsAndReturnsItsChoice()
     ok.click();
     QVERIFY(answer.value() == edges(TrimBasedOn::bottomRightPixelColor, false, true, false, false));
     sheet.findChild<QPushButton *>("trimCancel")->click();
-    QVERIFY(answer && !answer->has_value());
+    QVERIFY(answer && !answer.value().has_value());
 }
 
 void ImageTrimTests::theControllerTrimsThroughTheSheetAsOneStep()

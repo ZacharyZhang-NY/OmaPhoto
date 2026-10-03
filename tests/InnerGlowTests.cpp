@@ -77,7 +77,7 @@ void InnerGlowTests::innerGlowCodableRoundTrip()
     QCOMPARE(ManifestJson::effects(encoded), original);
     // Absent `enabled` stays absent, read as shown.
     LayerEffects shown = original;
-    shown.innerGlow->enabled = std::nullopt;
+    shown.innerGlow.value().enabled = std::nullopt;
     QVERIFY(!ManifestJson::encoded(shown).value("innerGlow").toObject().contains("enabled"));
     QCOMPARE(ManifestJson::effects(ManifestJson::encoded(shown)), shown);
     // A key of the wrong type, or missing, refuses it.
@@ -165,10 +165,10 @@ void InnerGlowTests::itSitsOverTheOverlayAndUnderTheInnerShadow()
     const LayerEffectsRenderer::Rendered shadowed = LayerEffectsRenderer::render(square(40, Qt::black), std::nullopt, effects);
     QCOMPARE(at(shadowed, 0, 20), at(covered, 0, 20));
     // A sideways shadow covers the glow on one edge.
-    effects.innerShadow->distance = 4;
-    const int x = effects.innerShadow->offset().width() > 0 ? 0 : 39;
+    effects.innerShadow.value().distance = 4;
+    const int x = effects.innerShadow.value().offset().width() > 0 ? 0 : 39;
     const QColor edge = at(LayerEffectsRenderer::render(square(40, Qt::black), std::nullopt, effects), x, 20);
-    QVERIFY(std::abs(effects.innerShadow->offset().width()) > 3.9);
+    QVERIFY(std::abs(effects.innerShadow.value().offset().width()) > 3.9);
     QVERIFY(edge.redF() > 0.9 && edge.greenF() < 0.1);
 }
 
@@ -195,11 +195,11 @@ void InnerGlowTests::theSessionAddsCopiesAndCancelsIt()
     session.addEffect(LayerEffectKind::innerGlow);
     QCOMPARE(session.history.undoName(), QString("Add Inner Glow"));
     QVERIFY(session.activeEffects().innerGlow == InnerGlowEffect());
-    session.changeEffects([](LayerEffects &effects) { effects.innerGlow->size = 44; });
+    session.changeEffects([](LayerEffects &effects) { effects.innerGlow.value().size = 44; });
     session.finishEffectsEditing(false);
     QVERIFY(!session.activeEffects().innerGlow);
     session.addEffect(LayerEffectKind::innerGlow);
-    session.changeEffects([](LayerEffects &effects) { effects.innerGlow->size = 44; });
+    session.changeEffects([](LayerEffects &effects) { effects.innerGlow.value().size = 44; });
     session.finishEffectsEditing(true);
     // Adding it again keeps the glow it has.
     session.addEffect(LayerEffectKind::innerGlow);

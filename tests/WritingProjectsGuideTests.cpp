@@ -220,7 +220,7 @@ void WritingProjectsGuideTests::hsvSettingsWinOverTheLegacyFields()
         QJsonObject adjustment = layer.value(QStringLiteral("adjustment")).toObject();
         adjustment.insert(QStringLiteral("hue"), legacyHue);
         if (masterHue) {
-            const QJsonObject values{{"hue", *masterHue}, {"saturation", 0}, {"lightness", 0}};
+            const QJsonObject values{{"hue", masterHue.value()}, {"saturation", 0}, {"lightness", 0}};
             adjustment.insert(QStringLiteral("hsvSettings"), QJsonObject{{"range", "Master"}, {"colorize", false}, {"invertRange", false},
                                                                          {"adjustments", QJsonArray{"Master", values}}, {"bands", QJsonArray{}}});
         }

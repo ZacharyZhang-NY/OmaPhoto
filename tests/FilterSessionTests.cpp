@@ -260,7 +260,7 @@ void FilterSessionTests::aCoveringMaskStaysPutUnderABlur()
     session->insert(ImportedImage(image, image, QStringLiteral("Quarter")));
     const QUuid id = session->activeLayerID().value();
     session->applySelection(rectPath(QRectF(0, 0, 20, 20)), SelectionMode::replace, "Select");
-    session->addMask(false);
+    session->addMask(true);
     session->selectLayerTarget(id, false);
     session->beginFilter(FilterKind::gaussianBlur);
     QVERIFY(committed(*session));

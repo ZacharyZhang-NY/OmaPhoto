@@ -72,10 +72,10 @@ void RawDevelopTests::theSheetsSettingsDevelopTheLayer()
     bool done = false;
     session.importImages({raw, png(folder)}, std::nullopt, [&done] { done = true; });
     QTRY_VERIFY(session.rawDevelop());
-    QCOMPARE(session.rawDevelop()->path, raw.toLocalFile());
-    QVERIFY(session.rawDevelop()->settings == RawImporter::asShot(raw.toLocalFile()).value());
+    QCOMPARE(session.rawDevelop().value().path, raw.toLocalFile());
+    QVERIFY(session.rawDevelop().value().settings == RawImporter::asShot(raw.toLocalFile()).value());
     QVERIFY(session.isImporting() && !session.document());
-    RawDevelopSettings settings = session.rawDevelop()->settings;
+    RawDevelopSettings settings = session.rawDevelop().value().settings;
     settings.boost = 0;
     settings.exposure = 1;
     // The sheet hears at once that it has gone.
@@ -139,7 +139,7 @@ void RawDevelopTests::whatCannotBeDevelopedIsReported()
     QFile broken(gray.toLocalFile());
     QVERIFY(broken.open(QIODevice::WriteOnly) && broken.write("gone") == 4);
     broken.close();
-    session.finishRawDevelop(session.rawDevelop()->settings);
+    session.finishRawDevelop(session.rawDevelop().value().settings);
     QTRY_VERIFY(done);
     QCOMPARE(session.importError().value(), "Gray.dng: " + unreadable);
     QCOMPARE(names(session), QStringList{"Plain"});
@@ -149,7 +149,7 @@ void RawDevelopTests::whatCannotBeDevelopedIsReported()
     const QUrl warm = dng(folder, "Warm.dng");
     session.importImages({warm}, std::nullopt, [&done] { done = true; });
     QTRY_VERIFY(session.rawDevelop());
-    RawDevelopSettings candle = session.rawDevelop()->settings;
+    RawDevelopSettings candle = session.rawDevelop().value().settings;
     candle.temperature = 2000;
     session.finishRawDevelop(candle);
     QTRY_VERIFY(done);
@@ -240,7 +240,7 @@ void RawDevelopTests::theSheetPreviewsAndAnswers()
     QTest::qWait(50);
     QCOMPARE(preview->grab().toImage().pixelColor(200, 170), QColor(139, 139, 139));
     QVERIFY(!spinner->isHidden());
-    RawDevelopSettings dimmer = session.rawDevelop()->settings;
+    RawDevelopSettings dimmer = session.rawDevelop().value().settings;
     dimmer.exposure = -1;
     wait->start();
     QTRY_COMPARE_WITH_TIMEOUT(preview->grab().toImage().pixelColor(200, 170), centre(RawImporter::develop(path, dimmer)), 1000);
@@ -249,7 +249,7 @@ void RawDevelopTests::theSheetPreviewsAndAnswers()
     exposure->setValue(100);
     QCOMPARE(label(sheet, "rawExposureValue"), QString("1.00 EV"));
     QVERIFY(reset->isEnabled());
-    RawDevelopSettings brighter = session.rawDevelop()->settings;
+    RawDevelopSettings brighter = session.rawDevelop().value().settings;
     brighter.exposure = 1;
     const QColor expected = centre(RawImporter::develop(path, brighter));
     QTRY_COMPARE(preview->grab().toImage().pixelColor(200, 170), expected);

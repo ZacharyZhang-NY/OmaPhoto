@@ -78,10 +78,10 @@ inline QByteArray file(const std::vector<Record> &records, const QByteArray &res
         PSDFixture::Buffer extra;
         if (record.mask) {
             extra.u32(20);
-            extra.i32(record.mask->top());
-            extra.i32(record.mask->left());
-            extra.i32(record.mask->top() + record.mask->height());
-            extra.i32(record.mask->left() + record.mask->width());
+            extra.i32(record.mask.value().top());
+            extra.i32(record.mask.value().left());
+            extra.i32(record.mask.value().top() + record.mask.value().height());
+            extra.i32(record.mask.value().left() + record.mask.value().width());
             extra.u8(record.maskDefault);
             extra.u8(record.maskFlags);
             extra.u16(0);

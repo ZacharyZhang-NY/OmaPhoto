@@ -128,27 +128,27 @@ inline std::vector<Channel> emptyChannels()
 
 inline Prepared layer(const PSDRecord &record, bool large = false)
 {
-    const int width = record.image ? record.image->width() : 0, height = record.image ? record.image->height() : 0;
+    const int width = record.image ? record.image.value().width() : 0, height = record.image ? record.image.value().height() : 0;
     const int left = int(std::round(record.bounds.left())), top = int(std::round(record.bounds.top()));
     Prepared prepared;
     prepared.record = record;
     if (record.image && width > 0 && height > 0) {
-        const Planes split = planes(*record.image);
+        const Planes split = planes(record.image.value());
         for (const auto &[id, plane] : {std::pair<qint16, const std::vector<uchar> &>(-1, split.alpha), {0, split.red}, {1, split.green}, {2, split.blue}})
             prepared.channels.push_back({id, channelPayload(plane, width, height, large)});
     } else {
         prepared.channels = emptyChannels();
     }
     if (record.mask)
-        prepared.channels.push_back({-2, channelPayload(grayPlane(*record.mask), record.mask->width(), record.mask->height(), large)});
+        prepared.channels.push_back({-2, channelPayload(grayPlane(record.mask.value()), record.mask.value().width(), record.mask.value().height(), large)});
     prepared.top = top;
     prepared.left = left;
     prepared.bottom = top + height;
     prepared.right = left + width;
     prepared.maskTop = top;
     prepared.maskLeft = left;
-    prepared.maskBottom = top + (record.mask ? record.mask->height() : 0);
-    prepared.maskRight = left + (record.mask ? record.mask->width() : 0);
+    prepared.maskBottom = top + (record.mask ? record.mask.value().height() : 0);
+    prepared.maskRight = left + (record.mask ? record.mask.value().width() : 0);
     return prepared;
 }
 
@@ -170,9 +170,9 @@ inline Prepared emptyLayer(const QString &name, const QString &blendKey, int sec
     prepared.isDivider = section == 3;
     prepared.channels = emptyChannels();
     if (record.mask) {
-        prepared.channels.push_back({-2, channelPayload(grayPlane(*record.mask), record.mask->width(), record.mask->height(), large)});
-        prepared.maskBottom = record.mask->height();
-        prepared.maskRight = record.mask->width();
+        prepared.channels.push_back({-2, channelPayload(grayPlane(record.mask.value()), record.mask.value().width(), record.mask.value().height(), large)});
+        prepared.maskBottom = record.mask.value().height();
+        prepared.maskRight = record.mask.value().width();
     }
     return prepared;
 }

@@ -326,7 +326,7 @@ void MaskAloneTests::aPendingGradientElsewhereStaysOutOfTheView()
     session.selectLayerTarget(shown.id, false);
     session.beginGradient(QPointF(0, 80));
     session.moveGradient(std::nullopt, QPointF(200, 80));
-    QVERIFY(session.gradientEdit().has_value() && !session.gradientEdit()->raster->isMask);
+    QVERIFY(session.gradientEdit().has_value() && !session.gradientEdit().value().raster->isMask);
     session.toggleMaskAlone(shown.id);
     // The commit is posted: the pixels' raster lingers, unshown.
     QVERIFY(session.maskAloneLayer().has_value() && session.gradientEdit().has_value());
@@ -338,7 +338,7 @@ void MaskAloneTests::aPendingGradientElsewhereStaysOutOfTheView()
     session.addLayerMask();
     session.beginGradient(QPointF(0, 80));
     session.moveGradient(std::nullopt, QPointF(200, 80));
-    QVERIFY(session.gradientEdit().has_value() && session.gradientEdit()->raster->isMask && session.gradientEdit()->raster->layer.id == other);
+    QVERIFY(session.gradientEdit().has_value() && session.gradientEdit().value().raster->isMask && session.gradientEdit().value().raster->layer.id == other);
     session.toggleMaskAlone(shown.id);
     QCOMPARE(session.maskAloneLayer().value().id, shown.id);
     QVERIFY(session.gradientEdit().has_value());

@@ -29,7 +29,7 @@ void LayerTests::importedLayerTakesItsSizeAndNameFromTheAsset()
     QCOMPARE(layer.name, QString("Photo"));
     QCOMPARE(layer.origin(), QPointF(40, -10));
     QCOMPARE(layer.size(), QSizeF(320, 200));
-    QCOMPARE(layer.asset->image().size(), QSize(320, 200));
+    QCOMPARE(layer.asset.value().image().size(), QSize(320, 200));
     QVERIFY(layer.isVisible);
     QCOMPARE(layer.opacity, 1.0);
     QCOMPARE(layer.blendMode, LayerBlendMode::normal);

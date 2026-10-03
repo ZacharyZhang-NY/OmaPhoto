@@ -237,15 +237,15 @@ void LayerEffectRowTests::theEyeShowsOrHidesItsEffect()
     LayerEffectRow &stroke = *listed.effects(0)[0];
     // One step each way; the choice stays as it was.
     listed.click(listed.eye(stroke), QPoint(10, 11));
-    QVERIFY(!layerWith(listed.session, top).effects->stroke->isEnabled() && listed.session.history.undoName() == "Hide Stroke");
+    QVERIFY(!layerWith(listed.session, top).effects.value().stroke.value().isEnabled() && listed.session.history.undoName() == "Hide Stroke");
     QVERIFY(!listed.chosen() && listed.eye(stroke).accessibleName() == "Show Stroke");
     listed.click(listed.eye(stroke), QPoint(10, 11));
-    QVERIFY(layerWith(listed.session, top).effects->stroke->isEnabled() && listed.session.history.undoName() == "Show Stroke");
+    QVERIFY(layerWith(listed.session, top).effects.value().stroke.value().isEnabled() && listed.session.history.undoName() == "Show Stroke");
     // It rests while layers cannot be edited.
     listed.session.setIsProjectBusy(true);
     QVERIFY(!listed.eye(stroke).isEnabled());
     listed.click(listed.eye(stroke), QPoint(10, 11));
-    QVERIFY(layerWith(listed.session, top).effects->stroke->isEnabled() && !listed.chosen());
+    QVERIFY(layerWith(listed.session, top).effects.value().stroke.value().isEnabled() && !listed.chosen());
     listed.session.setIsProjectBusy(false);
     QVERIFY(listed.eye(stroke).isEnabled());
 }
@@ -270,14 +270,14 @@ void LayerEffectRowTests::pressesFollowSwiftsOrder()
     listed.session.dropEffectSelection();
     listed.press(listed.eye(shadow), QPoint(10, 5), Qt::AltModifier);
     listed.release(listed.eye(shadow), QPoint(10, 5), Qt::AltModifier);
-    QVERIFY(layerWith(listed.session, top).effects->shadow->isEnabled() && listed.chosen() == (LayerEffectSelection{top, LayerEffectKind::shadow}));
+    QVERIFY(layerWith(listed.session, top).effects.value().shadow.value().isEnabled() && listed.chosen() == (LayerEffectSelection{top, LayerEffectKind::shadow}));
     // An Alt double click on the eye hides nothing either.
     listed.session.dropEffectSelection();
     QTest::mouseDClick(listed.list.windowHandle(), Qt::LeftButton, Qt::AltModifier, listed.at(listed.eye(shadow), QPoint(12, 5)));
-    QVERIFY(layerWith(listed.session, top).effects->shadow->isEnabled() && listed.chosen() == (LayerEffectSelection{top, LayerEffectKind::shadow}));
+    QVERIFY(layerWith(listed.session, top).effects.value().shadow.value().isEnabled() && listed.chosen() == (LayerEffectSelection{top, LayerEffectKind::shadow}));
     // On the strip, the eye's Alt press clips too.
     listed.click(listed.eye(shadow), QPoint(10, 20), Qt::AltModifier);
-    QVERIFY(!layerWith(listed.session, top).maskSourceID && !listed.chosen() && layerWith(listed.session, top).effects->shadow->isEnabled());
+    QVERIFY(!layerWith(listed.session, top).maskSourceID && !listed.chosen() && layerWith(listed.session, top).effects.value().shadow.value().isEnabled());
     // Its own row's press lets go, keeping the layer.
     listed.session.selectEffect(LayerEffectKind::stroke, top);
     listed.click(listed.cell(0), QPoint(listed.cell(0).width() - 20, 20));
@@ -295,7 +295,7 @@ void LayerEffectRowTests::pressesFollowSwiftsOrder()
     QVERIFY(listed.chosen() == (LayerEffectSelection{top, LayerEffectKind::shadow}));
     listed.release(shadow, QPoint(150, 5), Qt::AltModifier | Qt::ControlModifier);
     listed.click(listed.eye(shadow), QPoint(10, 5), Qt::AltModifier | Qt::ControlModifier);
-    QVERIFY(!layerWith(listed.session, top).effects->shadow->isEnabled());
+    QVERIFY(!layerWith(listed.session, top).effects.value().shadow.value().isEnabled());
     // A plain press on another effect chooses it at once.
     listed.press(stroke, QPoint(150, 12));
     QVERIFY(listed.chosen() == (LayerEffectSelection{top, LayerEffectKind::stroke}));
@@ -412,7 +412,7 @@ void LayerEffectRowTests::effectDropsLandOnTheRowUnderThePointer()
     const std::unique_ptr<QMimeData> probe(effectDrag(listed.list, payload));
     QCOMPARE(listed.list.dropTarget(*probe, Qt::CopyAction, onMiddle).value(), (LayerDropTarget{.row = 1, .onRow = true, .atBottom = false, .copying = true}));
     QVERIFY(listed.drop(effectDrag(listed.list, payload), onMiddle));
-    QVERIFY(listed.lastAction == Qt::CopyAction && layerWith(listed.session, middle).effects->stroke->size == 12);
+    QVERIFY(listed.lastAction == Qt::CopyAction && layerWith(listed.session, middle).effects.value().stroke.value().size == 12);
     QVERIFY(listed.session.history.undoName() == "Copy Stroke" && listed.chosen() == (LayerEffectSelection{middle, LayerEffectKind::stroke}));
     // Refused: its own row, a missing kind, strangers, bad words.
     QVERIFY(!listed.drop(effectDrag(listed.list, payload), onTop));
@@ -448,7 +448,7 @@ void LayerEffectRowTests::aRowRebuiltUnderItsOwnPressLivesOn()
     QTest::mouseDClick(shadow.data(), Qt::LeftButton, Qt::NoModifier, QPoint(150, 12));
     QVERIFY(shadow && !shadow->isVisible());
     QVERIFY(listed.session.effectsEditing() == (LayerEffectSelection{top, LayerEffectKind::shadow}) && listed.list.hasFocus());
-    QVERIFY(!layerWith(listed.session, top).effects->stroke && listed.effects(0).size() == 1);
+    QVERIFY(!layerWith(listed.session, top).effects.value().stroke && listed.effects(0).size() == 1);
     QTRY_VERIFY(!shadow);
 }
 

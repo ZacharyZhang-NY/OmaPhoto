@@ -28,11 +28,11 @@ inline QImage preview(const BrushStroke &stroke, QSizeF canvas)
     QPainter painter(&context);
     const ImageLayer &layer = stroke.layer;
     const std::optional<ImportedImage> &asset = layer.asset;
-    const QImage image = asset && !asset->raster ? asset->image() : QImage();
+    const QImage image = asset && !asset.value().raster ? asset.value().image() : QImage();
     LayerRenderer::drawBrushPreview(image, stroke.paintTransform, stroke.paintTransform.center(), painter,
-                                    {.opacity = layer.opacity, .blendMode = layer.blendMode, .mask = layer.mask ? layer.mask->enabledImage().value_or(QImage()) : QImage()},
+                                    {.opacity = layer.opacity, .blendMode = layer.blendMode, .mask = layer.mask ? layer.mask.value().enabledImage().value_or(QImage()) : QImage()},
                                     {.patches = stroke.patches(), .pixelWidth = stroke.width, .pixelHeight = stroke.height, .paintingMask = stroke.isMask,
-                                     .sourceRect = stroke.sourceRect, .raster = asset ? asset->raster : nullptr});
+                                     .sourceRect = stroke.sourceRect, .raster = asset ? asset.value().raster : nullptr});
     painter.end();
     return context;
 }

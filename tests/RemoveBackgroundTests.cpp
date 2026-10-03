@@ -75,12 +75,12 @@ void RemoveBackgroundTests::thePreviewClearsTheBackgroundAndTheCommitMasksIt()
     const FilterEdit &edit = session->filterEdit().value();
     QVERIFY(edit.previewSource.size() == QSize(400, 300) && !edit.previewError);
     const QImage preview = edit.previewImage(id).value();
-    QVERIFY(preview.pixelColor(0, 0).alpha() == 0 && preview.pixelColor(200, 150) == before.asset->image().pixelColor(200, 150));
+    QVERIFY(preview.pixelColor(0, 0).alpha() == 0 && preview.pixelColor(200, 150) == before.asset.value().image().pixelColor(200, 150));
     const int steps = session->history.undoCount();
     QVERIFY(committed(*session));
     // The pixels stay; a mask hides the background instead.
     const ImageLayer after = layerWith(*session, id);
-    QVERIFY(after.asset->identity() == before.asset->identity() && after.transform == before.transform);
+    QVERIFY(after.asset.value().identity() == before.asset.value().identity() && after.transform == before.transform);
     const LayerMask &mask = after.mask.value();
     QVERIFY(mask.isEnabled && !mask.placement && mask.isLinked);
     QVERIFY(mask.asset.image().format() == QImage::Format_Grayscale8 && mask.asset.size() == QSize(400, 300));

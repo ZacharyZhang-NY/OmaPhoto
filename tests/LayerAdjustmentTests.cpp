@@ -132,14 +132,14 @@ void LayerAdjustmentTests::validityFollowsSwiftsBounds()
         QCOMPARE((LayerAdjustment{.kind = AdjustmentKind::hsv, .hue = hue, .saturation = saturation, .lightness = lightness}.isValid()), valid);
     // Each range's values too, and every band's handles finite.
     LayerAdjustment ranged = full();
-    ranged.hsvSettings->adjustments[ColorRange::blues] = {0, 0, 101};
+    ranged.hsvSettings.value().adjustments[ColorRange::blues] = {0, 0, 101};
     QVERIFY(!ranged.isValid());
     ranged = full();
-    ranged.hsvSettings->bands[ColorRange::cyans].falloffEnd = std::numeric_limits<double>::infinity();
+    ranged.hsvSettings.value().bands[ColorRange::cyans].falloffEnd = std::numeric_limits<double>::infinity();
     QVERIFY(!ranged.isValid());
     // The legacy fields count only when no range settings exist.
     ranged = full();
-    ranged.hsvSettings->adjustments[ColorRange::reds] = {-360, -100, -100};
+    ranged.hsvSettings.value().adjustments[ColorRange::reds] = {-360, -100, -100};
     QVERIFY(ranged.isValid());
     // Levels as normalized, then every kind's own rules.
     LayerAdjustment levels{AdjustmentKind::hsv};
@@ -308,7 +308,7 @@ void LayerAdjustmentTests::theStoreKeepsAdjustmentsToVersion7WithoutPixels()
     blank.isGroup = true;
     QCOMPARE(stored(snapshot), ProjectError::Kind::invalid);
     blank.isGroup = std::nullopt;
-    blank.adjustment->hue = 400;
+    blank.adjustment.value().hue = 400;
     QCOMPARE(stored(snapshot), ProjectError::Kind::invalid);
 }
 
@@ -440,7 +440,7 @@ void LayerAdjustmentTests::adjustmentsTravelWithTheirLayers()
     session->duplicateActiveLayer();
     QVERIFY(session->activeLayer().value().adjustment == full());
     ImageLayer changed = session->activeLayer().value();
-    changed.adjustment->hue = 11;
+    changed.adjustment.value().hue = 11;
     QVERIFY(!(changed == session->activeLayer().value()));
 }
 

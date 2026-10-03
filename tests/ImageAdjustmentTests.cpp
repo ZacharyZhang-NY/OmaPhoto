@@ -244,7 +244,7 @@ void ImageAdjustmentTests::newAdjustmentLayersStartFromThePaletteRenderAndEditIn
     session.setAdjustmentEditingID(std::nullopt);
     session.addAdjustment(AdjustmentKind::grain);
     const std::vector<ImageLayer> &layers = session.document().value().layers;
-    QCOMPARE(std::count_if(layers.begin(), layers.end(), [](const ImageLayer &layer) { return layer.adjustment && layer.adjustment->kind == AdjustmentKind::grain; }), 2);
+    QCOMPARE(std::count_if(layers.begin(), layers.end(), [](const ImageLayer &layer) { return layer.adjustment && layer.adjustment.value().kind == AdjustmentKind::grain; }), 2);
     QVERIFY2(session.activeLayer().value().adjustment.value().grain().seed != first, "each Grain layer gets its own pattern");
     QVERIFY(std::find(allAdjustmentKinds.begin(), allAdjustmentKinds.end(), AdjustmentKind::exposure) != allAdjustmentKinds.end()
             && filterKind(AdjustmentKind::exposure) == FilterKind::exposure);

@@ -60,11 +60,11 @@ void LayerEffectsRendererTests::theMarginHoldsWhatReachesOut()
     LayerEffects cast = stroke(10);
     cast.shadow = ShadowEffect{.distance = 5, .blur = 2.5};
     QCOMPARE(LayerEffectsRenderer::margin(cast), 15.0);
-    cast.shadow->blur = 4;
+    cast.shadow.value().blur = 4;
     QCOMPARE(LayerEffectsRenderer::margin(cast), 19.0);
     // Switched off, it takes no room.
-    cast.shadow->enabled = false;
-    cast.stroke->enabled = false;
+    cast.shadow.value().enabled = false;
+    cast.stroke.value().enabled = false;
     QCOMPARE(LayerEffectsRenderer::margin(cast), 2.0);
 }
 
@@ -113,11 +113,11 @@ void LayerEffectsRendererTests::renderingPadsMasksThenRunsTheKernel()
     QVERIFY(pixel(soft, 2, 10)[3] == 0 && pixel(soft, 65, 10)[3] == 255);
     // Switched-off effects are none; invalid or vast ones refuse.
     LayerEffects hidden = stroke(3);
-    hidden.stroke->enabled = false;
+    hidden.stroke.value().enabled = false;
     QCOMPARE(LayerEffectsRenderer::render(image, std::nullopt, hidden).image.size(), QSize(24, 14));
     // A switched-off effect is not judged.
     LayerEffects wild = stroke(600);
-    wild.stroke->enabled = false;
+    wild.stroke.value().enabled = false;
     QVERIFY(LayerEffectsRenderer::render(image, std::nullopt, wild).image == LayerEffectsRenderer::render(image, std::nullopt, hidden).image);
     try {
         LayerEffectsRenderer::render(image, std::nullopt, stroke(501));
@@ -142,7 +142,7 @@ void LayerEffectsRendererTests::theCacheKeepsEightWithinItsBudget()
     QVERIFY(!LayerEffectsRenderer::cached(image, std::nullopt, std::nullopt));
     QVERIFY(!LayerEffectsRenderer::cached(image, std::nullopt, LayerEffects()));
     LayerEffects hidden = stroke(2);
-    hidden.stroke->enabled = false;
+    hidden.stroke.value().enabled = false;
     QVERIFY(!LayerEffectsRenderer::cached(image, std::nullopt, hidden));
     QVERIFY(!LayerEffectsRenderer::cached(image, std::nullopt, stroke(600)));
     // The same pixels, mask and effects: the same result.

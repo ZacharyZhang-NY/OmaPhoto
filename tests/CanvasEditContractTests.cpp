@@ -151,7 +151,7 @@ void CanvasEditContractTests::aGradientThatCannotFillCancels()
     scene.session.selectTool(NavigationTool::gradient);
     scene.session.beginGradient(QPointF(10, 30));
     QVERIFY(scene.session.gradientEdit());
-    scene.session.gradientEdit()->raster->pixelLimit = 100;
+    scene.session.gradientEdit().value().raster->pixelLimit = 100;
     scene.session.moveGradient(std::nullopt, QPointF(70, 30));
     QVERIFY(!scene.session.gradientEdit() && scene.session.brushError().has_value());
     QCOMPARE(scene.session.history.undoCount(), count);

@@ -149,7 +149,7 @@ inline QByteArray engine(const TypeBlock &block)
     return "<<\n/EngineDict\n<<\n/Editor\n<<\n/Text " + parenthesized(block.engineText.value_or(block.text)) + "\n>>\n/ParagraphRun\n<<\n/RunArray\n[\n<<\n"
         + "/ParagraphSheet\n<<\n/Properties\n<<\n/Justification " + block.justification + "\n>>\n>>\n>>\n]\n>>\n"
         + "/StyleRun\n<<\n/RunArray\n[\n" + runs + "\n]\n>>\n>>\n/ResourceDict\n<<\n/FontSet\n[\n<<\n/Name " + parenthesized(block.font)
-        + "\n>>\n" + (block.secondFont ? "<<\n/Name " + parenthesized(*block.secondFont) + "\n>>\n" : QByteArray()) + "]\n>>\n>>";
+        + "\n>>\n" + (block.secondFont ? "<<\n/Name " + parenthesized(block.secondFont.value()) + "\n>>\n" : QByteArray()) + "]\n>>\n>>";
 }
 
 inline QByteArray tySh(const TypeBlock &block)
@@ -164,9 +164,9 @@ inline QByteArray tySh(const TypeBlock &block)
         items.emplace_back(block.wordsKey, textItem(block.text));
     items.emplace_back("Ornt", enumItem("Ornt", block.vertical ? "Vrtc" : "Hrzn"));
     if (block.bounds)
-        items.emplace_back("bounds", rectItem(*block.bounds));
+        items.emplace_back("bounds", rectItem(block.bounds.value()));
     if (block.glyphBounds)
-        items.emplace_back("boundingBox", rectItem(*block.glyphBounds));
+        items.emplace_back("boundingBox", rectItem(block.glyphBounds.value()));
     if (block.withEngine)
         items.emplace_back("EngineData", rawItem(engine(block)));
     descriptor(data, "TxLr", items);

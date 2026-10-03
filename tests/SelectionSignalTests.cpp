@@ -53,7 +53,11 @@ void SelectionSignalTests::selectionCallsAnnounceAndRefuseInSilence()
     QVERIFY(session->selection().has_value());
     QVERIFY(announced([&] { session->selectAll(); }));
     QVERIFY(!announced([&] { session->selectAll(); }));
+    // Inverse of everything leaves nothing to deselect.
     QVERIFY(announced([&] { session->invertSelection(); }));
+    QVERIFY(!session->selection().has_value());
+    QVERIFY(!announced([&] { session->deselect(); }));
+    QVERIFY(announced([&] { session->selectAll(); }));
     QVERIFY(announced([&] { session->deselect(); }));
     QVERIFY(announced([&] { session->toggleMarqueeKind(); }));
     QVERIFY(announced([&] { session->toggleLassoKind(); }));

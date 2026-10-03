@@ -320,7 +320,7 @@ void ShapeLayerTests::aProjectKeepsLiveShapesOnly()
     // Swift's keys; a rectangle writes no line fields.
     QCOMPARE(firstShape(snapshot, 1).keys(), (QStringList{"blue", "cornerRadius", "green", "kind", "red"}));
     QCOMPARE(firstShape(snapshot, 1).value("kind").toString(), QString("Rectangle"));
-    QCOMPARE(firstShape(snapshot, 2).value("start").toArray(), (QJsonArray{line.start->x(), line.start->y()}));
+    QCOMPARE(firstShape(snapshot, 2).value("start").toArray(), (QJsonArray{line.start.value().x(), line.start.value().y()}));
     QCOMPARE(firstShape(snapshot, 2).value("lineWidth").toDouble(), 3.0);
     const ProjectManifest decoded = ProjectManifest::decoded(snapshot.manifest.encoded());
     QCOMPARE(decoded.layers[1].shape, snapshot.manifest.layers[1].shape);

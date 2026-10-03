@@ -284,6 +284,11 @@ void NativeResolutionPaintTests::layersPanelSaysHowFarALayerIsScaled()
     QCOMPARE(sizeLabel(layer), QString("500 × 300 px · 50%"));
     layer.transform.size = QSizeF(2333, 2000);
     QCOMPARE(sizeLabel(layer), QString("2333 × 2000 px · 233.3%"));
+    // Exact ties go to the even tenth.
+    layer.transform.size = QSizeF(1062.5, 300);
+    QCOMPARE(sizeLabel(layer), QString("1063 × 300 px · 106.2%"));
+    layer.transform.size = QSizeF(1187.5, 300);
+    QCOMPARE(sizeLabel(layer), QString("1188 × 300 px · 118.8%"));
     // A blank layer has no pixels to measure against.
     QCOMPARE(sizeLabel(ImageLayer(QStringLiteral("Blank"), QSizeF(30, 20))), QString("30 × 20 px"));
     // The row shows it.

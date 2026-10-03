@@ -83,7 +83,7 @@ void LayerEffectsSessionTests::addingAnEffectTakesItsDefaultsAndOpensItsPanel()
     present.shadow = ShadowEffect{.distance = 33};
     session.setEffects(present);
     session.addEffect(LayerEffectKind::shadow);
-    QVERIFY(two.effects(two.top).value().shadow->distance == 33);
+    QVERIFY(two.effects(two.top).value().shadow.value().distance == 33);
     session.finishEffectsEditing(true);
     const int kept = session.history.undoCount();
     session.addEffect(LayerEffectKind::colorOverlay);
@@ -128,15 +128,15 @@ void LayerEffectsSessionTests::cancelPutsBackThisPanelsEffectAlone()
     session.setEffects(start);
     session.selectEffect(LayerEffectKind::stroke, two.top, true);
     QVERIFY(session.effectsEditingOriginal() == start);
-    session.changeEffects([](LayerEffects &effects) { effects.stroke->size = 9; });
+    session.changeEffects([](LayerEffects &effects) { effects.stroke.value().size = 9; });
     QCOMPARE(session.history.undoName(), QString("Edit Stroke"));
     // Another effect changed meanwhile keeps its change.
     LayerEffects other = two.effects(two.top).value();
-    other.shadow->distance = 30;
+    other.shadow.value().distance = 30;
     session.setEffects(other);
     session.finishEffectsEditing(false);
     const LayerEffects after = two.effects(two.top).value();
-    QVERIFY(after.stroke->size == 3 && after.shadow->distance == 30);
+    QVERIFY(after.stroke.value().size == 3 && after.shadow.value().distance == 30);
     QCOMPARE(session.history.undoName(), QString("Cancel Stroke"));
     QVERIFY(!session.effectsEditing() && !session.effectsEditingOriginal());
     // The chosen effect stays chosen while its layer shows it.
@@ -147,26 +147,26 @@ void LayerEffectsSessionTests::cancelPutsBackThisPanelsEffectAlone()
     QVERIFY(!two.effects(two.top).value().innerShadow);
     QVERIFY(!session.effectSelection());
     session.selectEffect(LayerEffectKind::shadow, two.top, true);
-    session.changeEffects([](LayerEffects &effects) { effects.shadow->blur = 2; });
+    session.changeEffects([](LayerEffects &effects) { effects.shadow.value().blur = 2; });
     const int steps = session.history.undoCount();
     session.finishEffectsEditing(true);
-    QVERIFY(session.history.undoCount() == steps && two.effects(two.top).value().shadow->blur == 2);
+    QVERIFY(session.history.undoCount() == steps && two.effects(two.top).value().shadow.value().blur == 2);
     // Nothing open, nothing to finish.
     session.finishEffectsEditing(false);
     QCOMPARE(session.history.undoCount(), steps);
     // Opening another panel cancels the open one's changes.
     session.selectEffect(LayerEffectKind::stroke, two.top, true);
-    session.changeEffects([](LayerEffects &effects) { effects.stroke->size = 40; });
+    session.changeEffects([](LayerEffects &effects) { effects.stroke.value().size = 40; });
     session.selectEffect(LayerEffectKind::shadow, two.top, true);
-    QVERIFY(two.effects(two.top).value().stroke->size == 3 && session.history.undoName() == QString("Cancel Stroke"));
+    QVERIFY(two.effects(two.top).value().stroke.value().size == 3 && session.history.undoName() == QString("Cancel Stroke"));
     session.finishEffectsEditing(true);
     // An overlay's Cancel puts back the overlay alone.
     session.addEffect(LayerEffectKind::colorOverlay);
     session.finishEffectsEditing(true);
     session.selectEffect(LayerEffectKind::colorOverlay, two.top, true);
-    session.changeEffects([](LayerEffects &effects) { effects.colorOverlay->opacity = 0.25; });
+    session.changeEffects([](LayerEffects &effects) { effects.colorOverlay.value().opacity = 0.25; });
     session.finishEffectsEditing(false);
-    QCOMPARE(two.effects(two.top).value().colorOverlay->opacity, 1.0);
+    QCOMPARE(two.effects(two.top).value().colorOverlay.value().opacity, 1.0);
     // Its layer's effects all gone, Cancel has nothing to restore.
     session.selectEffect(LayerEffectKind::shadow, two.top, true);
     session.setEffects(LayerEffects(), two.top);
@@ -195,7 +195,7 @@ void LayerEffectsSessionTests::setEffectsIsOneStepOnAValidChange()
     // The same again, an invalid one, a missing layer: nothing.
     session.setEffects(effects, two.bottom);
     LayerEffects wild = effects;
-    wild.stroke->size = 501;
+    wild.stroke.value().size = 501;
     session.setEffects(wild, two.bottom);
     session.setEffects(effects, QUuid::createUuid());
     QCOMPARE(session.history.undoCount(), steps + 1);
@@ -220,18 +220,18 @@ void LayerEffectsSessionTests::panelEditsStayWithTheirLayer()
     EditorSession &session = two.session;
     session.addEffect(LayerEffectKind::stroke);
     session.selectLayer(two.bottom);
-    session.changeEffects([](LayerEffects &effects) { effects.stroke->size = 12; });
-    QVERIFY(two.effects(two.top).value().stroke->size == 12 && !two.effects(two.bottom));
+    session.changeEffects([](LayerEffects &effects) { effects.stroke.value().size = 12; });
+    QVERIFY(two.effects(two.top).value().stroke.value().size == 12 && !two.effects(two.bottom));
     // Once its effect is gone, edits have nowhere to go.
     LayerEffects without = two.effects(two.top).value();
     without.stroke.reset();
     without.shadow = ShadowEffect();
     session.setEffects(without, two.top);
     const int steps = session.history.undoCount();
-    session.changeEffects([](LayerEffects &effects) { effects.shadow->blur = 1; });
+    session.changeEffects([](LayerEffects &effects) { effects.shadow.value().blur = 1; });
     QCOMPARE(session.history.undoCount(), steps);
     session.finishEffectsEditing(true);
-    session.changeEffects([](LayerEffects &effects) { effects.shadow->blur = 1; });
+    session.changeEffects([](LayerEffects &effects) { effects.shadow.value().blur = 1; });
     QCOMPARE(session.history.undoCount(), steps);
 }
 
@@ -251,7 +251,7 @@ void LayerEffectsSessionTests::copyingAnEffectClosesTheTargetsPanelFirst()
     target.stroke = StrokeEffect();
     session.setEffects(target, two.bottom);
     session.selectEffect(LayerEffectKind::shadow, two.bottom, true);
-    session.changeEffects([](LayerEffects &effects) { effects.shadow->blur = 7; });
+    session.changeEffects([](LayerEffects &effects) { effects.shadow.value().blur = 7; });
     session.copyEffect(LayerEffectKind::shadow, two.top, two.bottom);
     QCOMPARE(session.history.undoName(), QString("Copy Drop Shadow"));
     QVERIFY(!session.effectsEditing() && two.effects(two.bottom).value().shadow == source.shadow);
@@ -259,7 +259,7 @@ void LayerEffectsSessionTests::copyingAnEffectClosesTheTargetsPanelFirst()
     QVERIFY(session.effectSelection() == (LayerEffectSelection{two.bottom, LayerEffectKind::shadow}) && session.activeLayerID() == two.bottom);
     // The open edit was kept: one undo brings it back.
     session.undo();
-    QVERIFY(two.effects(two.bottom).value().shadow->blur == 7);
+    QVERIFY(two.effects(two.bottom).value().shadow.value().blur == 7);
     session.redo();
     // No source, a blank or folder target, busy: no copy.
     QVERIFY(!session.canCopyEffect(LayerEffectKind::shadow, QUuid::createUuid(), two.bottom));
@@ -278,9 +278,9 @@ void LayerEffectsSessionTests::togglingAndRemovingAnEffect()
     session.addEffect(LayerEffectKind::stroke);
     session.finishEffectsEditing(true);
     session.toggleEffect(LayerEffectKind::stroke, two.top);
-    QVERIFY(two.effects(two.top).value().stroke->enabled == false && session.history.undoName() == QString("Hide Stroke"));
+    QVERIFY(two.effects(two.top).value().stroke.value().enabled == false && session.history.undoName() == QString("Hide Stroke"));
     session.toggleEffect(LayerEffectKind::stroke, two.top);
-    QVERIFY(two.effects(two.top).value().stroke->enabled == true && session.history.undoName() == QString("Show Stroke"));
+    QVERIFY(two.effects(two.top).value().stroke.value().enabled == true && session.history.undoName() == QString("Show Stroke"));
     // Toggling a missing effect, or none at all, does nothing.
     const int steps = session.history.undoCount();
     session.toggleEffect(LayerEffectKind::shadow, two.top);
@@ -381,7 +381,7 @@ void LayerEffectsSessionTests::thePickerEditsTheOpenEffect()
     QVERIFY(session.colorPicker());
     const int steps = session.history.undoCount();
     session.previewEffectColor();
-    QVERIFY(session.history.undoCount() == steps && two.effects(two.top).value().stroke->red == 1);
+    QVERIFY(session.history.undoCount() == steps && two.effects(two.top).value().stroke.value().red == 1);
     session.openEffectColorPicker(LayerEffectKind::shadow);
     QVERIFY(session.colorPicker().value().target.kind == ColorPickerTarget::Kind::palette);
     session.closeColorPicker(false);
@@ -408,7 +408,7 @@ void LayerEffectsSessionTests::thePickerEditsTheOpenEffect()
     session.setColorPickerHSB(PickerHSB(PaletteColor{1, 1, 0}));
     session.previewEffectColor();
     session.addEffect(LayerEffectKind::stroke);
-    QVERIFY(!session.colorPicker() && two.effects(two.top).value().shadow->color() == PaletteColor::black());
+    QVERIFY(!session.colorPicker() && two.effects(two.top).value().shadow.value().color() == PaletteColor::black());
 }
 
 void LayerEffectsSessionTests::everyChangeIsAnnouncedLast()
@@ -424,7 +424,7 @@ void LayerEffectsSessionTests::everyChangeIsAnnouncedLast()
         return seen == left ? QString() : seen.join("; ") + " != " + left.join("; ");
     };
     QCOMPARE(stale([&] { session.addEffect(LayerEffectKind::stroke); }), QString());
-    QCOMPARE(stale([&] { session.changeEffects([](LayerEffects &effects) { effects.stroke->size = 6; }); }), QString());
+    QCOMPARE(stale([&] { session.changeEffects([](LayerEffects &effects) { effects.stroke.value().size = 6; }); }), QString());
     QCOMPARE(stale([&] { session.openEffectColorPicker(LayerEffectKind::stroke); }), QString());
     QCOMPARE(stale([&] { session.setColorPickerHSB(PickerHSB(PaletteColor{1, 0, 0})); }), QString());
     QCOMPARE(stale([&] { session.previewEffectColor(); }), QString());

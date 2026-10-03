@@ -19,7 +19,7 @@ struct Shown {
     explicit Shown(std::optional<QSize> document = QSize(100, 100), QSize size = QSize(400, 300)) : canvas(new CanvasView(session, &window))
     {
         if (document)
-            session.createDocument(document->width(), document->height());
+            session.createDocument(document.value().width(), document.value().height());
         window.resize(size);
         canvas->setGeometry(QRect(QPoint(0, 0), size));
         window.show();

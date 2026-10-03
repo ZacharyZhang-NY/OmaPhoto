@@ -118,16 +118,16 @@ void LayerEffectsTests::validityFollowsSwiftsBounds()
     QVERIFY(!InnerShadowEffect{.angle = -360.5}.isValid() && !InnerShadowEffect{.distance = -1}.isValid() && !InnerShadowEffect{.blur = notANumber}.isValid());
     // One bad effect spoils the set.
     LayerEffects effects = every();
-    effects.innerShadow->blur = infinity;
+    effects.innerShadow.value().blur = infinity;
     QVERIFY(!effects.isValid());
     effects = every();
-    effects.stroke->size = 501;
+    effects.stroke.value().size = 501;
     QVERIFY(!effects.isValid());
     effects = every();
-    effects.shadow->distance = -1;
+    effects.shadow.value().distance = -1;
     QVERIFY(!effects.isValid());
     effects = every();
-    effects.colorOverlay->opacity = 2;
+    effects.colorOverlay.value().opacity = 2;
     QVERIFY(!effects.isValid());
 }
 
@@ -163,7 +163,7 @@ void LayerEffectsTests::theHelpersReadAndWriteOneKind()
     effects.setEnabled(true, LayerEffectKind::stroke);
     effects.setEnabled(false, LayerEffectKind::innerShadow);
     effects.setEnabled(true, LayerEffectKind::shadow);
-    QVERIFY(effects.stroke->enabled == true && effects.innerShadow->enabled == false && !effects.shadow);
+    QVERIFY(effects.stroke.value().enabled == true && effects.innerShadow.value().enabled == false && !effects.shadow);
     // Visible keeps what is switched on.
     const LayerEffects shown = effects.visible();
     QVERIFY(shown.stroke == effects.stroke && !shown.innerShadow && !shown.shadow && !shown.colorOverlay);

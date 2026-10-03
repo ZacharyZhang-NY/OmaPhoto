@@ -48,8 +48,8 @@ void HistoryTests::undoAndRedoReturnTheRecordedSnapshots()
     DocumentHistory history;
     const std::optional<CanvasDocument> before = documentNamed("Before");
     std::optional<CanvasDocument> after = before;
-    after->layers[0].name = "After";
-    const QUuid selection = before->layers[0].id;
+    after.value().layers[0].name = "After";
+    const QUuid selection = before.value().layers[0].id;
     history.begin("Rename Layer", before, std::nullopt);
     history.end(after, selection);
     QCOMPARE(history.undoCount(), 1);
@@ -96,9 +96,9 @@ void HistoryTests::nestedTransactionsRecordOneEntry()
     history.redo();
     history.begin("Layer Setup", start, std::nullopt);
     QVERIFY(!history.canUndo());
-    edited->layers[0].name = "B";
+    edited.value().layers[0].name = "B";
     history.begin("Inner", edited, std::nullopt);
-    edited->layers[0].name = "C";
+    edited.value().layers[0].name = "C";
     history.end(edited, std::nullopt);
     QCOMPARE(history.undoCount(), 1);
     QVERIFY(!history.canUndo());
@@ -114,12 +114,12 @@ void HistoryTests::noOpEditsPreserveRedo()
     DocumentHistory history;
     const std::optional<CanvasDocument> start = documentNamed("A");
     std::optional<CanvasDocument> renamed = start;
-    renamed->layers[0].name = "B";
+    renamed.value().layers[0].name = "B";
     history.begin("Rename Layer", start, std::nullopt);
     history.end(renamed, std::nullopt);
     history.undo();
     history.begin("Rename Layer", start, std::nullopt);
-    history.end(start, start->layers[0].id);
+    history.end(start, start.value().layers[0].id);
     QCOMPARE(history.undoCount(), 0);
     QVERIFY(history.canRedo());
     QVERIFY(!history.isModified());
@@ -203,16 +203,16 @@ void HistoryTests::historyBoundsEntriesAndUniqueRetainedPixels()
 {
     DocumentHistory history(2, 0);
     std::optional<CanvasDocument> doc = CanvasDocument(64, 32);
-    doc->layers.push_back(ImageLayer(asset(64, 32, "fixture"), QPointF(0, 0)));
+    doc.value().layers.push_back(ImageLayer(asset(64, 32, "fixture"), QPointF(0, 0)));
     for (const QString name : {"A", "B", "C"}) {
-        history.begin("Rename", doc, doc->layers[0].id);
-        doc->layers[0].name = name;
-        history.end(doc, doc->layers[0].id);
+        history.begin("Rename", doc, doc.value().layers[0].id);
+        doc.value().layers[0].name = name;
+        history.end(doc, doc.value().layers[0].id);
     }
     QCOMPARE(history.undoCount(), 2);
     QCOMPARE(history.retainedBytes(doc), 0);
-    history.begin("Delete", doc, doc->layers[0].id);
-    doc->layers.clear();
+    history.begin("Delete", doc, doc.value().layers[0].id);
+    doc.value().layers.clear();
     history.end(doc, std::nullopt);
     QCOMPARE(history.undoCount(), 0);
     QCOMPARE(history.retainedBytes(doc), 0);
@@ -222,15 +222,15 @@ void HistoryTests::retainedBytesCountEachHistoryOnlyImageOnce()
 {
     DocumentHistory history;
     std::optional<CanvasDocument> doc = CanvasDocument(64, 32);
-    doc->layers.push_back(ImageLayer(asset(10, 10, "old"), QPointF(0, 0)));
+    doc.value().layers.push_back(ImageLayer(asset(10, 10, "old"), QPointF(0, 0)));
     for (const QString name : {"A", "B"}) {
         history.begin("Rename", doc, std::nullopt);
-        doc->layers[0].name = name;
+        doc.value().layers[0].name = name;
         history.end(doc, std::nullopt);
     }
     QCOMPARE(history.retainedBytes(doc), 0);
     history.begin("Replace", doc, std::nullopt);
-    doc->layers[0].asset = asset(20, 10, "new");
+    doc.value().layers[0].asset = asset(20, 10, "new");
     history.end(doc, std::nullopt);
     const qint64 oldBytes = 10 * 10 * 4 + 8 * 8 * 4;
     QCOMPARE(history.retainedBytes(doc), oldBytes);
@@ -242,13 +242,13 @@ void HistoryTests::byteLimitDropsTheOldestPastEntryFirst()
     const qint64 small = 10 * 10 * 4 + 8 * 8 * 4;
     DocumentHistory history(100, small);
     std::optional<CanvasDocument> doc = CanvasDocument(64, 32);
-    doc->layers.push_back(ImageLayer(asset(10, 10, "x"), QPointF(0, 0)));
+    doc.value().layers.push_back(ImageLayer(asset(10, 10, "x"), QPointF(0, 0)));
     history.begin("First", doc, std::nullopt);
-    doc->layers[0].asset = asset(10, 10, "y");
+    doc.value().layers[0].asset = asset(10, 10, "y");
     history.end(doc, std::nullopt);
     QCOMPARE(history.undoCount(), 1);
     history.begin("Second", doc, std::nullopt);
-    doc->layers[0].asset = asset(10, 10, "z");
+    doc.value().layers[0].asset = asset(10, 10, "z");
     history.end(doc, std::nullopt);
     QCOMPARE(history.undoCount(), 1);
     QCOMPARE(history.undoName(), QString("Second"));
@@ -260,10 +260,10 @@ void HistoryTests::undoTrimsRedoWhenItsPixelsExceedTheLimit()
     const qint64 small = 10 * 10 * 4 + 8 * 8 * 4;
     DocumentHistory history(100, small);
     std::optional<CanvasDocument> doc = CanvasDocument(64, 32);
-    doc->layers.push_back(ImageLayer(asset(10, 10, "small"), QPointF(0, 0)));
+    doc.value().layers.push_back(ImageLayer(asset(10, 10, "small"), QPointF(0, 0)));
     const std::optional<CanvasDocument> before = doc;
     history.begin("Enlarge", doc, std::nullopt);
-    doc->layers[0].asset = asset(40, 40, "large");
+    doc.value().layers[0].asset = asset(40, 40, "large");
     history.end(doc, std::nullopt);
     QCOMPARE(history.undoCount(), 1);
     const DocumentHistory::Snapshot undone = history.undo().value();
@@ -277,12 +277,12 @@ void HistoryTests::undoTrimsThePastBeforeTheRedoStack()
     const qint64 small = 10 * 10 * 4 + 8 * 8 * 4;
     DocumentHistory history(100, 2 * small);
     std::optional<CanvasDocument> doc = CanvasDocument(64, 32);
-    doc->layers.push_back(ImageLayer(asset(10, 10, "a"), QPointF(0, 0)));
+    doc.value().layers.push_back(ImageLayer(asset(10, 10, "a"), QPointF(0, 0)));
     history.begin("First", doc, std::nullopt);
-    doc->layers[0].asset = asset(10, 10, "b");
+    doc.value().layers[0].asset = asset(10, 10, "b");
     history.end(doc, std::nullopt);
     history.begin("Second", doc, std::nullopt);
-    doc->layers[0].asset = asset(15, 15, "c");
+    doc.value().layers[0].asset = asset(15, 15, "c");
     history.end(doc, std::nullopt);
     QCOMPARE(history.undoCount(), 2);
     history.undo();

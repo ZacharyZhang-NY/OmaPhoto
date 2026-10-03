@@ -176,7 +176,7 @@ void SelectionFeatherTests::aMaskFromAFeatheredSelectionFades()
     EditorSession session;
     session.createDocument(60, 20, true);
     session.setSelection(DocumentSelection{rectPath(QRectF(20, 0, 20, 20)), true, 6}, "probe");
-    session.addMask(false);
+    session.addMask(true);
     const QImage mask = session.activeLayer().value().mask.value().asset.image();
     QCOMPARE(mask, session.document().value().layers.back().mask.value().asset.image());
     QVERIFY2(fading(mask, 10, 0, 1) >= 4, "the mask has a hard edge");
