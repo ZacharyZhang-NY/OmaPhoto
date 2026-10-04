@@ -55,7 +55,7 @@ std::optional<BrushStroke::Clone> EditorSession::blurSample(const BrushStroke &s
     const double margin = std::ceil(3 * sigma);
     const QRectF region = stroke.sourceRect.adjusted(-margin, -margin, margin, margin);
     // A huge layer's sample is made coarser, within several canvases.
-    const qint64 canvas = m_document ? qint64(m_document->width) * m_document->height : 0;
+    const qint64 canvas = qint64(m_document.value().width) * m_document.value().height;
     const double budget = double(std::min(DocumentLimits::maxSurfacePixels, std::max<qint64>(16'000'000, 4 * canvas)));
     const double fit = std::min(1.0, std::sqrt(budget / (region.width() * region.height())));
     const int width = std::max(1, int(std::ceil(region.width() * fit))), height = std::max(1, int(std::ceil(region.height() * fit)));
@@ -63,8 +63,8 @@ std::optional<BrushStroke::Clone> EditorSession::blurSample(const BrushStroke &s
     try {
         QImage context = BrushRaster::context(width, height, stroke.isMask);
         // Past its pixels a mask keeps its edge tone.
-        if (stroke.isMask && layer.mask)
-            context.fill(int(std::round(LayerMask::background(layer.mask->asset.thumbnail) * 255)));
+        if (stroke.isMask)
+            context.fill(int(std::round(LayerMask::background(asset->thumbnail) * 255)));
         QPainter painter(&context);
         // A painted asset flattens here; the catch covers it too.
         BrushRaster::draw(asset->image(), placed, painter);

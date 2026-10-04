@@ -111,6 +111,18 @@ void WarpStrokeTests::aCommitKeepsATwentiethAndTheLastPoint()
     QCOMPARE(kept[6], stroke.points()[18]);
     // Two and a half from the previous, kept as last.
     QCOMPARE(kept.back(), QPointF(51, 10));
+    // Exactly the spacing apart is kept: a 40 brush.
+    WarpStroke even = warp(image, BlurToolMode::liquify, brush(40, 0.5, 0, 0, 0, 1));
+    even.append(QPointF(0, 10));
+    even.append(QPointF(10, 10));
+    QCOMPARE(even.committedPoints(), (std::vector<QPointF>{{1, 10}, {3, 10}, {5, 10}, {7, 10}, {9, 10}, {10, 10}}));
+    // A small brush still keeps points a pixel apart.
+    WarpStroke small = warp(image, BlurToolMode::liquify, brush(10, 0.5, 0, 0, 0, 1));
+    small.append(QPointF(0, 10));
+    small.append(QPointF(1.5, 10));
+    small.append(QPointF(3, 10));
+    QCOMPARE(small.points().size(), size_t(4));
+    QCOMPARE(small.committedPoints(), (std::vector<QPointF>{{0.75, 10}, {2.25, 10}, {3, 10}}));
 }
 
 QTEST_GUILESS_MAIN(WarpStrokeTests)
