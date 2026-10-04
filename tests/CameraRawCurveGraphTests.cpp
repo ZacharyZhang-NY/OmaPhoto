@@ -377,8 +377,12 @@ void CameraRawCurveGraphTests::aDoubleClickInTheStripMovesADivider()
     Graph graph;
     const int w = graph.graph->width(), h = graph.graph->height();
     graph.set([](CameraRawCurveSettings &curve) { curve.rgb = {{0, 0}, {0.5, 0.5}, {1, 1}}; });
-    // Both presses take the nearest divider there; no point goes.
-    QTest::mouseDClick(graph.graph->window()->windowHandle(), Qt::LeftButton, {}, graph.graph->mapTo(graph.graph->window(), QPoint(int(0.3 * w), h - 5)));
+    // The first press moves the divider; no point goes.
+    graph.press(QPoint(int(0.25 * w), h - 5));
+    graph.release(QPoint(int(0.25 * w), h - 5));
+    QVERIFY(std::abs(graph.curve().shadowSplit - 25) < 0.5);
+    // The second press, elsewhere, moves it again.
+    QTest::mouseDClick(graph.graph, Qt::LeftButton, {}, QPoint(int(0.3 * w), h - 5));
     QVERIFY(std::abs(graph.curve().shadowSplit - 30) < 0.5);
     QVERIFY(graph.curve().darkSplit == 50 && graph.curve().lightSplit == 75);
     QCOMPARE(graph.curve().rgb.size(), size_t(3));

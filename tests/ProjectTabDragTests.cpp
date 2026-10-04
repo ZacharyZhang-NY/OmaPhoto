@@ -71,6 +71,7 @@ private slots:
     void aBusyProjectHoldsTheOrder();
     void aTabClosedMidDragEndsIt();
     void aLostReleaseGivesWayToTheNextDrag();
+    void anotherTabPressedBeforeTheWatchMovesNothing();
     void tabsThatDoNotFitGatherInAMenu();
     void theMenuSwitchesAndPinsTheChosenTab();
     void aBusyProjectOpensNoMenu();
@@ -236,6 +237,30 @@ void ProjectTabDragTests::aLostReleaseGivesWayToTheNextDrag()
     QVERIFY(button(fixture.strip, "Untitled 3").x() == 0 && watch->isActive());
     fixture.release("Untitled 3", next - QPoint(5000, 0));
     QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled 3", "Untitled", "Untitled 2"}));
+}
+
+void ProjectTabDragTests::anotherTabPressedBeforeTheWatchMovesNothing()
+{
+    Strip fixture;
+    const QPoint first = fixture.press("Untitled");
+    fixture.move(first + QPoint(5000, 0));
+    const int held = button(fixture.strip, "Untitled").x();
+    QVERIFY(held > 100);
+    QDialog alert;
+    alert.setModal(true);
+    alert.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&alert));
+    fixture.release("Untitled", first + QPoint(5000, 0));
+    alert.close();
+    // Pressed before the watch looks: the first drag holds.
+    const QPoint next = fixture.press("Untitled 2");
+    fixture.move(next - QPoint(5000, 0));
+    QCOMPARE(button(fixture.strip, "Untitled").x(), held);
+    // Its release ends the first drag, which moved nothing.
+    fixture.release("Untitled 2", next - QPoint(5000, 0));
+    QTRY_VERIFY(settled(fixture.strip));
+    QCOMPARE(button(fixture.strip, "Untitled").x(), 0);
+    QCOMPARE(titles(fixture.workspace), (QStringList{"Untitled", "Untitled 2", "Untitled 3"}));
 }
 
 void ProjectTabDragTests::tabsThatDoNotFitGatherInAMenu()
